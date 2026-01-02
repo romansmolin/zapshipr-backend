@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1767012096166,
+      "tag": "0000_ambiguous_magma",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1767327672303,
+      "tag": "0001_furry_apocalypse",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1767331832829,
+      "tag": "0002_magenta_black_knight",
+      "breakpoints": true
+    }
+  ]
+}

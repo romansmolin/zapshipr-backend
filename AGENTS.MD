@@ -1,0 +1,69 @@
+# AGENTS.MD - ZapShipr Backend
+
+> 📚 **Документация разбита на отдельные файлы в директории `docs/`**
+
+## Быстрая навигация
+
+- **[01-overview.md](docs/01-overview.md)** — Обзор проекта и технологический стек
+- **[02-architecture.md](docs/02-architecture.md)** — Архитектура проекта и паттерны
+- **[03-modules.md](docs/03-modules.md)** — Описание всех модулей системы
+- **[04-database.md](docs/04-database.md)** — Работа с базой данных (Drizzle ORM)
+- **[05-queues-workers.md](docs/05-queues-workers.md)** — Очереди и воркеры (BullMQ)
+- **[06-media-processing.md](docs/06-media-processing.md)** — Медиа-обработка и загрузка
+- **[07-authentication.md](docs/07-authentication.md)** — Аутентификация (JWT, OAuth)
+- **[08-code-conventions.md](docs/08-code-conventions.md)** — Конвенции кода и стиль
+- **[09-guides.md](docs/09-guides.md)** — Руководства (создание модулей, добавление платформ)
+- **[10-environment.md](docs/10-environment.md)** — Переменные окружения и скрипты
+- **[11-best-practices.md](docs/11-best-practices.md)** — Важные замечания и лучшие практики
+
+## Краткое описание
+
+ZapShipr Backend — это серверная часть платформы для управления публикациями в социальных сетях. Система позволяет пользователям создавать посты и публиковать их одновременно на нескольких платформах: Facebook, Instagram, LinkedIn, X (Twitter), TikTok, YouTube, Pinterest, Bluesky и Threads.
+
+### Технологический стек
+
+- **Runtime**: Node.js с TypeScript
+- **Framework**: Express.js 5.x
+- **Database**: PostgreSQL с Drizzle ORM
+- **Queue System**: BullMQ с Redis
+- **Authentication**: JWT + Google OAuth
+- **Storage**: AWS S3
+- **Media Processing**: Sharp, fluent-ffmpeg
+
+### Ключевые особенности архитектуры
+
+- Модульная архитектура с четким разделением ответственности
+- Dependency Injection через конструкторы
+- Интерфейсы для всех сервисов и репозиториев
+- Factory Pattern для платформо-специфичных сервисов
+- Централизованная обработка ошибок
+- Типизированная работа с БД через Drizzle ORM
+
+Для получения подробной информации обратитесь к соответствующим разделам документации выше.
+
+## Landing the Plane (Session Completion)
+
+**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+
+**MANDATORY WORKFLOW:**
+
+1. **File issues for remaining work** - Create issues for anything that needs follow-up
+2. **Run quality gates** (if code changed) - Tests, linters, builds
+3. **Update issue status** - Close finished work, update in-progress items
+4. **PUSH TO REMOTE** - This is MANDATORY:
+   ```bash
+   git pull --rebase
+   bd sync
+   git push
+   git status  # MUST show "up to date with origin"
+   ```
+5. **Clean up** - Clear stashes, prune remote branches
+6. **Verify** - All changes committed AND pushed
+7. **Hand off** - Provide context for next session
+
+**CRITICAL RULES:**
+- Work is NOT complete until `git push` succeeds
+- NEVER stop before pushing - that leaves work stranded locally
+- NEVER say "ready to push when you are" - YOU must push
+- If push fails, resolve and retry until it succeeds
+Use 'bd' for task tracking

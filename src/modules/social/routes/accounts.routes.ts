@@ -1,0 +1,110 @@
+import type { Router } from 'express'
+import { Router as createRouter } from 'express'
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
+
+import { schema as dbSchema } from '@/db/schema'
+import { authMiddleware } from '@/middleware/auth.middleware'
+import { AccountRepository } from '@/modules/social/repositories/account.repository'
+import { AccountsController } from '@/modules/social/controllers/accounts.controller'
+import { AccountsService } from '@/modules/social/services/accounts.service'
+import { OAuthStateService } from '@/modules/social/services/oauth-state.service'
+import { SocilaMediaConnectorService } from '@/modules/social/services/social-media-connector.service'
+import { ConnectAccountUseCase } from '@/modules/social/use-cases/connect-account.use-case'
+import { DeleteAccountUseCase } from '@/modules/social/use-cases/delete-account.use-case'
+import { FindExpiringAccountsUseCase } from '@/modules/social/use-cases/find-expiring-accounts.use-case'
+import { GetAccountByIdUseCase } from '@/modules/social/use-cases/get-account-by-id.use-case'
+import { GetPinterestBoardsUseCase } from '@/modules/social/use-cases/get-pinterest-boards.use-case'
+import { ListAccountsUseCase } from '@/modules/social/use-cases/list-accounts.use-case'
+import { UpdateAccessTokenByIdUseCase } from '@/modules/social/use-cases/update-access-token-by-id.use-case'
+import { UpdateAccessTokenUseCase } from '@/modules/social/use-cases/update-access-token.use-case'
+import { asyncHandler } from '@/shared/http/async-handler'
+import { AxiosHttpClient } from '@/shared/http-client/axios-http-client'
+import type { ILogger } from '@/shared/logger/logger.interface'
+import { S3Uploader } from '@/shared/media-uploader/media-uploader'
+
+export const createAccountsRouter = (logger: ILogger, db: NodePgDatabase<typeof dbSchema>): Router => {
+    const router = createRouter()
+
+    const accountRepository = new AccountRepository(db, logger)
+    const mediaUploader = new S3Uploader(logger)
+    const apiClient = new AxiosHttpClient()
+
+    const connectAccountUseCase = new ConnectAccountUseCase(accountRepository, logger)
+    const listAccountsUseCase = new ListAccountsUseCase(accountRepository, logger)
+    const getAccountByIdUseCase = new GetAccountByIdUseCase(accountRepository, logger)
+    const deleteAccountUseCase = new DeleteAccountUseCase(accountRepository, logger, mediaUploader)
+    const getPinterestBoardsUseCase = new GetPinterestBoardsUseCase(accountRepository, logger)
+    const updateAccessTokenUseCase = new UpdateAccessTokenUseCase(accountRepository, logger)
+    const updateAccessTokenByIdUseCase = new UpdateAccessTokenByIdUseCase(accountRepository, logger)
+    const findExpiringAccountsUseCase = new FindExpiringAccountsUseCase(accountRepository, logger)
+
+    const accountsService = new AccountsService(
+        connectAccountUseCase,
+        listAccountsUseCase,
+        getAccountByIdUseCase,
+        deleteAccountUseCase,
+        getPinterestBoardsUseCase,
+        updateAccessTokenUseCase,
+        updateAccessTokenByIdUseCase,
+        findExpiringAccountsUseCase
+    )
+
+    const connectorService = new SocilaMediaConnectorService(
+        logger,
+        mediaUploader,
+        accountRepository,
+        apiClient,
+        accountsService
+    )
+
+    const oauthStateService = new OAuthStateService()
+    const accountsController = new AccountsController(accountsService, connectorService, logger, oauthStateService)
+
+    router.get(
+        '/facebook/authorize',
+        authMiddleware,
+        asyncHandler(accountsController.initiateOAuth.bind(accountsController))
+    )
+    router.get(
+        '/facebook/callback',
+        asyncHandler(accountsController.connectFacebookAccount.bind(accountsController))
+    )
+    router.get(
+        '/threads/callback',
+        asyncHandler(accountsController.connectThreadsAccount.bind(accountsController))
+    )
+    router.get('/tiktok/callback', asyncHandler(accountsController.connectTikTokAccount.bind(accountsController)))
+    router.get(
+        '/youtube/callback',
+        asyncHandler(accountsController.connectYouTubeAccount.bind(accountsController))
+    )
+    router.get('/x/callback', asyncHandler(accountsController.connectXAccount.bind(accountsController)))
+    router.get(
+        '/pinterest/callback',
+        asyncHandler(accountsController.connectPinterestAccount.bind(accountsController))
+    )
+    router.get(
+        '/instagram/callback',
+        asyncHandler(accountsController.connectInstagramAccount.bind(accountsController))
+    )
+    router.get(
+        '/linkedin/callback',
+        asyncHandler(accountsController.connectLinkedinAccount.bind(accountsController))
+    )
+
+    router.use(authMiddleware)
+
+    router.post('/oauth/state', asyncHandler(accountsController.createOAuthState.bind(accountsController)))
+    router.post(
+        '/bluesky/connect',
+        asyncHandler(accountsController.connectBlueskyAccount.bind(accountsController))
+    )
+    router.get('/accounts', asyncHandler(accountsController.getAllAccounts.bind(accountsController)))
+    router.delete('/accounts/:accountId', asyncHandler(accountsController.deleteAccount.bind(accountsController)))
+    router.get(
+        '/accounts/:socialAccountId/pinterest-boards',
+        asyncHandler(accountsController.getPinterestBoards.bind(accountsController))
+    )
+
+    return router
+}
