@@ -71,13 +71,23 @@ Extract key topics, tone, target audience, and actionable insights from the prov
                                     },
                                     contentFormat: {
                                         type: 'string',
-                                        enum: ['video', 'article', 'thread', 'carousel', 'image', 'infographic', 'story', 'other'],
+                                        enum: [
+                                            'video',
+                                            'article',
+                                            'thread',
+                                            'carousel',
+                                            'image',
+                                            'infographic',
+                                            'story',
+                                            'other',
+                                        ],
                                         description: 'Format of the content',
                                     },
                                     tone: {
                                         type: 'array',
                                         items: { type: 'string' },
-                                        description: 'Array of 2-4 tone attributes (e.g., professional, casual, humorous)',
+                                        description:
+                                            'Array of 2-4 tone attributes (e.g., professional, casual, humorous)',
                                     },
                                     targetAudience: {
                                         type: 'string',
@@ -102,7 +112,16 @@ Extract key topics, tone, target audience, and actionable insights from the prov
                                         description: 'Array of 5-10 suggested tags for workspace',
                                     },
                                 },
-                                required: ['summary', 'keyTopics', 'contentFormat', 'tone', 'targetAudience', 'keyInsights', 'contentStructure', 'suggestedTags'],
+                                required: [
+                                    'summary',
+                                    'keyTopics',
+                                    'contentFormat',
+                                    'tone',
+                                    'targetAudience',
+                                    'keyInsights',
+                                    'contentStructure',
+                                    'suggestedTags',
+                                ],
                                 additionalProperties: false,
                             },
                         },

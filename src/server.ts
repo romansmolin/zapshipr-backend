@@ -7,6 +7,7 @@ import { createWaitlistRouter } from './modules/waitlist/routes/waitlist.routes'
 import { createUserRoutes } from './modules/user/routes/user.routes'
 import { createWorkspaceRouter } from './modules/workspace/routes/workspace.routes'
 import { createInspirationsRouter } from './modules/inspiration/routes/inspirations.routes'
+import { createWorkspaceTagsRouter } from './modules/inspiration/routes/workspace-tags.routes'
 import { createErrorHandler } from './shared/http/error-handler'
 import { ConsoleLogger } from './shared/logger/console-logger'
 
@@ -22,6 +23,7 @@ const startServer = async () => {
     const userRoutes = createUserRoutes(logger, db)
     const workspaceRoutes = createWorkspaceRouter(logger, db)
     const inspirationsRoutes = createInspirationsRouter(logger, db)
+    const workspaceTagsRoutes = createWorkspaceTagsRouter(logger, db)
 
     app.use(authRoutes)
     app.use(accountsRoutes)
@@ -30,6 +32,7 @@ const startServer = async () => {
     app.use(userRoutes)
     app.use(workspaceRoutes)
     app.use(inspirationsRoutes)
+    app.use(workspaceTagsRoutes)
 
     app.use(createErrorHandler(logger))
 
