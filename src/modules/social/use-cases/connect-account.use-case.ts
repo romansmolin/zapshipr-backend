@@ -37,6 +37,7 @@ export class ConnectAccountUseCase {
         if (existing) {
             const updated = await this.repo.updateAccountByTenantPlatformAndPage({
                 userId: account.userId,
+                workspaceId: account.workspaceId,
                 platform: account.platform,
                 pageId: account.pageId,
                 username: account.username,

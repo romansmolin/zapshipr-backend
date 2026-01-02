@@ -554,6 +554,7 @@ export class PostsService implements IPostsService {
 
             const { postId } = await this.postRepository.createBasePost(
                 userId,
+                userId, // workspaceId - temporarily use userId
                 initialStatus,
                 createPostsRequest.postType,
                 createPostsRequest.scheduledTime ?? null,

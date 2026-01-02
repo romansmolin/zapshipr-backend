@@ -102,6 +102,7 @@ export class XConnectorService implements IXConnectorService {
             const account = new Account(
                 uuidv4(),
                 userId,
+                userId, // workspaceId - temporarily use userId
                 "x",
                 user.name || user.username,
                 accessToken,

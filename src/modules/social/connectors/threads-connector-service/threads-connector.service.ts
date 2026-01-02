@@ -109,6 +109,7 @@ export class ThreadsConnectorService implements IThreadsConnectorService {
             const account = new Account(
                 uuidv4(),
                 userId.toString(),
+                userId.toString(), // workspaceId - temporarily use userId
                 "threads",
                 profile.username,
                 longLiveAccessToken,

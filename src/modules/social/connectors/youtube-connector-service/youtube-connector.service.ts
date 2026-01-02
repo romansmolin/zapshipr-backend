@@ -103,6 +103,7 @@ export class YouTubeConnectorService implements IYouTubeConnectorService {
             const account = new Account(
                 uuidv4(),
                 userId,
+                userId, // workspaceId - temporarily use userId
                 "youtube",
                 channel.snippet.title,
                 accessToken,

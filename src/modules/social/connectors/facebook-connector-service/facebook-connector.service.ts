@@ -114,6 +114,7 @@ export class FacebookConnectorService implements IFacebookConnectorService {
                     const account = new Account(
                         uuidv4(),
                         userId.toString(),
+                        userId.toString(), // workspaceId - temporarily use userId
                         "facebook",
                         page.name,
                         longLiveAccessToken.access_token,

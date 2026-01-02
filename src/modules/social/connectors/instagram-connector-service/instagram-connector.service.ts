@@ -113,6 +113,7 @@ export class InstagramConnectorService implements IInstagramConnectorService {
             const account = new Account(
                 uuidv4(),
                 userId,
+                userId, // workspaceId - temporarily use userId
                 "instagram",
                 accountInfoResponse.username,
                 longLivedToken,

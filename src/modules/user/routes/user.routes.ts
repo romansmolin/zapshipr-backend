@@ -10,14 +10,12 @@ import { authMiddleware } from '@/middleware/auth.middleware'
 
 import { UserController } from '../controllers/user.controller'
 import { UserService } from '../services/user.service'
-import { GetUserInfoUseCase } from '../use-cases/get-user-info'
 
 export const createUserRoutes = (logger: ILogger, db: NodePgDatabase<typeof dbSchema>): Router => {
     const router = createRouter()
 
     const userRepository = new UserRepository(db, logger)
-    const getUserInfoUseCase = new GetUserInfoUseCase(userRepository, logger)
-    const userService = new UserService(getUserInfoUseCase)
+    const userService = new UserService(userRepository, logger)
     const userController = new UserController(userService, logger)
 
     router.get('/user/info', authMiddleware, asyncHandler(userController.getUserInfo.bind(userController)))

@@ -32,7 +32,10 @@ export class UserService implements IUserService {
             userId,
         })
 
-        return user
+        return {
+            user,
+            planName: null, // TODO: Implement plan logic
+        }
     }
 
     async getUsageQuota(userId: string): Promise<UsageQuota> {

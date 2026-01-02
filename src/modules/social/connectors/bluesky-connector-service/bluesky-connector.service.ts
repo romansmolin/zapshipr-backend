@@ -97,6 +97,7 @@ export class BlueskyConnectorService implements IBlueskyConnectorService {
             const account = new Account(
                 uuidv4(),
                 userId,
+                userId, // workspaceId - temporarily use userId
                 'bluesky',
                 accountName,
                 accessJwt,

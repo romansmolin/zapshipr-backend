@@ -19,9 +19,12 @@ export class UserController implements IUserController {
 
     async getUserInfo(req: Request, res: Response, next: NextFunction): Promise<void> {
         const userId = this.getUserId(req)
-        const user = await this.userService.getUserInfo(userId)
+        const userInfo = await this.userService.getUserInfo(userId)
 
-        res.json({ user: toUserResponse(user) })
+        res.json({
+            user: toUserResponse(userInfo.user),
+            planName: userInfo.planName,
+        })
     }
 
     private getUserId(req: Request): string {
