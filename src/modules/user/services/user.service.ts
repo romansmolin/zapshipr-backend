@@ -3,13 +3,17 @@ import { AppError, ErrorMessageCode } from '@/shared/errors/app-error'
 import type { ILogger } from '@/shared/logger/logger.interface'
 
 import type { IUserService, UsageQuota, UserPlanSnapshot } from './user.service.interface'
+import { IWorkspaceRepository } from '@/modules/workspace/repositories/workspace-repository.interface'
 
 export class UserService implements IUserService {
     private readonly userRepository: IUserRepository
+    private readonly workspaceRepository: IWorkspaceRepository
+
     private readonly logger: ILogger
 
-    constructor(userRepository: IUserRepository, logger: ILogger) {
+    constructor(userRepository: IUserRepository, workspaceRepository: IWorkspaceRepository, logger: ILogger) {
         this.userRepository = userRepository
+        this.workspaceRepository = workspaceRepository
         this.logger = logger
     }
 
@@ -27,6 +31,8 @@ export class UserService implements IUserService {
             })
         }
 
+        const userWorkspaces = this.workspaceRepository.findByUserId(userId)
+
         this.logger.info('User info retrieved', {
             operation: 'UserService.getUserInfo',
             userId,
@@ -34,7 +40,8 @@ export class UserService implements IUserService {
 
         return {
             user,
-            planName: null, // TODO: Implement plan logic
+            userWorkspaces,
+            planName: null,
         }
     }
 
