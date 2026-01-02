@@ -18,10 +18,21 @@ export class WorkspaceService implements IWorkspaceService {
     async create(userId: string, data: CreateWorkspaceInput): Promise<WorkspaceDto> {
         this.logger.info('Creating workspace', { userId, name: data.name })
 
+        // Проверяем, есть ли у пользователя уже workspaces
+        const workspacesCount = await this.repository.countByUserId(userId)
+        const isFirstWorkspace = workspacesCount === 0
+
         const workspace = await this.repository.create({
             userId,
             name: data.name,
             description: data.description || null,
+            isDefault: isFirstWorkspace, // Если это первый workspace - делаем его дефолтным
+        })
+
+        this.logger.info('Workspace created', { 
+            workspaceId: workspace.id, 
+            isDefault: workspace.isDefault,
+            isFirstWorkspace 
         })
 
         return toWorkspaceDto(workspace)
@@ -191,6 +202,58 @@ export class WorkspaceService implements IWorkspaceService {
         }
 
         return updatedPrompt
+    }
+
+    async getDefaultWorkspace(userId: string): Promise<WorkspaceDto | null> {
+        this.logger.info('Getting default workspace', { userId })
+
+        const workspace = await this.repository.findDefaultByUserId(userId)
+
+        if (!workspace) {
+            // Если нет дефолтного, но есть хотя бы один workspace - вернем его
+            const workspaces = await this.repository.findByUserId(userId)
+            
+            if (workspaces.length === 0) {
+                return null
+            }
+
+            // Если есть только один workspace - автоматически делаем его дефолтным
+            if (workspaces.length === 1) {
+                const defaultWorkspace = await this.repository.setAsDefault(workspaces[0].id, userId)
+                return defaultWorkspace ? toWorkspaceDto(defaultWorkspace) : null
+            }
+
+            // Если workspace несколько, но нет дефолтного - вернем первый
+            return toWorkspaceDto(workspaces[0])
+        }
+
+        return toWorkspaceDto(workspace)
+    }
+
+    async setDefaultWorkspace(workspaceId: string, userId: string): Promise<WorkspaceDto> {
+        this.logger.info('Setting default workspace', { workspaceId, userId })
+
+        // Проверяем, что workspace существует и принадлежит пользователю
+        const workspace = await this.repository.findById(workspaceId)
+
+        if (!workspace) {
+            throw new BaseAppError('Workspace not found', ErrorCode.NOT_FOUND, 404)
+        }
+
+        if (workspace.userId !== userId) {
+            throw new BaseAppError('Access denied', ErrorCode.FORBIDDEN, 403)
+        }
+
+        // Устанавливаем как дефолтный
+        const defaultWorkspace = await this.repository.setAsDefault(workspaceId, userId)
+
+        if (!defaultWorkspace) {
+            throw new BaseAppError('Failed to set default workspace', ErrorCode.UNKNOWN_ERROR, 500)
+        }
+
+        this.logger.info('Workspace set as default', { workspaceId, userId })
+
+        return toWorkspaceDto(defaultWorkspace)
     }
 }
 

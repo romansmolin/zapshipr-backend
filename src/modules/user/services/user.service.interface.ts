@@ -1,3 +1,4 @@
+import { Workspace } from '@/modules/workspace/entity/workspace.schema'
 import type { User } from '../entity/user.schema'
 
 export interface UsageQuota {
@@ -14,6 +15,7 @@ export interface UserPlanSnapshot {
 export interface UserInfo {
     user: User
     planName: string | null
+    userWorkspaces: Workspace[]
 }
 
 export interface IUserService {

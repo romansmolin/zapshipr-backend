@@ -6,6 +6,7 @@ export interface WorkspaceDto {
     name: string
     description: string | null
     avatarUrl: string | null
+    isDefault: boolean
     createdAt: Date
     updatedAt: Date
 }
@@ -16,6 +17,7 @@ export const toWorkspaceDto = (workspace: Workspace): WorkspaceDto => ({
     name: workspace.name,
     description: workspace.description,
     avatarUrl: workspace.avatarUrl,
+    isDefault: workspace.isDefault,
     createdAt: workspace.createdAt,
     updatedAt: workspace.updatedAt,
 })

@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm'
+import { eq, and, sql } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 
 import type { DBSchema } from '@/db/schema'
@@ -95,6 +95,49 @@ export class WorkspaceRepository implements IWorkspaceRepository {
             })
             .where(eq(workspaces.id, id))
             .returning()
+
+        return workspace
+    }
+
+    async findDefaultByUserId(userId: string): Promise<Workspace | undefined> {
+        this.logger.info('Finding default workspace by user id', { userId })
+
+        const [workspace] = await this.db
+            .select()
+            .from(workspaces)
+            .where(and(eq(workspaces.userId, userId), eq(workspaces.isDefault, true)))
+
+        return workspace
+    }
+
+    async countByUserId(userId: string): Promise<number> {
+        this.logger.info('Counting workspaces by user id', { userId })
+
+        const result = await this.db
+            .select({ count: sql<number>`count(*)::int` })
+            .from(workspaces)
+            .where(eq(workspaces.userId, userId))
+
+        return result[0]?.count ?? 0
+    }
+
+    async setAsDefault(workspaceId: string, userId: string): Promise<Workspace | undefined> {
+        this.logger.info('Setting workspace as default', { workspaceId, userId })
+
+        // Сначала убираем флаг isDefault у всех workspace пользователя
+        await this.db
+            .update(workspaces)
+            .set({ isDefault: false, updatedAt: new Date() })
+            .where(eq(workspaces.userId, userId))
+
+        // Затем устанавливаем isDefault для выбранного workspace
+        const [workspace] = await this.db
+            .update(workspaces)
+            .set({ isDefault: true, updatedAt: new Date() })
+            .where(and(eq(workspaces.id, workspaceId), eq(workspaces.userId, userId)))
+            .returning()
+
+        this.logger.info('Workspace set as default', { workspaceId })
 
         return workspace
     }

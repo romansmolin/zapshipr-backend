@@ -31,11 +31,12 @@ export class UserService implements IUserService {
             })
         }
 
-        const userWorkspaces = this.workspaceRepository.findByUserId(userId)
+        const userWorkspaces = await this.workspaceRepository.findByUserId(userId)
 
         this.logger.info('User info retrieved', {
             operation: 'UserService.getUserInfo',
             userId,
+            userWorkspaces,
         })
 
         return {

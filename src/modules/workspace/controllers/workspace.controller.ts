@@ -105,6 +105,32 @@ export class WorkspaceController implements IWorkspaceController {
 
         res.json(mainPrompt)
     }
+
+    async getDefault(req: Request, res: Response): Promise<void> {
+        const userId = req.user!.id
+
+        this.logger.info('Get default workspace request', { userId })
+
+        const workspace = await this.service.getDefaultWorkspace(userId)
+
+        if (!workspace) {
+            res.status(404).json({ message: 'No workspaces found' })
+            return
+        }
+
+        res.json(workspace)
+    }
+
+    async setAsDefault(req: Request, res: Response): Promise<void> {
+        const userId = req.user!.id
+        const { id } = req.params
+
+        this.logger.info('Set workspace as default request', { userId, workspaceId: id })
+
+        const workspace = await this.service.setDefaultWorkspace(id, userId)
+
+        res.json(workspace)
+    }
 }
 
 

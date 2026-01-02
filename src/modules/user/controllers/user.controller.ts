@@ -24,6 +24,7 @@ export class UserController implements IUserController {
         res.json({
             user: toUserResponse(userInfo.user),
             planName: userInfo.planName,
+            userWorkspaces: userInfo.userWorkspaces,
         })
     }
 

@@ -25,8 +25,10 @@ export const createWorkspaceRouter = (logger: ILogger, db: NodePgDatabase<typeof
 
     router.post('/workspaces', authMiddleware, asyncHandler(controller.create.bind(controller)))
     router.get('/workspaces', authMiddleware, asyncHandler(controller.getAll.bind(controller)))
+    router.get('/workspaces/default', authMiddleware, asyncHandler(controller.getDefault.bind(controller)))
     router.get('/workspaces/:id', authMiddleware, asyncHandler(controller.getById.bind(controller)))
     router.put('/workspaces/:id', authMiddleware, asyncHandler(controller.update.bind(controller)))
+    router.put('/workspaces/:id/default', authMiddleware, asyncHandler(controller.setAsDefault.bind(controller)))
     router.delete('/workspaces/:id', authMiddleware, asyncHandler(controller.delete.bind(controller)))
     router.post(
         '/workspaces/:id/avatar',
