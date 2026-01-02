@@ -115,5 +115,3 @@ export class WorkspaceController implements IWorkspaceController {
         res.json(workspace)
     }
 }
-
-
