@@ -2,6 +2,7 @@ import { describe, it, expect, jest, beforeEach } from '@jest/globals'
 import { InspirationsService } from '../inspirations.service'
 import type { IInspirationsRepository } from '../../repositories/inspirations-repository.interface'
 import type { IMediaUploader } from '@/shared/media-uploader/media-uploader.interface'
+import type { IInspirationScheduler } from '@/shared/queue/scheduler/inspiration-scheduler/inspiration-scheduler.interface'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import { AppError, ErrorMessageCode } from '@/shared/errors/app-error'
 import type { RawInspiration } from '../../entity/raw-inspiration.schema'
@@ -10,6 +11,7 @@ describe('InspirationsService', () => {
     let service: InspirationsService
     let mockRepository: jest.Mocked<IInspirationsRepository>
     let mockMediaUploader: jest.Mocked<IMediaUploader>
+    let mockScheduler: jest.Mocked<IInspirationScheduler>
     let mockLogger: jest.Mocked<ILogger>
 
     beforeEach(() => {
@@ -29,6 +31,11 @@ describe('InspirationsService', () => {
             delete: jest.fn(),
         } as any
 
+        // Mock scheduler
+        mockScheduler = {
+            scheduleInspiration: jest.fn(),
+        } as any
+
         // Mock logger
         mockLogger = {
             info: jest.fn(),
@@ -37,7 +44,7 @@ describe('InspirationsService', () => {
             debug: jest.fn(),
         } as any
 
-        service = new InspirationsService(mockRepository, mockMediaUploader, mockLogger)
+        service = new InspirationsService(mockRepository, mockMediaUploader, mockScheduler, mockLogger)
     })
 
     describe('createInspiration', () => {
@@ -78,6 +85,7 @@ describe('InspirationsService', () => {
                 userDescription: 'Test description',
                 status: 'processing',
             })
+            expect(mockScheduler.scheduleInspiration).toHaveBeenCalledWith('123', 'ws-1', 'user-1')
             expect(mockLogger.info).toHaveBeenCalledWith(
                 'Created inspiration',
                 expect.objectContaining({
@@ -440,4 +448,3 @@ describe('InspirationsService', () => {
         })
     })
 })
-

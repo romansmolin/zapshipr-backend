@@ -44,7 +44,7 @@ async function startWorkers() {
         socialMediaErrorHandler
     )
 
-    await initializeWorkers(logger, socialMediaPostSender, socialMediaTokenRefresher, postsService)
+    await initializeWorkers(logger, db, socialMediaPostSender, socialMediaTokenRefresher, postsService)
 
     logger.info('BullMQ workers started successfully')
 }

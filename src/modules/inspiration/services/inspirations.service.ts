@@ -1,6 +1,7 @@
 import { AppError, ErrorMessageCode } from '@/shared/errors/app-error'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import type { IMediaUploader } from '@/shared/media-uploader/media-uploader.interface'
+import type { IInspirationScheduler } from '@/shared/queue/scheduler/inspiration-scheduler/inspiration-scheduler.interface'
 
 import type { IInspirationsRepository } from '../repositories/inspirations-repository.interface'
 import type {
@@ -16,6 +17,7 @@ export class InspirationsService implements IInspirationsService {
     constructor(
         private readonly inspirationsRepository: IInspirationsRepository,
         private readonly mediaUploader: IMediaUploader,
+        private readonly inspirationScheduler: IInspirationScheduler,
         private readonly logger: ILogger
     ) {}
 
@@ -75,6 +77,14 @@ export class InspirationsService implements IInspirationsService {
             inspirationId: inspiration.id,
             workspaceId: data.workspaceId,
             type: data.type,
+        })
+
+        // Добавить задачу в очередь для обработки
+        await this.inspirationScheduler.scheduleInspiration(inspiration.id, data.workspaceId, data.userId)
+
+        this.logger.info('Scheduled inspiration for processing', {
+            operation: 'InspirationsService.createInspiration',
+            inspirationId: inspiration.id,
         })
 
         return inspiration

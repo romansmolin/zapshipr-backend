@@ -8,6 +8,7 @@ import type { ILogger } from '@/shared/logger/logger.interface'
 import { asyncHandler } from '@/shared/http/async-handler'
 import { authMiddleware } from '@/middleware/auth.middleware'
 import { S3Uploader } from '@/shared/media-uploader/media-uploader'
+import { BullMqInspirationScheduler } from '@/shared/queue'
 
 import { InspirationsRepository } from '../repositories/inspirations.repository'
 import { InspirationsService } from '../services/inspirations.service'
@@ -25,7 +26,8 @@ export const createInspirationsRouter = (logger: ILogger, db: NodePgDatabase<typ
 
     const repository = new InspirationsRepository(db, logger)
     const mediaUploader = new S3Uploader(logger)
-    const service = new InspirationsService(repository, mediaUploader, logger)
+    const scheduler = new BullMqInspirationScheduler()
+    const service = new InspirationsService(repository, mediaUploader, scheduler, logger)
     const controller = new InspirationsController(service, logger)
 
     // Raw Inspirations endpoints
