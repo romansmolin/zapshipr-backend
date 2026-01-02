@@ -22,6 +22,7 @@
     "devDependencies": {
         "@jest/globals": "^29.7.0",
         "@trivago/prettier-plugin-sort-imports": "^5.2.2",
+        "@types/cookie-parser": "^1.4.10",
         "@types/cors": "^2.8.19",
         "@types/express": "^5.0.6",
         "@types/fluent-ffmpeg": "^2.1.0",
