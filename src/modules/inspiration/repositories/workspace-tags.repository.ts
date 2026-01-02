@@ -75,7 +75,7 @@ export class WorkspaceTagsRepository implements IWorkspaceTagsRepository {
                     and(
                         eq(workspaceTags.workspaceId, workspaceId),
                         eq(workspaceTags.name, name),
-                        eq(workspaceTags.category, category)
+                        eq(workspaceTags.category, category as WorkspaceTag['category'])
                     )
                 )
                 .limit(1)

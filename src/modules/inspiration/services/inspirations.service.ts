@@ -27,10 +27,7 @@ export class InspirationsService implements IInspirationsService {
 
         // Проверка дубликатов для ссылок
         if (data.type === 'link' && data.content) {
-            const isDuplicate = await this.inspirationsRepository.checkDuplicateUrl(
-                data.workspaceId,
-                data.content
-            )
+            const isDuplicate = await this.inspirationsRepository.checkDuplicateUrl(data.workspaceId, data.content)
 
             if (isDuplicate) {
                 throw new AppError({
