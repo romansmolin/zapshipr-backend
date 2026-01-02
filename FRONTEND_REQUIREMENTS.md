@@ -770,6 +770,614 @@ When an inspiration is processed:
 
 ---
 
+## Integration Requirements: Inspirations System
+
+This section provides detailed technical requirements for successfully integrating the Inspirations System into the frontend application.
+
+---
+
+### 1. File Upload Requirements
+
+#### Image Upload (for Image Inspirations)
+
+**Endpoint**: Your file upload endpoint (e.g., `/upload/image`)
+
+**Requirements**:
+- Max file size: 5 MB
+- Supported formats: JPEG, PNG, GIF, WebP
+- Upload to S3 before creating inspiration
+- Use returned S3 URL as `imageUrl` in POST request
+
+**Flow**:
+```javascript
+// 1. Upload image to S3
+const formData = new FormData()
+formData.append('file', imageFile)
+
+const uploadResponse = await fetch('/api/v1/upload/image', {
+  method: 'POST',
+  headers: { 'Authorization': `Bearer ${token}` },
+  body: formData
+})
+
+const { url: imageUrl } = await uploadResponse.json()
+
+// 2. Create inspiration with S3 URL
+const inspiration = await fetch('/api/v1/workspaces/:workspaceId/inspirations', {
+  method: 'POST',
+  headers: {
+    'Authorization': `Bearer ${token}`,
+    'Content-Type': 'application/json'
+  },
+  body: JSON.stringify({
+    type: 'image',
+    imageUrl: imageUrl,
+    userDescription: 'Great color scheme'
+  })
+})
+```
+
+#### Document Upload (for Document Inspirations)
+
+**Requirements**:
+- Max file size: 10 MB
+- Supported formats: PDF, DOCX, TXT, MD
+- Upload to S3 before creating inspiration
+- Use returned S3 URL as `content` in POST request
+
+**Flow**: Similar to image upload, but set `type: 'document'` and use URL in `content` field
+
+---
+
+### 2. Status Polling & Real-time Updates
+
+#### Polling Strategy
+
+When an inspiration is created, it starts with `status: "processing"`. The frontend must poll for updates until processing completes.
+
+**Implementation**:
+
+```javascript
+async function createAndTrackInspiration(data) {
+  // 1. Create inspiration
+  const response = await createInspiration(data)
+  const inspiration = await response.json()
+  
+  // 2. If status is 'processing', start polling
+  if (inspiration.status === 'processing') {
+    return await pollInspirationStatus(inspiration.id, inspiration.workspaceId)
+  }
+  
+  return inspiration
+}
+
+async function pollInspirationStatus(inspirationId, workspaceId, maxAttempts = 60) {
+  let attempts = 0
+  
+  while (attempts < maxAttempts) {
+    await new Promise(resolve => setTimeout(resolve, 5000)) // Wait 5 seconds
+    
+    const response = await fetch(
+      `/api/v1/workspaces/${workspaceId}/inspirations/${inspirationId}`,
+      {
+        headers: { 'Authorization': `Bearer ${token}` }
+      }
+    )
+    
+    const inspiration = await response.json()
+    
+    // Check if processing completed
+    if (inspiration.status === 'completed') {
+      return inspiration
+    }
+    
+    if (inspiration.status === 'failed') {
+      throw new Error(inspiration.errorMessage || 'Processing failed')
+    }
+    
+    attempts++
+  }
+  
+  throw new Error('Processing timeout - please refresh to check status')
+}
+```
+
+**Polling Configuration**:
+- Interval: 5 seconds
+- Max attempts: 60 (5 minutes total)
+- Timeout behavior: Show message to user, stop polling
+
+**UI Indicators**:
+- Show loading spinner during processing
+- Update inspiration in list when completed
+- Show success toast notification
+- Show error message if failed
+
+---
+
+### 3. Inspiration Type Validation
+
+#### Text Inspiration
+```typescript
+{
+  type: 'text',
+  content: string,        // Required, min: 10 chars, max: 10000 chars
+  userDescription?: string // Optional, max: 500 chars
+}
+```
+
+#### URL Inspiration
+```typescript
+{
+  type: 'url',
+  content: string,        // Required, must be valid URL
+  userDescription?: string // Optional, max: 500 chars
+}
+```
+
+**Frontend Validation**:
+- Validate URL format: `https?://...`
+- Check if URL is accessible (optional pre-validation)
+- Show preview of URL metadata if available
+
+#### Image Inspiration
+```typescript
+{
+  type: 'image',
+  imageUrl: string,       // Required, must be S3 URL
+  userDescription?: string // Optional, max: 500 chars
+}
+```
+
+**Frontend Requirements**:
+- Show image preview after upload
+- Display upload progress
+- Validate file size before upload
+- Handle upload errors gracefully
+
+#### Video Inspiration
+```typescript
+{
+  type: 'video',
+  content: string,        // Required, must be valid video URL
+  userDescription?: string // Optional, max: 500 chars
+}
+```
+
+**Supported Platforms**:
+- YouTube: `youtube.com/watch?v=...` or `youtu.be/...`
+- Vimeo: `vimeo.com/...`
+- TikTok: `tiktok.com/@.../video/...`
+
+**Frontend Validation**:
+- Validate video URL format
+- Show video thumbnail if available (use oEmbed API)
+- Extract video metadata for preview
+
+#### Document Inspiration
+```typescript
+{
+  type: 'document',
+  content: string,        // Required, must be S3 URL to document
+  userDescription?: string // Optional, max: 500 chars
+}
+```
+
+**Frontend Requirements**:
+- Show document upload progress
+- Display file name and size
+- Show appropriate icon for file type (PDF, DOCX, etc.)
+- Handle upload errors with clear messages
+
+---
+
+### 4. Error Handling
+
+#### Common Error Scenarios
+
+**1. Invalid URL**
+```json
+{
+  "error": {
+    "code": "VALIDATION_ERROR",
+    "message": "Invalid URL format"
+  }
+}
+```
+**UI Action**: Show inline error under URL input field
+
+**2. Duplicate URL**
+```json
+{
+  "error": {
+    "code": "DUPLICATE_ERROR",
+    "message": "This URL has already been saved in this workspace"
+  }
+}
+```
+**UI Action**: Show modal asking if user wants to view existing inspiration
+
+**3. Processing Failed**
+```json
+{
+  "status": "failed",
+  "errorMessage": "Failed to extract content from URL"
+}
+```
+**UI Actions**:
+- Show error badge on inspiration card
+- Display error message in detail view
+- Provide "Retry" button
+- Allow user to edit and re-submit
+
+**4. File Upload Failed**
+```json
+{
+  "error": {
+    "code": "UPLOAD_FAILED",
+    "message": "File size exceeds maximum allowed size"
+  }
+}
+```
+**UI Action**: Show error toast with clear message about size/format requirements
+
+**5. LLM Extraction Failed**
+```json
+{
+  "status": "failed",
+  "errorMessage": "AI analysis failed - content may be too long or in unsupported format"
+}
+```
+**UI Actions**:
+- Inspiration still saved (user can view original content)
+- Show warning that AI insights are unavailable
+- Suggest manual tag addition
+- Don't block user from using the inspiration
+
+---
+
+### 5. Displaying Extraction Results
+
+#### Extraction Data Layout
+
+**Summary Section**:
+```jsx
+<section>
+  <h3>Summary</h3>
+  <p>{extraction.summary}</p>
+</section>
+```
+
+**Key Topics**:
+```jsx
+<section>
+  <h3>Key Topics</h3>
+  <div className="flex flex-wrap gap-2">
+    {extraction.keyTopics.map(topic => (
+      <Badge key={topic} color="blue">{topic}</Badge>
+    ))}
+  </div>
+</section>
+```
+
+**Content Analysis**:
+```jsx
+<section>
+  <h3>Content Analysis</h3>
+  <dl>
+    <dt>Format:</dt>
+    <dd>{extraction.contentFormat}</dd>
+    
+    <dt>Tone:</dt>
+    <dd>{extraction.tone.join(', ')}</dd>
+    
+    <dt>Target Audience:</dt>
+    <dd>{extraction.targetAudience}</dd>
+    
+    <dt>Structure:</dt>
+    <dd>{extraction.contentStructure}</dd>
+    
+    {extraction.visualStyle && (
+      <>
+        <dt>Visual Style:</dt>
+        <dd>{extraction.visualStyle}</dd>
+      </>
+    )}
+  </dl>
+</section>
+```
+
+**Key Insights**:
+```jsx
+<section>
+  <h3>Key Insights</h3>
+  <ul>
+    {extraction.keyInsights.map((insight, i) => (
+      <li key={i}>{insight}</li>
+    ))}
+  </ul>
+</section>
+```
+
+**Suggested Tags**:
+```jsx
+<section>
+  <h3>Suggested Tags</h3>
+  <div className="flex flex-wrap gap-2">
+    {extraction.suggestedTags.map(tag => (
+      <Badge 
+        key={tag} 
+        color="purple"
+        onClick={() => addTagToWorkspace(tag)}
+      >
+        {tag}
+        <PlusIcon className="ml-1 h-3 w-3" />
+      </Badge>
+    ))}
+  </div>
+</section>
+```
+
+---
+
+### 6. List View Requirements
+
+#### Inspiration Card Component
+
+**Required Elements**:
+- Type indicator icon (text/url/image/video/document)
+- Status badge (processing/completed/failed)
+- Preview (thumbnail for images/videos, favicon for URLs)
+- User description (truncated to 100 chars)
+- Created date (relative: "2 hours ago")
+- Action menu (view, edit, delete)
+
+**Visual States**:
+
+**Processing**:
+```jsx
+<Card className="opacity-75">
+  <LoadingSpinner />
+  <p>Processing content...</p>
+</Card>
+```
+
+**Completed**:
+```jsx
+<Card>
+  <TypeIcon type={inspiration.type} />
+  {inspiration.imageUrl && <img src={inspiration.imageUrl} />}
+  <p>{truncate(inspiration.userDescription, 100)}</p>
+  <Badge color="green">Completed</Badge>
+  {inspiration.extraction && (
+    <div className="tags">
+      {inspiration.extraction.keyTopics.slice(0, 3).map(topic => (
+        <SmallBadge key={topic}>{topic}</SmallBadge>
+      ))}
+    </div>
+  )}
+</Card>
+```
+
+**Failed**:
+```jsx
+<Card className="border-red-200">
+  <TypeIcon type={inspiration.type} />
+  <p>{truncate(inspiration.userDescription, 100)}</p>
+  <Badge color="red">Failed</Badge>
+  <Button size="sm" onClick={handleRetry}>Retry</Button>
+</Card>
+```
+
+#### Filters & Search
+
+**Filter Options**:
+```jsx
+<FilterBar>
+  <Select label="Status" value={statusFilter} onChange={setStatusFilter}>
+    <option value="">All</option>
+    <option value="processing">Processing</option>
+    <option value="completed">Completed</option>
+    <option value="failed">Failed</option>
+  </Select>
+  
+  <Select label="Type" value={typeFilter} onChange={setTypeFilter}>
+    <option value="">All Types</option>
+    <option value="text">Text</option>
+    <option value="url">URL</option>
+    <option value="image">Image</option>
+    <option value="video">Video</option>
+    <option value="document">Document</option>
+  </Select>
+  
+  <SearchInput 
+    placeholder="Search inspirations..." 
+    value={searchQuery}
+    onChange={setSearchQuery}
+  />
+</FilterBar>
+```
+
+**Pagination**:
+```jsx
+// Use cursor-based pagination for better performance
+const [inspirations, setInspirations] = useState([])
+const [hasMore, setHasMore] = useState(true)
+const [offset, setOffset] = useState(0)
+
+async function loadMore() {
+  const response = await fetch(
+    `/api/v1/workspaces/${workspaceId}/inspirations?limit=20&offset=${offset}`,
+    { headers: { 'Authorization': `Bearer ${token}` }}
+  )
+  const newInspirations = await response.json()
+  
+  setInspirations([...inspirations, ...newInspirations])
+  setOffset(offset + 20)
+  setHasMore(newInspirations.length === 20)
+}
+```
+
+---
+
+### 7. Detail View Requirements
+
+#### Layout Structure
+
+```
+┌─────────────────────────────────────┐
+│ Header: Type Icon + Title          │
+│ [Edit] [Delete]                     │
+├─────────────────────────────────────┤
+│                                     │
+│ Content Preview                     │
+│ (Image/Video/Text/Document)         │
+│                                     │
+├─────────────────────────────────────┤
+│ User Description (editable)         │
+├─────────────────────────────────────┤
+│ Metadata (if available)             │
+│ - Title, Author, Site Name, etc.    │
+├─────────────────────────────────────┤
+│ AI Insights (if completed)          │
+│ - Summary                           │
+│ - Key Topics                        │
+│ - Content Analysis                  │
+│ - Key Insights                      │
+│ - Suggested Tags                    │
+├─────────────────────────────────────┤
+│ Parsed Content (collapsible)        │
+│ - Full text content                 │
+│ - Word count                        │
+└─────────────────────────────────────┘
+```
+
+#### Editable Fields
+
+Only `userDescription` should be editable:
+
+```jsx
+const [description, setDescription] = useState(inspiration.userDescription)
+const [isEditing, setIsEditing] = useState(false)
+
+async function saveDescription() {
+  await fetch(
+    `/api/v1/workspaces/${workspaceId}/inspirations/${inspiration.id}`,
+    {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ userDescription: description })
+    }
+  )
+  setIsEditing(false)
+}
+```
+
+---
+
+### 8. Edge Cases & Special Scenarios
+
+#### 1. Very Long Content
+- URL with 50,000+ words
+- **Backend**: Truncates to first ~5000 words for LLM
+- **Frontend**: Show "Content truncated for analysis" warning
+
+#### 2. Content in Non-English Language
+- **Backend**: LLM handles multiple languages
+- **Frontend**: No special handling needed
+
+#### 3. Protected/Paywalled URLs
+- **Backend**: May fail to extract content
+- **Frontend**: Show error, suggest using document upload instead
+
+#### 4. Expired Video URLs
+- **Backend**: oEmbed may return error
+- **Frontend**: Show fallback message with original URL
+
+#### 5. Multiple Inspirations Processing Simultaneously
+- **Frontend**: Poll each separately
+- **UI**: Show progress count (e.g., "Processing 3 inspirations")
+
+#### 6. User Closes Tab During Processing
+- **Backend**: Processing continues in background
+- **Frontend**: Resume polling when user returns
+
+#### 7. Network Interruption During Upload
+- **Frontend**: Show retry button
+- **Backend**: Idempotent operations (safe to retry)
+
+---
+
+### 9. Performance Optimization
+
+#### Lazy Loading Images
+```jsx
+<img 
+  src={inspiration.imageUrl} 
+  loading="lazy"
+  alt={inspiration.userDescription}
+/>
+```
+
+#### Virtualized Lists
+For workspaces with 100+ inspirations, use virtualization:
+```jsx
+import { VirtualList } from 'react-virtual'
+
+<VirtualList
+  height={600}
+  itemCount={inspirations.length}
+  itemSize={150}
+  renderItem={({ index }) => (
+    <InspirationCard inspiration={inspirations[index]} />
+  )}
+/>
+```
+
+#### Optimistic Updates
+```jsx
+async function deleteInspiration(id) {
+  // Optimistically remove from UI
+  setInspirations(inspirations.filter(i => i.id !== id))
+  
+  try {
+    await fetch(`/api/v1/workspaces/${workspaceId}/inspirations/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+  } catch (error) {
+    // Revert on error
+    setInspirations([...inspirations])
+    showError('Failed to delete inspiration')
+  }
+}
+```
+
+---
+
+### 10. Testing Checklist
+
+- [ ] Create inspiration of each type (text, URL, image, video, document)
+- [ ] Verify status polling works and stops when completed
+- [ ] Test file upload with max size limit
+- [ ] Test invalid URL handling
+- [ ] Test duplicate URL detection
+- [ ] Test failed processing error display
+- [ ] Test editing user description
+- [ ] Test deleting inspiration
+- [ ] Test filters and search
+- [ ] Test pagination with 50+ inspirations
+- [ ] Test multiple simultaneous processing
+- [ ] Test network interruption during upload
+- [ ] Verify extraction results display correctly
+- [ ] Test suggested tag addition to workspace
+- [ ] Test retry functionality for failed inspirations
+
+---
+
 ## Next Steps for Frontend
 
 ### Phase 1: Core Setup
