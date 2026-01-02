@@ -7,7 +7,7 @@ export class BullMqInspirationScheduler implements IInspirationScheduler {
     private queue: Queue<InspirationJobData>
 
     constructor() {
-        this.queue = new Queue<InspirationJobData>('inspirations:process', {
+        this.queue = new Queue<InspirationJobData>('inspirations-process', {
             connection: redisConnection,
         })
     }

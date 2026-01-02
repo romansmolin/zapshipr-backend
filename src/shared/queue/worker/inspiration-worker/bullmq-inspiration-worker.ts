@@ -23,7 +23,7 @@ export class BullMqInspirationWorker implements IInspirationWorker {
         private readonly contentParser: IContentParserService,
         private readonly llmExtraction: ILLMExtractionService
     ) {
-        this.worker = new Worker<InspirationJobData>('inspirations:process', async (job) => this.handleJob(job), {
+        this.worker = new Worker<InspirationJobData>('inspirations-process', async (job) => this.handleJob(job), {
             connection: redisConnection,
             concurrency: 2, // Обрабатываем по 2 inspiration одновременно
             settings: {
