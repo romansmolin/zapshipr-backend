@@ -37,7 +37,7 @@ export class BullMqInspirationWorker implements IInspirationWorker {
     start(): void {
         this.logger.info('Inspiration worker started', {
             operation: 'BullMqInspirationWorker.start',
-            queueName: 'inspirations:process',
+            queueName: 'inspirations-process',
         })
     }
 
