@@ -9,9 +9,7 @@ export const posts = pgTable('posts', {
     userId: uuid('user_id')
         .notNull()
         .references(() => users.id, { onDelete: 'cascade' }),
-    workspaceId: uuid('workspace_id')
-        .notNull()
-        .references(() => workspaces.id, { onDelete: 'cascade' }),
+    workspaceId: uuid('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }),
     status: text('status').notNull(),
     type: text('type'),
     scheduledTime: timestamp('scheduled_time', { withTimezone: true }),

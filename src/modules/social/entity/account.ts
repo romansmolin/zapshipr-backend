@@ -3,7 +3,7 @@ import type { SocialPlatform } from './social-account.schema'
 export class Account {
     id: string
     userId: string
-    workspaceId: string
+    workspaceId: string | null
     platform: SocialPlatform
     username: string
     accessToken: string
@@ -19,7 +19,7 @@ export class Account {
     constructor(
         id: string,
         userId: string,
-        workspaceId: string,
+        workspaceId: string | null,
         platform: SocialPlatform,
         username: string,
         accessToken: string,

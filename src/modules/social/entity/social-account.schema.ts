@@ -30,9 +30,7 @@ export const socialAccounts = pgTable(
         userId: uuid('user_id')
             .notNull()
             .references(() => users.id, { onDelete: 'cascade' }),
-        workspaceId: uuid('workspace_id')
-            .notNull()
-            .references(() => workspaces.id, { onDelete: 'cascade' }),
+        workspaceId: uuid('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }),
         platform: socialPlatformEnum('platform').notNull(),
         username: text('username').notNull(),
         accessToken: text('access_token').notNull(),

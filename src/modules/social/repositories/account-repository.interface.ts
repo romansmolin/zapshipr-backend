@@ -5,7 +5,7 @@ import type { SocialTokenSnapshot } from '@/modules/social/entity/social-account
 
 export interface AccountUpdateInput {
     userId: string
-    workspaceId: string
+    workspaceId: string | null
     platform: SocialPlatform
     pageId: string
     username: string
