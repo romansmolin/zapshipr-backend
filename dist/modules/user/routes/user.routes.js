@@ -1,0 +1,20 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.createUserRoutes = void 0;
+const express_1 = require("express");
+const users_repository_1 = require("@/modules/user/repositories/users.repository");
+const async_handler_1 = require("@/shared/http/async-handler");
+const auth_middleware_1 = require("@/middleware/auth.middleware");
+const user_controller_1 = require("../controllers/user.controller");
+const user_service_1 = require("../services/user.service");
+const get_user_info_1 = require("../use-cases/get-user-info");
+const createUserRoutes = (logger, db) => {
+    const router = (0, express_1.Router)();
+    const userRepository = new users_repository_1.UserRepository(db, logger);
+    const getUserInfoUseCase = new get_user_info_1.GetUserInfoUseCase(userRepository, logger);
+    const userService = new user_service_1.UserService(getUserInfoUseCase);
+    const userController = new user_controller_1.UserController(userService, logger);
+    router.get('/user/info', auth_middleware_1.authMiddleware, (0, async_handler_1.asyncHandler)(userController.getUserInfo.bind(userController)));
+    return router;
+};
+exports.createUserRoutes = createUserRoutes;

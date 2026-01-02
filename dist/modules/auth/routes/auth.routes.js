@@ -1,0 +1,24 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.createAuthRouter = void 0;
+const express_1 = require("express");
+const users_repository_1 = require("@/modules/user/repositories/users.repository");
+const async_handler_1 = require("@/shared/http/async-handler");
+const auth_controller_1 = require("../controllers/auth.controller");
+const auth_service_1 = require("../services/auth.service");
+const createAuthRouter = (logger, db) => {
+    const router = (0, express_1.Router)();
+    const userRepository = new users_repository_1.UserRepository(db, logger);
+    const authService = new auth_service_1.AuthService(userRepository, logger);
+    const authController = new auth_controller_1.AuthController(authService, logger);
+    router.post('/auth/sign-up', (0, async_handler_1.asyncHandler)(authController.signUp.bind(authController)));
+    router.post('/auth/sign-in', (0, async_handler_1.asyncHandler)(authController.signIn.bind(authController)));
+    router.put('/auth/change-password', (0, async_handler_1.asyncHandler)(authController.changePassword.bind(authController)));
+    router.post('/auth/forget-password', (0, async_handler_1.asyncHandler)(authController.forgetPassword.bind(authController)));
+    router.get('/auth/me', (0, async_handler_1.asyncHandler)(authController.authMe.bind(authController)));
+    router.post('/auth/refresh', (0, async_handler_1.asyncHandler)(authController.authRefresh.bind(authController)));
+    router.post('/auth/logout', (0, async_handler_1.asyncHandler)(authController.logout.bind(authController)));
+    router.get('/auth/callback/google', (0, async_handler_1.asyncHandler)(authController.googleCallback.bind(authController)));
+    return router;
+};
+exports.createAuthRouter = createAuthRouter;

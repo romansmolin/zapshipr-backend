@@ -1,11 +1,13 @@
 import * as cheerio from 'cheerio'
-import * as pdfParse from 'pdf-parse'
-import mammoth from 'mammoth'
+import * as pdfParseModule from 'pdf-parse'
+import * as mammoth from 'mammoth'
 import axios from 'axios'
-import { fileTypeFromBuffer } from 'file-type/core'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import type { IContentParserService, ParsedContent } from './content-parser-service.interface'
 import { AppError, ErrorMessageCode } from '@/shared/errors/app-error'
+
+// @ts-ignore - pdf-parse doesn't have proper types
+const pdfParse = pdfParseModule.default || pdfParseModule
 
 export class ContentParserService implements IContentParserService {
     private readonly TIMEOUT = 30000 // 30 seconds
@@ -110,21 +112,17 @@ export class ContentParserService implements IContentParserService {
     }
 
     async parseDocument(fileBuffer: Buffer, fileName: string): Promise<ParsedContent> {
-        const fileType = await fileTypeFromBuffer(fileBuffer)
         const extension = fileName.split('.').pop()?.toLowerCase()
 
         let content = ''
         let title = fileName
 
-        if (fileType?.mime === 'application/pdf' || extension === 'pdf') {
+        if (extension === 'pdf') {
             // Парсинг PDF
             const pdfData = await pdfParse(fileBuffer)
             content = pdfData.text
             title = pdfData.info?.Title || fileName
-        } else if (
-            fileType?.mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
-            extension === 'docx'
-        ) {
+        } else if (extension === 'docx') {
             // Парсинг DOCX
             const result = await mammoth.extractRawText({ buffer: fileBuffer })
             content = result.value
@@ -148,7 +146,7 @@ export class ContentParserService implements IContentParserService {
         this.logger.info('Parsed document successfully', {
             operation: 'ContentParserService.parseDocument',
             fileName,
-            fileType: fileType?.mime || extension,
+            fileType: extension,
             contentLength: content.length,
         })
 

@@ -70,7 +70,7 @@ export class WorkspaceService implements IWorkspaceService {
         })
 
         if (!workspace) {
-            throw new BaseAppError('Failed to update workspace', ErrorCode.INTERNAL_SERVER_ERROR, 500)
+            throw new BaseAppError('Failed to update workspace', ErrorCode.UNKNOWN_ERROR, 500)
         }
 
         return toWorkspaceDto(workspace)
@@ -105,12 +105,16 @@ export class WorkspaceService implements IWorkspaceService {
             throw new BaseAppError('Access denied', ErrorCode.FORBIDDEN, 403)
         }
 
-        const avatarUrl = await this.mediaUploader.upload(file, `workspaces/${id}`)
+        const avatarUrl = await this.mediaUploader.upload({
+            key: `workspaces/${id}/avatar/${file.originalname}`,
+            body: file.buffer,
+            contentType: file.mimetype,
+        })
 
         const updatedWorkspace = await this.repository.updateAvatar(id, avatarUrl)
 
         if (!updatedWorkspace) {
-            throw new BaseAppError('Failed to update workspace avatar', ErrorCode.INTERNAL_SERVER_ERROR, 500)
+            throw new BaseAppError('Failed to update workspace avatar', ErrorCode.UNKNOWN_ERROR, 500)
         }
 
         return toWorkspaceDto(updatedWorkspace)
@@ -183,7 +187,7 @@ export class WorkspaceService implements IWorkspaceService {
         const updated = await this.repository.updateMainPrompt(workspaceId, updatedPrompt)
 
         if (!updated) {
-            throw new BaseAppError('Failed to update main prompt', ErrorCode.INTERNAL_SERVER_ERROR, 500)
+            throw new BaseAppError('Failed to update main prompt', ErrorCode.UNKNOWN_ERROR, 500)
         }
 
         return updatedPrompt
