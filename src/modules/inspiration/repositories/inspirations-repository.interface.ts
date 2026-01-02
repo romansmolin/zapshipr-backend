@@ -16,4 +16,3 @@ export interface IInspirationsRepository {
     delete(id: string): Promise<boolean>
     checkDuplicateUrl(workspaceId: string, url: string): Promise<boolean>
 }
-

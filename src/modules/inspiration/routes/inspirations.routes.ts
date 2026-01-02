@@ -35,11 +35,14 @@ export const createInspirationsRouter = (logger: ILogger, db: NodePgDatabase<typ
         upload.single('file'),
         asyncHandler(controller.create.bind(controller))
     )
-    router.get('/workspaces/:workspaceId/inspirations', authMiddleware, asyncHandler(controller.getAll.bind(controller)))
+    router.get(
+        '/workspaces/:workspaceId/inspirations',
+        authMiddleware,
+        asyncHandler(controller.getAll.bind(controller))
+    )
     router.get('/inspirations/:id', authMiddleware, asyncHandler(controller.getById.bind(controller)))
     router.put('/inspirations/:id', authMiddleware, asyncHandler(controller.update.bind(controller)))
     router.delete('/inspirations/:id', authMiddleware, asyncHandler(controller.delete.bind(controller)))
 
     return router
 }
-

@@ -62,12 +62,22 @@ export class WorkspaceTagsRepository implements IWorkspaceTagsRepository {
         }
     }
 
-    async findByNameAndCategory(workspaceId: string, name: string, category: string): Promise<WorkspaceTag | undefined> {
+    async findByNameAndCategory(
+        workspaceId: string,
+        name: string,
+        category: string
+    ): Promise<WorkspaceTag | undefined> {
         try {
             const [tag] = await this.db
                 .select()
                 .from(workspaceTags)
-                .where(and(eq(workspaceTags.workspaceId, workspaceId), eq(workspaceTags.name, name), eq(workspaceTags.category, category)))
+                .where(
+                    and(
+                        eq(workspaceTags.workspaceId, workspaceId),
+                        eq(workspaceTags.name, name),
+                        eq(workspaceTags.category, category)
+                    )
+                )
                 .limit(1)
 
             return tag
@@ -197,4 +207,3 @@ export class WorkspaceTagsRepository implements IWorkspaceTagsRepository {
         }
     }
 }
-

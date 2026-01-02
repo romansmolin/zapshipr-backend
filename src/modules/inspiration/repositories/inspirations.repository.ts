@@ -182,7 +182,13 @@ export class InspirationsRepository implements IInspirationsRepository {
             const [existing] = await this.db
                 .select({ id: rawInspirations.id })
                 .from(rawInspirations)
-                .where(and(eq(rawInspirations.workspaceId, workspaceId), eq(rawInspirations.content, url), eq(rawInspirations.type, 'link')))
+                .where(
+                    and(
+                        eq(rawInspirations.workspaceId, workspaceId),
+                        eq(rawInspirations.content, url),
+                        eq(rawInspirations.type, 'link')
+                    )
+                )
                 .limit(1)
 
             return !!existing
@@ -197,4 +203,3 @@ export class InspirationsRepository implements IInspirationsRepository {
         }
     }
 }
-

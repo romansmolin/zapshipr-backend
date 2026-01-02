@@ -16,5 +16,3 @@ export const workspaces = pgTable('workspaces', {
 
 export type Workspace = typeof workspaces.$inferSelect
 export type InsertWorkspace = typeof workspaces.$inferInsert
-
-

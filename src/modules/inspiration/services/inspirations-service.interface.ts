@@ -30,4 +30,3 @@ export interface IInspirationsService {
     updateInspiration(id: string, userDescription: string): Promise<RawInspiration | null>
     deleteInspiration(id: string): Promise<boolean>
 }
-

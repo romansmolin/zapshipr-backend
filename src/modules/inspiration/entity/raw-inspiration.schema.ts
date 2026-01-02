@@ -2,10 +2,8 @@ import { pgTable, uuid, varchar, text, timestamp, pgEnum, jsonb } from 'drizzle-
 import { users } from '@/modules/user/entity/user.schema'
 import { workspaces } from '@/modules/workspace/entity/workspace.schema'
 
-// Enum для типов вдохновений
 export const inspirationType = pgEnum('inspiration_type', ['image', 'link', 'text', 'document'])
 
-// Enum для статуса обработки
 export const inspirationStatus = pgEnum('inspiration_status', ['processing', 'completed', 'failed'])
 
 export const rawInspirations = pgTable('raw_inspirations', {
@@ -17,21 +15,17 @@ export const rawInspirations = pgTable('raw_inspirations', {
         .notNull()
         .references(() => users.id, { onDelete: 'cascade' }),
 
-    // Тип вдохновения
     type: inspirationType('type').notNull(),
 
-    // Данные вдохновения
-    content: text('content'), // URL или текст
-    imageUrl: varchar('image_url', { length: 1024 }), // Ссылка на изображение в S3
-    userDescription: text('user_description'), // Описание от пользователя
+    content: text('content'),
+    imageUrl: varchar('image_url', { length: 1024 }),
+    userDescription: text('user_description'),
 
-    // Метаданные (parsed)
-    metadata: jsonb('metadata'), // {title, description, author, domain, etc}
-    parsedContent: text('parsed_content'), // Извлеченный текст (max 1500 слов)
+    metadata: jsonb('metadata'),
+    parsedContent: text('parsed_content'),
 
-    // Статус обработки
     status: inspirationStatus('status').notNull().default('processing'),
-    errorMessage: text('error_message'), // Если status=failed
+    errorMessage: text('error_message'),
 
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
@@ -39,4 +33,3 @@ export const rawInspirations = pgTable('raw_inspirations', {
 
 export type RawInspiration = typeof rawInspirations.$inferSelect
 export type InsertRawInspiration = typeof rawInspirations.$inferInsert
-

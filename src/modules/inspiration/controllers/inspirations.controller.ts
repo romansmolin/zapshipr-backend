@@ -109,4 +109,3 @@ export class InspirationsController {
         res.status(204).send()
     }
 }
-

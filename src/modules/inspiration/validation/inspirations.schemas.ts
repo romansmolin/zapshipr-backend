@@ -92,4 +92,3 @@ export type UpdateTagInput = z.infer<typeof UpdateTagSchema>
 export type GetTagsQuery = z.infer<typeof GetTagsQuerySchema>
 export type MainPromptInput = z.infer<typeof MainPromptSchema>
 export type UpdateMainPromptInput = z.infer<typeof UpdateMainPromptSchema>
-

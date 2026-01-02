@@ -15,4 +15,3 @@ export interface IWorkspaceTagsRepository {
     delete(id: string): Promise<boolean>
     incrementUsageCount(id: string): Promise<void>
 }
-

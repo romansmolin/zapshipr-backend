@@ -12,12 +12,11 @@ export const inspirationsExtractions = pgTable('inspirations_extractions', {
         .notNull()
         .references(() => workspaces.id, { onDelete: 'cascade' }),
 
-    // Структура для LLM (оптимизирована для AI)
-    summary: text('summary').notNull(), // Краткое описание (2-3 предложения)
+    summary: text('summary').notNull(),
     keyTopics: text('key_topics')
         .array()
         .notNull()
-        .default(sql`ARRAY[]::text[]`), // ["marketing", "storytelling"]
+        .default(sql`ARRAY[]::text[]`),
     contentFormat: varchar('content_format', { length: 50 }), // "video", "article", etc
     tone: text('tone')
         .array()
@@ -44,4 +43,3 @@ export const inspirationsExtractions = pgTable('inspirations_extractions', {
 
 export type InspirationsExtraction = typeof inspirationsExtractions.$inferSelect
 export type InsertInspirationsExtraction = typeof inspirationsExtractions.$inferInsert
-
