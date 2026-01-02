@@ -69,21 +69,6 @@ export class WorkspaceRepository implements IWorkspaceRepository {
         this.logger.info('Workspace deleted', { workspaceId: id })
     }
 
-    async updateAvatar(id: string, avatarUrl: string): Promise<Workspace | undefined> {
-        this.logger.info('Updating workspace avatar', { workspaceId: id })
-
-        const [workspace] = await this.db
-            .update(workspaces)
-            .set({
-                avatarUrl,
-                updatedAt: new Date(),
-            })
-            .where(eq(workspaces.id, id))
-            .returning()
-
-        return workspace
-    }
-
     async updateMainPrompt(id: string, mainPrompt: any): Promise<Workspace | undefined> {
         this.logger.info('Updating workspace main prompt', { workspaceId: id })
 

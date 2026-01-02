@@ -31,65 +31,75 @@ workspace/
 ## API Endpoints
 
 ### POST /workspaces
+
 Создание нового workspace.
 
 **Request Body:**
+
 ```json
 {
-  "name": "My Project",
-  "description": "Project description (optional)"
+    "name": "My Project",
+    "description": "Project description (optional)"
 }
 ```
 
 **Response:**
+
 ```json
 {
-  "id": "uuid",
-  "userId": "uuid",
-  "name": "My Project",
-  "description": "Project description",
-  "avatarUrl": null,
-  "createdAt": "2024-01-01T00:00:00Z",
-  "updatedAt": "2024-01-01T00:00:00Z"
-}
-```
-
-### GET /workspaces
-Получение списка всех workspace пользователя.
-
-**Response:**
-```json
-[
-  {
     "id": "uuid",
     "userId": "uuid",
     "name": "My Project",
     "description": "Project description",
-    "avatarUrl": "https://...",
+    "avatarUrl": null,
     "createdAt": "2024-01-01T00:00:00Z",
     "updatedAt": "2024-01-01T00:00:00Z"
-  }
+}
+```
+
+### GET /workspaces
+
+Получение списка всех workspace пользователя.
+
+**Response:**
+
+```json
+[
+    {
+        "id": "uuid",
+        "userId": "uuid",
+        "name": "My Project",
+        "description": "Project description",
+        "avatarUrl": "https://...",
+        "createdAt": "2024-01-01T00:00:00Z",
+        "updatedAt": "2024-01-01T00:00:00Z"
+    }
 ]
 ```
 
 ### GET /workspaces/:id
+
 Получение workspace по ID.
 
 ### PUT /workspaces/:id
+
 Обновление workspace.
 
 **Request Body:**
+
 ```json
 {
-  "name": "Updated Name (optional)",
-  "description": "Updated description (optional)"
+    "name": "Updated Name (optional)",
+    "description": "Updated description (optional)"
 }
 ```
 
 ### DELETE /workspaces/:id
+
 Удаление workspace. **Внимание:** удаляет все связанные посты и аккаунты!
 
 ### POST /workspaces/:id/avatar
+
 Загрузка аватарки для workspace.
 
 **Request:** multipart/form-data с полем `avatar`
@@ -97,14 +107,17 @@ workspace/
 ## Связи с другими модулями
 
 ### Posts
+
 Каждый пост привязан к workspace через `workspaceId`. При фильтрации постов можно указать `workspaceId` для получения постов конкретного workspace.
 
 ### Social Accounts
+
 Каждый подключенный аккаунт социальной сети привязан к workspace. При получении списка аккаунтов можно фильтровать по `workspaceId`.
 
 ## Cascade удаление
 
 При удалении workspace автоматически удаляются:
+
 - Все посты этого workspace
 - Все аккаунты социальных сетей этого workspace
 - Все связанные медиа-файлы
@@ -115,8 +128,8 @@ workspace/
 
 ```typescript
 const workspace = await workspaceService.create(userId, {
-  name: 'My Project',
-  description: 'Project for client X'
+    name: 'My Project',
+    description: 'Project for client X',
 })
 ```
 
@@ -124,8 +137,8 @@ const workspace = await workspaceService.create(userId, {
 
 ```typescript
 const posts = await postsService.getPostsByFilters(userId, {
-  workspaceId: 'workspace-uuid',
-  status: PostStatus.PUBLISHED
+    workspaceId: 'workspace-uuid',
+    status: PostStatus.PUBLISHED,
 })
 ```
 
@@ -134,5 +147,3 @@ const posts = await postsService.getPostsByFilters(userId, {
 ```typescript
 const accounts = await accountsService.getAllAccounts(userId, 'workspace-uuid')
 ```
-
-

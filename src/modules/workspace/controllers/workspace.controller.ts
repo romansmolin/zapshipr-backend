@@ -67,23 +67,6 @@ export class WorkspaceController implements IWorkspaceController {
         res.status(204).send()
     }
 
-    async updateAvatar(req: Request, res: Response): Promise<void> {
-        const userId = req.user!.id
-        const { id } = req.params
-        const file = req.file
-
-        if (!file) {
-            res.status(400).json({ error: 'No file provided' })
-            return
-        }
-
-        this.logger.info('Update workspace avatar request', { userId, workspaceId: id })
-
-        const workspace = await this.service.updateAvatar(id, userId, file)
-
-        res.json(workspace)
-    }
-
     async getMainPrompt(req: Request, res: Response): Promise<void> {
         const userId = req.user!.id
         const { id } = req.params
