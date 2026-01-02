@@ -5,14 +5,6 @@ export interface InspirationJobData {
 }
 
 export interface IInspirationWorker {
-    /**
-     * Запустить воркер
-     */
     start(): void
-
-    /**
-     * Остановить воркер
-     */
     stop(): Promise<void>
 }
-

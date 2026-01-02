@@ -1,7 +1,12 @@
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 
 import { PostPlatformsWithoutX } from '@/modules/post/schemas/posts.schemas'
-import { BullMqAccessTokenWorker, BullMqPostWorker, BullMqTokenRefreshScheduler, BullMqInspirationWorker } from '@/shared/queue'
+import {
+    BullMqAccessTokenWorker,
+    BullMqPostWorker,
+    BullMqTokenRefreshScheduler,
+    BullMqInspirationWorker,
+} from '@/shared/queue'
 import { schema } from '@/db/schema'
 
 import type { IPostsService } from '@/modules/post/services/posts-service.interface'

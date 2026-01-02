@@ -11,7 +11,7 @@ import { getEnvVar } from '@/shared/utils/get-env-var'
 
 export class LLMExtractionService implements ILLMExtractionService {
     private readonly openai: OpenAI
-    private readonly model: string = 'gpt-4o-mini' // или gpt-4o для более качественных результатов
+    private readonly model: string = 'gpt-4o' // или gpt-4o для более качественных результатов
     private readonly maxRetries = 3
 
     constructor(private readonly logger: ILogger) {
@@ -42,8 +42,8 @@ export class LLMExtractionService implements ILLMExtractionService {
                     messages: [
                         {
                             role: 'system',
-                            content: `You are an expert content analyst. Your task is to analyze content and extract structured insights in JSON format.
-Always respond with valid JSON only, no additional text or explanations.`,
+                            content: `You are an expert content analyst. Your task is to analyze content and extract structured insights.
+Extract key topics, tone, target audience, and actionable insights from the provided content.`,
                         },
                         {
                             role: 'user',
@@ -52,7 +52,61 @@ Always respond with valid JSON only, no additional text or explanations.`,
                     ],
                     temperature: 0.7,
                     max_tokens: 1500,
-                    response_format: { type: 'json_object' },
+                    response_format: {
+                        type: 'json_schema',
+                        json_schema: {
+                            name: 'content_extraction',
+                            strict: true,
+                            schema: {
+                                type: 'object',
+                                properties: {
+                                    summary: {
+                                        type: 'string',
+                                        description: 'A 2-3 sentence summary of the content',
+                                    },
+                                    keyTopics: {
+                                        type: 'array',
+                                        items: { type: 'string' },
+                                        description: 'Array of 3-7 main topics',
+                                    },
+                                    contentFormat: {
+                                        type: 'string',
+                                        enum: ['video', 'article', 'thread', 'carousel', 'image', 'infographic', 'story', 'other'],
+                                        description: 'Format of the content',
+                                    },
+                                    tone: {
+                                        type: 'array',
+                                        items: { type: 'string' },
+                                        description: 'Array of 2-4 tone attributes (e.g., professional, casual, humorous)',
+                                    },
+                                    targetAudience: {
+                                        type: 'string',
+                                        description: 'Description of the target audience',
+                                    },
+                                    keyInsights: {
+                                        type: 'array',
+                                        items: { type: 'string' },
+                                        description: 'Array of 3-5 key takeaways',
+                                    },
+                                    contentStructure: {
+                                        type: 'string',
+                                        description: 'Description of content structure (hook, body, cta, etc)',
+                                    },
+                                    visualStyle: {
+                                        type: 'string',
+                                        description: 'Description of visual style if applicable',
+                                    },
+                                    suggestedTags: {
+                                        type: 'array',
+                                        items: { type: 'string' },
+                                        description: 'Array of 5-10 suggested tags for workspace',
+                                    },
+                                },
+                                required: ['summary', 'keyTopics', 'contentFormat', 'tone', 'targetAudience', 'keyInsights', 'contentStructure', 'suggestedTags'],
+                                additionalProperties: false,
+                            },
+                        },
+                    },
                 })
 
                 const responseText = completion.choices[0]?.message?.content
@@ -124,26 +178,15 @@ Always respond with valid JSON only, no additional text or explanations.`,
 
         prompt += `Content:\n${input.content}\n\n`
 
-        prompt += `Extract the following information in JSON format:
-{
-  "summary": "A 2-3 sentence summary of the content",
-  "keyTopics": ["array", "of", "main", "topics"],
-  "contentFormat": "video | article | thread | carousel | image | infographic | story",
-  "tone": ["professional", "casual", "humorous", "educational"],
-  "targetAudience": "Description of the target audience",
-  "keyInsights": ["Key", "takeaways", "from", "content"],
-  "contentStructure": "Description of how the content is structured (hook, body, cta, etc)",
-  "visualStyle": "Description of visual style if applicable",
-  "suggestedTags": ["suggested", "tags", "for", "workspace"]
-}
-
-Guidelines:
-- Be concise and specific
-- Extract 3-7 key topics
-- Identify 2-4 tone attributes
-- Provide 3-5 key insights
-- Suggest 5-10 relevant tags
-- Focus on actionable insights`
+        prompt += `Guidelines:
+- Provide a clear 2-3 sentence summary
+- Extract 3-7 key topics that represent main themes
+- Identify 2-4 tone attributes (professional, casual, humorous, educational, inspirational, etc.)
+- Provide 3-5 actionable key insights or takeaways
+- Suggest 5-10 relevant tags that could categorize this content
+- Describe the content structure (hook, body, call-to-action, etc.)
+- If visual elements are present, describe the visual style
+- Focus on insights that would help create similar content`
 
         return prompt
     }
@@ -151,21 +194,22 @@ Guidelines:
     private parseExtractionResponse(responseText: string): ExtractionData {
         const data = JSON.parse(responseText)
 
-        // Валидация обязательных полей
-        if (!data.summary || !data.keyTopics || !data.contentFormat || !data.tone) {
-            throw new Error('Missing required fields in extraction response')
+        // OpenAI с JSON Schema гарантирует правильную структуру,
+        // но добавим минимальную валидацию на всякий случай
+        if (!data.summary || !data.keyTopics || !data.contentFormat) {
+            throw new Error('Invalid extraction response: missing required fields')
         }
 
         return {
             summary: data.summary,
-            keyTopics: Array.isArray(data.keyTopics) ? data.keyTopics : [],
+            keyTopics: data.keyTopics,
             contentFormat: data.contentFormat,
-            tone: Array.isArray(data.tone) ? data.tone : [],
-            targetAudience: data.targetAudience || '',
-            keyInsights: Array.isArray(data.keyInsights) ? data.keyInsights : [],
-            contentStructure: data.contentStructure || '',
-            visualStyle: data.visualStyle,
-            suggestedTags: Array.isArray(data.suggestedTags) ? data.suggestedTags : [],
+            tone: data.tone,
+            targetAudience: data.targetAudience,
+            keyInsights: data.keyInsights,
+            contentStructure: data.contentStructure,
+            visualStyle: data.visualStyle || null,
+            suggestedTags: data.suggestedTags,
         }
     }
 
@@ -173,4 +217,3 @@ Guidelines:
         return new Promise((resolve) => setTimeout(resolve, ms))
     }
 }
-
