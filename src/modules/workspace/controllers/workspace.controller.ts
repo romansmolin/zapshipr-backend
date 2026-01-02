@@ -83,6 +83,28 @@ export class WorkspaceController implements IWorkspaceController {
 
         res.json(workspace)
     }
+
+    async getMainPrompt(req: Request, res: Response): Promise<void> {
+        const userId = req.user!.id
+        const { id } = req.params
+
+        this.logger.info('Get main prompt request', { userId, workspaceId: id })
+
+        const mainPrompt = await this.service.getMainPrompt(id, userId)
+
+        res.json(mainPrompt)
+    }
+
+    async updateMainPrompt(req: Request, res: Response): Promise<void> {
+        const userId = req.user!.id
+        const { id } = req.params
+
+        this.logger.info('Update main prompt request', { userId, workspaceId: id })
+
+        const mainPrompt = await this.service.updateMainPrompt(id, userId, req.body)
+
+        res.json(mainPrompt)
+    }
 }
 
 

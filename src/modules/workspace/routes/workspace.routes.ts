@@ -34,6 +34,10 @@ export const createWorkspaceRouter = (logger: ILogger, db: NodePgDatabase<typeof
         upload.single('avatar'),
         asyncHandler(controller.updateAvatar.bind(controller))
     )
+    
+    // Main Prompt endpoints
+    router.get('/workspaces/:id/prompt', authMiddleware, asyncHandler(controller.getMainPrompt.bind(controller)))
+    router.put('/workspaces/:id/prompt', authMiddleware, asyncHandler(controller.updateMainPrompt.bind(controller)))
 
     return router
 }

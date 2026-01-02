@@ -1,4 +1,5 @@
 import type { InsertWorkspace, Workspace } from '../entity/workspace.schema'
+import type { MainPrompt } from '../validation/workspace.schemas'
 
 export interface IWorkspaceRepository {
     create(data: InsertWorkspace): Promise<Workspace>
@@ -7,6 +8,7 @@ export interface IWorkspaceRepository {
     update(id: string, data: Partial<InsertWorkspace>): Promise<Workspace | undefined>
     delete(id: string): Promise<void>
     updateAvatar(id: string, avatarUrl: string): Promise<Workspace | undefined>
+    updateMainPrompt(id: string, mainPrompt: MainPrompt): Promise<Workspace | undefined>
 }
 
 

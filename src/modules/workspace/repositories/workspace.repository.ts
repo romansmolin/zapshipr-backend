@@ -83,6 +83,21 @@ export class WorkspaceRepository implements IWorkspaceRepository {
 
         return workspace
     }
+
+    async updateMainPrompt(id: string, mainPrompt: any): Promise<Workspace | undefined> {
+        this.logger.info('Updating workspace main prompt', { workspaceId: id })
+
+        const [workspace] = await this.db
+            .update(workspaces)
+            .set({
+                mainPrompt,
+                updatedAt: new Date(),
+            })
+            .where(eq(workspaces.id, id))
+            .returning()
+
+        return workspace
+    }
 }
 
 

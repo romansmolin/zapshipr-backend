@@ -5,7 +5,7 @@ import type { IMediaUploader } from '@/shared/media-uploader'
 
 import { toWorkspaceDto, type WorkspaceDto } from '../entity/workspace.dto'
 import type { IWorkspaceRepository } from '../repositories/workspace-repository.interface'
-import type { CreateWorkspaceInput, UpdateWorkspaceInput } from '../validation/workspace.schemas'
+import type { CreateWorkspaceInput, UpdateWorkspaceInput, MainPrompt, UpdateMainPrompt } from '../validation/workspace.schemas'
 import type { IWorkspaceService } from './workspace-service.interface'
 
 export class WorkspaceService implements IWorkspaceService {
@@ -114,6 +114,79 @@ export class WorkspaceService implements IWorkspaceService {
         }
 
         return toWorkspaceDto(updatedWorkspace)
+    }
+
+    async getMainPrompt(workspaceId: string, userId: string): Promise<MainPrompt> {
+        this.logger.info('Getting main prompt', { workspaceId, userId })
+
+        const workspace = await this.repository.findById(workspaceId)
+
+        if (!workspace) {
+            throw new BaseAppError('Workspace not found', ErrorCode.NOT_FOUND, 404)
+        }
+
+        if (workspace.userId !== userId) {
+            throw new BaseAppError('Access denied', ErrorCode.FORBIDDEN, 403)
+        }
+
+        // Если main prompt не установлен, вернуть пустую структуру
+        if (!workspace.mainPrompt) {
+            return {
+                brandVoice: '',
+                coreThemes: [],
+                targetAudience: '',
+                contentGoals: [],
+                avoidTopics: [],
+                preferredFormats: [],
+                additionalContext: '',
+            }
+        }
+
+        return workspace.mainPrompt as MainPrompt
+    }
+
+    async updateMainPrompt(workspaceId: string, userId: string, data: UpdateMainPrompt): Promise<MainPrompt> {
+        this.logger.info('Updating main prompt', { workspaceId, userId })
+
+        const workspace = await this.repository.findById(workspaceId)
+
+        if (!workspace) {
+            throw new BaseAppError('Workspace not found', ErrorCode.NOT_FOUND, 404)
+        }
+
+        if (workspace.userId !== userId) {
+            throw new BaseAppError('Access denied', ErrorCode.FORBIDDEN, 403)
+        }
+
+        // Merge с существующим prompt
+        const currentPrompt = (workspace.mainPrompt as MainPrompt) || {
+            brandVoice: '',
+            coreThemes: [],
+            targetAudience: '',
+            contentGoals: [],
+            avoidTopics: [],
+            preferredFormats: [],
+            additionalContext: '',
+        }
+
+        const updatedPrompt: MainPrompt = {
+            brandVoice: data.brandVoice !== undefined ? data.brandVoice : currentPrompt.brandVoice || '',
+            coreThemes: data.coreThemes !== undefined ? data.coreThemes : currentPrompt.coreThemes || [],
+            targetAudience: data.targetAudience !== undefined ? data.targetAudience : currentPrompt.targetAudience || '',
+            contentGoals: data.contentGoals !== undefined ? data.contentGoals : currentPrompt.contentGoals || [],
+            avoidTopics: data.avoidTopics !== undefined ? data.avoidTopics : currentPrompt.avoidTopics || [],
+            preferredFormats: data.preferredFormats !== undefined ? data.preferredFormats : currentPrompt.preferredFormats || [],
+            additionalContext: data.additionalContext !== undefined ? data.additionalContext : currentPrompt.additionalContext || '',
+        }
+
+        // Обновить в БД
+        const updated = await this.repository.updateMainPrompt(workspaceId, updatedPrompt)
+
+        if (!updated) {
+            throw new BaseAppError('Failed to update main prompt', ErrorCode.INTERNAL_SERVER_ERROR, 500)
+        }
+
+        return updatedPrompt
     }
 }
 

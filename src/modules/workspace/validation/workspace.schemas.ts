@@ -10,7 +10,29 @@ export const updateWorkspaceSchema = z.object({
     description: z.string().optional(),
 })
 
+export const mainPromptSchema = z.object({
+    brandVoice: z.string().optional(),
+    coreThemes: z.array(z.string()).optional(),
+    targetAudience: z.string().optional(),
+    contentGoals: z.array(z.string()).optional(),
+    avoidTopics: z.array(z.string()).optional(),
+    preferredFormats: z.array(z.string()).optional(),
+    additionalContext: z.string().optional(),
+})
+
+export const updateMainPromptSchema = z.object({
+    brandVoice: z.string().optional(),
+    coreThemes: z.array(z.string()).optional(),
+    targetAudience: z.string().optional(),
+    contentGoals: z.array(z.string()).optional(),
+    avoidTopics: z.array(z.string()).optional(),
+    preferredFormats: z.array(z.string()).optional(),
+    additionalContext: z.string().optional(),
+})
+
 export type CreateWorkspaceInput = z.infer<typeof createWorkspaceSchema>
 export type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceSchema>
+export type MainPrompt = z.infer<typeof mainPromptSchema>
+export type UpdateMainPrompt = z.infer<typeof updateMainPromptSchema>
 
 
