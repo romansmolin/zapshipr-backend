@@ -1,0 +1,60 @@
+# Dependencies
+node_modules
+npm-debug.log*
+
+# Build
+dist
+
+# Testing
+coverage
+*.test.ts
+*.spec.ts
+__tests__
+**/__tests__
+
+# Development
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Documentation
+*.md
+!README.md
+docs
+
+# CI/CD
+.github
+.gitlab-ci.yml
+.travis.yml
+
+# Temp files
+temp
+tmp
+*.tmp
+*.log
+
+# Scripts
+scripts/*.ts
+scripts/*.js
+!scripts/apply-*.js
+
+# Tasks
+tasks
+
+# Drizzle
+drizzle.config.ts
+rename-tenant-id-to-user-id.js
+
+# Other
+.DS_Store
+Thumbs.db
+
