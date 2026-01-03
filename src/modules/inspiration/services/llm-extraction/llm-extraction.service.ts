@@ -43,7 +43,10 @@ export class LLMExtractionService implements ILLMExtractionService {
                         {
                             role: 'system',
                             content: `You are an expert content analyst. Your task is to analyze content and extract structured insights.
-Extract key topics, tone, target audience, and actionable insights from the provided content.`,
+Extract key topics, tone, target audience, and actionable insights from the provided content.
+
+IMPORTANT: Always respond in English only, regardless of the input content language.
+If the content is in another language, translate and analyze it, but provide all output in English.`,
                         },
                         {
                             role: 'user',

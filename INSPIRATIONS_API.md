@@ -32,13 +32,13 @@
 
 ## Content Types
 
-| Type | Description | Example |
-|------|-------------|---------|
-| `text` | Plain text notes | User's ideas, quotes |
-| `url` | Web pages, articles | Blog posts, news articles |
-| `image` | Images with description | Screenshots, infographics |
-| `video` | Video links | YouTube, Vimeo, TikTok |
-| `document` | Files | PDF, DOCX, TXT, MD |
+| Type       | Description             | Example                   |
+| ---------- | ----------------------- | ------------------------- |
+| `text`     | Plain text notes        | User's ideas, quotes      |
+| `url`      | Web pages, articles     | Blog posts, news articles |
+| `image`    | Images with description | Screenshots, infographics |
+| `video`    | Video links             | YouTube, Vimeo, TikTok    |
+| `document` | Files                   | PDF, DOCX, TXT, MD        |
 
 ---
 
@@ -49,6 +49,7 @@
 **POST** `/workspaces/:workspaceId/inspirations`
 
 **Headers**:
+
 ```
 Authorization: Bearer {token}
 ```
@@ -56,74 +57,80 @@ Authorization: Bearer {token}
 #### Text Inspiration
 
 **Request**:
+
 ```json
 {
-  "type": "text",
-  "content": "Focus on solving real user problems, not building features",
-  "userDescription": "Key principle for product development"
+    "type": "text",
+    "content": "Focus on solving real user problems, not building features",
+    "userDescription": "Key principle for product development"
 }
 ```
 
 #### URL Inspiration
 
 **Request**:
+
 ```json
 {
-  "type": "url",
-  "content": "https://example.com/article-about-startups",
-  "userDescription": "Great article about MVP development"
+    "type": "url",
+    "content": "https://example.com/article-about-startups",
+    "userDescription": "Great article about MVP development"
 }
 ```
 
 #### Image Inspiration
 
 **Request**:
+
 ```json
 {
-  "type": "image",
-  "imageUrl": "https://s3.amazonaws.com/.../image.jpg",
-  "userDescription": "Perfect color palette for our brand"
+    "type": "image",
+    "imageUrl": "https://s3.amazonaws.com/.../image.jpg",
+    "userDescription": "Perfect color palette for our brand"
 }
 ```
 
 #### Video Inspiration
 
 **Request**:
+
 ```json
 {
-  "type": "video",
-  "content": "https://youtube.com/watch?v=abc123",
-  "userDescription": "Tutorial on Instagram Reels editing"
+    "type": "video",
+    "content": "https://youtube.com/watch?v=abc123",
+    "userDescription": "Tutorial on Instagram Reels editing"
 }
 ```
 
 #### Document Inspiration
 
 **Request**:
+
 ```json
 {
-  "type": "document",
-  "content": "https://s3.amazonaws.com/.../report.pdf",
-  "userDescription": "Industry trends report 2024"
+    "type": "document",
+    "content": "https://s3.amazonaws.com/.../report.pdf",
+    "userDescription": "Industry trends report 2024"
 }
 ```
 
 **Response** (all types):
+
 ```json
 {
-  "id": "insp_abc123",
-  "workspaceId": "ws_xyz789",
-  "userId": "user_456",
-  "type": "url",
-  "content": "https://example.com/article",
-  "imageUrl": null,
-  "userDescription": "Great article",
-  "metadata": null,
-  "parsedContent": null,
-  "status": "processing",
-  "errorMessage": null,
-  "createdAt": "2024-01-01T12:00:00Z",
-  "updatedAt": "2024-01-01T12:00:00Z"
+    "id": "insp_abc123",
+    "workspaceId": "ws_xyz789",
+    "userId": "user_456",
+    "type": "url",
+    "content": "https://example.com/article",
+    "imageUrl": null,
+    "userDescription": "Great article",
+    "metadata": null,
+    "parsedContent": null,
+    "status": "processing",
+    "errorMessage": null,
+    "createdAt": "2024-01-01T12:00:00Z",
+    "updatedAt": "2024-01-01T12:00:00Z"
 }
 ```
 
@@ -134,58 +141,68 @@ Authorization: Bearer {token}
 **GET** `/workspaces/:workspaceId/inspirations`
 
 **Query Parameters**:
+
 - `status` (optional): `processing` | `completed` | `failed`
 - `type` (optional): `text` | `url` | `image` | `video` | `document`
 - `limit` (optional): 1-100, default: 20
 - `offset` (optional): pagination offset, default: 0
 
 **Example**:
+
 ```
 GET /workspaces/ws_xyz/inspirations?status=completed&type=url&limit=10
 ```
 
 **Response**:
+
 ```json
 [
-  {
-    "id": "insp_abc123",
-    "workspaceId": "ws_xyz789",
-    "userId": "user_456",
-    "type": "url",
-    "content": "https://example.com/article",
-    "imageUrl": null,
-    "userDescription": "Great article about startups",
-    "metadata": {
-      "title": "How to Build a Successful Startup",
-      "description": "Complete guide to building a startup...",
-      "imageUrl": "https://example.com/og-image.jpg",
-      "siteName": "TechCrunch",
-      "author": "John Doe"
-    },
-    "parsedContent": {
-      "textContent": "Full article text extracted...",
-      "wordCount": 1500
-    },
-    "status": "completed",
-    "errorMessage": null,
-    "createdAt": "2024-01-01T12:00:00Z",
-    "updatedAt": "2024-01-01T12:05:00Z",
-    "extraction": {
-      "summary": "This article covers the fundamentals of building a startup, from finding product-market fit to securing funding.",
-      "keyTopics": ["startups", "entrepreneurship", "product-market fit", "fundraising"],
-      "contentFormat": "article",
-      "tone": ["professional", "educational", "actionable"],
-      "targetAudience": "Aspiring entrepreneurs and early-stage founders",
-      "keyInsights": [
-        "Focus on solving real problems, not building features",
-        "Build MVP and validate with real users",
-        "Talk to customers before writing any code"
-      ],
-      "contentStructure": "Hook → Problem → Solution → Case Studies → Actionable Steps → CTA",
-      "visualStyle": null,
-      "suggestedTags": ["startup", "entrepreneurship", "mvp", "product-market-fit", "fundraising", "business"]
+    {
+        "id": "insp_abc123",
+        "workspaceId": "ws_xyz789",
+        "userId": "user_456",
+        "type": "url",
+        "content": "https://example.com/article",
+        "imageUrl": null,
+        "userDescription": "Great article about startups",
+        "metadata": {
+            "title": "How to Build a Successful Startup",
+            "description": "Complete guide to building a startup...",
+            "imageUrl": "https://example.com/og-image.jpg",
+            "siteName": "TechCrunch",
+            "author": "John Doe"
+        },
+        "parsedContent": {
+            "textContent": "Full article text extracted...",
+            "wordCount": 1500
+        },
+        "status": "completed",
+        "errorMessage": null,
+        "createdAt": "2024-01-01T12:00:00Z",
+        "updatedAt": "2024-01-01T12:05:00Z",
+        "extraction": {
+            "summary": "This article covers the fundamentals of building a startup, from finding product-market fit to securing funding.",
+            "keyTopics": ["startups", "entrepreneurship", "product-market fit", "fundraising"],
+            "contentFormat": "article",
+            "tone": ["professional", "educational", "actionable"],
+            "targetAudience": "Aspiring entrepreneurs and early-stage founders",
+            "keyInsights": [
+                "Focus on solving real problems, not building features",
+                "Build MVP and validate with real users",
+                "Talk to customers before writing any code"
+            ],
+            "contentStructure": "Hook → Problem → Solution → Case Studies → Actionable Steps → CTA",
+            "visualStyle": null,
+            "suggestedTags": [
+                "startup",
+                "entrepreneurship",
+                "mvp",
+                "product-market-fit",
+                "fundraising",
+                "business"
+            ]
+        }
     }
-  }
 ]
 ```
 
@@ -204,10 +221,11 @@ GET /workspaces/ws_xyz/inspirations?status=completed&type=url&limit=10
 **PUT** `/workspaces/:workspaceId/inspirations/:id`
 
 **Request** (all fields optional):
+
 ```json
 {
-  "userDescription": "Updated description",
-  "content": "Updated content"
+    "userDescription": "Updated description",
+    "content": "Updated content"
 }
 ```
 
@@ -259,11 +277,11 @@ GET /workspaces/ws_xyz/inspirations?status=completed&type=url&limit=10
   siteName?: string
   author?: string
   publishedDate?: string
-  
+
   // For Video
   videoThumbnail?: string
   videoDuration?: number
-  
+
   // For Document
   fileName?: string
   fileSize?: number
@@ -275,8 +293,8 @@ GET /workspaces/ws_xyz/inspirations?status=completed&type=url&limit=10
 
 ```typescript
 {
-  textContent: string    // Extracted text content
-  wordCount: number      // Number of words
+    textContent: string // Extracted text content
+    wordCount: number // Number of words
 }
 ```
 
@@ -302,11 +320,11 @@ GET /workspaces/ws_xyz/inspirations?status=completed&type=url&limit=10
 
 ### Processing States
 
-| Status | Description | UI Suggestion |
-|--------|-------------|---------------|
+| Status       | Description               | UI Suggestion                         |
+| ------------ | ------------------------- | ------------------------------------- |
 | `processing` | Content is being analyzed | Show spinner, poll every 5-10 seconds |
-| `completed` | Analysis complete | Show full data with extraction |
-| `failed` | Processing failed | Show error message, offer retry |
+| `completed`  | Analysis complete         | Show full data with extraction        |
+| `failed`     | Processing failed         | Show error message, offer retry       |
 
 ### Polling for Updates
 
@@ -314,26 +332,24 @@ When inspiration is created with `status: "processing"`:
 
 ```javascript
 async function pollInspiration(workspaceId, inspirationId) {
-  const maxAttempts = 30; // 5 minutes (10s * 30)
-  let attempts = 0;
-  
-  const interval = setInterval(async () => {
-    attempts++;
-    
-    const inspiration = await fetch(
-      `/workspaces/${workspaceId}/inspirations/${inspirationId}`
-    );
-    
-    if (inspiration.status === 'completed' || inspiration.status === 'failed') {
-      clearInterval(interval);
-      // Update UI
-    }
-    
-    if (attempts >= maxAttempts) {
-      clearInterval(interval);
-      // Show timeout message
-    }
-  }, 10000); // Poll every 10 seconds
+    const maxAttempts = 30 // 5 minutes (10s * 30)
+    let attempts = 0
+
+    const interval = setInterval(async () => {
+        attempts++
+
+        const inspiration = await fetch(`/workspaces/${workspaceId}/inspirations/${inspirationId}`)
+
+        if (inspiration.status === 'completed' || inspiration.status === 'failed') {
+            clearInterval(interval)
+            // Update UI
+        }
+
+        if (attempts >= maxAttempts) {
+            clearInterval(interval)
+            // Show timeout message
+        }
+    }, 10000) // Poll every 10 seconds
 }
 ```
 
@@ -345,16 +361,16 @@ async function pollInspiration(workspaceId, inspirationId) {
 
 ```json
 {
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Invalid request data",
-    "details": [
-      {
-        "field": "type",
-        "message": "type must be one of: text, url, image, video, document"
-      }
-    ]
-  }
+    "error": {
+        "code": "VALIDATION_ERROR",
+        "message": "Invalid request data",
+        "details": [
+            {
+                "field": "type",
+                "message": "type must be one of: text, url, image, video, document"
+            }
+        ]
+    }
 }
 ```
 
@@ -374,6 +390,7 @@ async function pollInspiration(workspaceId, inspirationId) {
 ### List View
 
 **Show for each inspiration**:
+
 - Type icon (text/url/image/video/document)
 - Thumbnail (if available)
 - Title or truncated content
@@ -382,11 +399,13 @@ async function pollInspiration(workspaceId, inspirationId) {
 - Created date
 
 **Filters**:
+
 - By status (All / Processing / Completed / Failed)
 - By type (All / Text / URL / Image / Video / Document)
 - Search by content/description
 
 **Sorting**:
+
 - Newest first (default)
 - Oldest first
 - By type
@@ -394,23 +413,26 @@ async function pollInspiration(workspaceId, inspirationId) {
 ### Detail View
 
 **For `status: "processing"`**:
+
 - Show loading spinner
 - Display: "Analyzing content..."
 - Auto-refresh every 10 seconds
 
 **For `status: "completed"`**:
+
 - Show original content/link
 - Display metadata (title, description, author, etc.)
 - Show AI extraction in organized sections:
-  - Summary (highlighted)
-  - Key Topics (as chips/tags)
-  - Key Insights (bulleted list)
-  - Content Format & Tone
-  - Target Audience
-  - Content Structure
-  - Suggested Tags (clickable to add to workspace)
+    - Summary (highlighted)
+    - Key Topics (as chips/tags)
+    - Key Insights (bulleted list)
+    - Content Format & Tone
+    - Target Audience
+    - Content Structure
+    - Suggested Tags (clickable to add to workspace)
 
 **For `status: "failed"`**:
+
 - Show error message
 - Offer "Retry" button
 - Still show user description and original content
@@ -418,11 +440,13 @@ async function pollInspiration(workspaceId, inspirationId) {
 ### Create Form
 
 **Type Selector**:
+
 ```
 [Text] [URL] [Image] [Video] [Document]
 ```
 
 **Form Fields** (adapt based on type):
+
 - Text: Textarea for content
 - URL: Input field + preview after validation
 - Image: Upload button or URL input
@@ -431,6 +455,7 @@ async function pollInspiration(workspaceId, inspirationId) {
 - User Description: Optional textarea for all types
 
 **Validation**:
+
 - Required: `type`, `content` or `imageUrl`
 - URL format validation for url/video types
 - File size limit for documents (10MB)
@@ -438,6 +463,7 @@ async function pollInspiration(workspaceId, inspirationId) {
 ### Suggested Tags
 
 After processing completes:
+
 - Display `suggestedTags` as chips
 - Add "+" button to add tag to workspace
 - Show checkmark if tag already exists
@@ -451,7 +477,8 @@ After processing completes:
 
 **Text**: No parsing needed, sent directly to LLM
 
-**URL**: 
+**URL**:
+
 - Fetches page with axios
 - Extracts metadata (Open Graph, Twitter Cards)
 - Parses HTML with cheerio
@@ -459,12 +486,14 @@ After processing completes:
 
 **Image**: User description + OCR (future feature)
 
-**Video**: 
+**Video**:
+
 - Fetches metadata via oEmbed
 - Extracts thumbnail, duration, title
 - Sends metadata to LLM
 
 **Document**:
+
 - PDF: Extracts text with pdf-parse
 - DOCX: Extracts text with mammoth
 - TXT/MD: Reads directly
@@ -490,22 +519,26 @@ After processing completes:
 ## Integration Checklist
 
 ### Phase 1: Basic CRUD
+
 - [ ] Create inspiration form (all 5 types)
 - [ ] Display inspiration list
 - [ ] Show inspiration details
 - [ ] Delete inspiration
 
 ### Phase 2: Status Handling
+
 - [ ] Show processing state
 - [ ] Implement polling for updates
 - [ ] Handle failed state with retry
 
 ### Phase 3: AI Features
+
 - [ ] Display LLM extraction results
 - [ ] Show suggested tags
 - [ ] Format key insights and topics
 
 ### Phase 4: Polish
+
 - [ ] Add filters (status, type)
 - [ ] Add search functionality
 - [ ] Implement optimistic updates
@@ -514,4 +547,3 @@ After processing completes:
 ---
 
 **Last Updated**: January 2, 2025
-
