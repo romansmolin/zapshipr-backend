@@ -10,11 +10,13 @@ export interface ExtractionData {
     suggestedTags: string[]
 }
 
+import type { InspirationMetadata } from '../../entity/raw-inspiration.schema'
+
 export interface ExtractionInput {
     type: 'image' | 'link' | 'text' | 'document'
     content: string
     userDescription?: string
-    metadata?: Record<string, any>
+    metadata?: InspirationMetadata
 }
 
 export interface ExtractionResult {
@@ -34,4 +36,3 @@ export interface ILLMExtractionService {
      */
     buildPromptForExtraction(input: ExtractionInput): string
 }
-

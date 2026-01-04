@@ -2,6 +2,20 @@ import { pgTable, uuid, varchar, text, timestamp, pgEnum, jsonb } from 'drizzle-
 import { users } from '@/modules/user/entity/user.schema'
 import { workspaces } from '@/modules/workspace/entity/workspace.schema'
 
+export type InspirationMetadataSource = 'external' | 'youtube' | 'tiktok' | 'notion' | 'docs'
+
+export type InspirationMetadata = {
+    title?: string
+    description?: string
+    author?: string
+    domain?: string
+    publishedDate?: string
+    thumbnailUrl?: string
+    source: InspirationMetadataSource
+    youTubeVideoId?: string
+    tikTokMediaId?: string
+}
+
 export const inspirationType = pgEnum('inspiration_type', ['image', 'link', 'text', 'document'])
 
 export const inspirationStatus = pgEnum('inspiration_status', ['processing', 'completed', 'failed'])
@@ -22,7 +36,7 @@ export const rawInspirations = pgTable('raw_inspirations', {
     imageUrl: varchar('image_url', { length: 1024 }),
     userDescription: text('user_description'),
 
-    metadata: jsonb('metadata'),
+    metadata: jsonb('metadata').$type<InspirationMetadata | null>(),
     parsedContent: text('parsed_content'),
 
     status: inspirationStatus('status').notNull().default('processing'),

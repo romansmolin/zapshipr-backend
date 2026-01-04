@@ -11,7 +11,7 @@ const pdfParse = pdfParseModule.default || pdfParseModule
 
 export class ContentParserService implements IContentParserService {
     private readonly TIMEOUT = 30000 // 30 seconds
-    private readonly MAX_CONTENT_LENGTH = 50000 // Макс. размер HTML для парсинга
+    private readonly MAX_CONTENT_LENGTH = -1 // Без ограничения размера HTML
 
     constructor(private readonly logger: ILogger) {}
 
@@ -287,4 +287,3 @@ export class ContentParserService implements IContentParserService {
         return null
     }
 }
-

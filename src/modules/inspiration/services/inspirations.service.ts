@@ -24,12 +24,9 @@ export class InspirationsService implements IInspirationsService {
     ) {}
 
     async createInspiration(data: CreateInspirationData): Promise<RawInspiration> {
-        // Валидация в зависимости от типа
-        if (data.type === 'link' || data.type === 'text') {
+        if (data.type === 'link' || data.type === 'text')
             validateInspirationByType({ type: data.type, content: data.content })
-        }
 
-        // Проверка дубликатов для ссылок
         if (data.type === 'link' && data.content) {
             const isDuplicate = await this.inspirationsRepository.checkDuplicateUrl(data.workspaceId, data.content)
 
@@ -42,7 +39,6 @@ export class InspirationsService implements IInspirationsService {
             }
         }
 
-        // Загрузка файла в S3 (если type=image или document)
         let imageUrl: string | undefined
 
         if (data.file && (data.type === 'image' || data.type === 'document')) {
@@ -65,7 +61,6 @@ export class InspirationsService implements IInspirationsService {
 
         const metadata = buildInspirationMetadataSource(data.type, data.content)
 
-        // Создание inspiration
         const inspiration = await this.inspirationsRepository.create({
             workspaceId: data.workspaceId,
             userId: data.userId,
@@ -85,7 +80,6 @@ export class InspirationsService implements IInspirationsService {
             type: data.type,
         })
 
-        // Добавить задачу в очередь для обработки
         await this.inspirationScheduler.scheduleInspiration(inspiration.id, data.workspaceId, data.userId)
 
         this.logger.info('Scheduled inspiration for processing', {
@@ -131,7 +125,11 @@ export class InspirationsService implements IInspirationsService {
         return inspiration
     }
 
-    async updateInspiration(id: string, workspaceId: string, userDescription: string): Promise<RawInspiration | null> {
+    async updateInspiration(
+        id: string,
+        workspaceId: string,
+        userDescription: string
+    ): Promise<RawInspiration | null> {
         const inspiration = await this.inspirationsRepository.findById(id)
 
         if (!inspiration) {
@@ -229,7 +227,6 @@ export class InspirationsService implements IInspirationsService {
             })
         }
 
-        // Обновляем статус на processing и очищаем errorMessage
         const updated = await this.inspirationsRepository.update(id, {
             status: 'processing',
             errorMessage: null,
@@ -243,7 +240,6 @@ export class InspirationsService implements IInspirationsService {
             })
         }
 
-        // Добавляем задачу в очередь для повторной обработки
         await this.inspirationScheduler.scheduleInspiration(id, workspaceId, userId)
 
         this.logger.info('Retried inspiration processing', {

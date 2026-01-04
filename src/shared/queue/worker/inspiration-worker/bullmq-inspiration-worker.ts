@@ -11,6 +11,7 @@ import type { IInspirationsRepository } from '@/modules/inspiration/repositories
 import type { IInspirationsExtractionRepository } from '@/modules/inspiration/repositories/inspirations-extraction-repository.interface'
 import type { IWorkspaceTagsRepository } from '@/modules/inspiration/repositories/workspace-tags-repository.interface'
 import { buildInspirationMetadataSource } from '@/modules/inspiration/utils/inspiration-metadata'
+import type { InspirationMetadata } from '@/modules/inspiration/entity/raw-inspiration.schema'
 
 export class BullMqInspirationWorker implements IInspirationWorker {
     private worker: Worker<InspirationJobData>
@@ -69,7 +70,7 @@ export class BullMqInspirationWorker implements IInspirationWorker {
 
         // Step 2: Парсинг контента
         let parsedContent = ''
-        let metadata: Record<string, any> = {}
+        let metadata: InspirationMetadata = { source: 'external' }
 
         if (inspiration.type === 'link') {
             const parsed = await this.contentParser.parseUrl(inspiration.content!)

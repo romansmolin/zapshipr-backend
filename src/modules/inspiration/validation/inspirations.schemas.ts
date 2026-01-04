@@ -24,6 +24,13 @@ export const validateInspirationByType = (data: { type: string; content?: string
         } catch {
             throw new Error('Invalid URL format')
         }
+        const url = data.content
+        if (/tiktok\.com\//i.test(url)) {
+            throw new Error('TikTok links are not supported yet')
+        }
+        if (/instagram\.com\/reel\//i.test(url)) {
+            throw new Error('Instagram Reels links are not supported yet')
+        }
     }
 
     if (data.type === 'text') {

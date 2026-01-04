@@ -85,6 +85,24 @@ describe('Inspirations Validation Schemas', () => {
             }).toThrow('Invalid URL format')
         })
 
+        it('should reject tiktok links', () => {
+            expect(() => {
+                validateInspirationByType({
+                    type: 'link',
+                    content: 'https://www.tiktok.com/@user/video/1234567890',
+                })
+            }).toThrow('TikTok links are not supported yet')
+        })
+
+        it('should reject instagram reels links', () => {
+            expect(() => {
+                validateInspirationByType({
+                    type: 'link',
+                    content: 'https://www.instagram.com/reel/ABC123/?utm_source=ig_web_copy_link',
+                })
+            }).toThrow('Instagram Reels links are not supported yet')
+        })
+
         it('should validate text type requires content', () => {
             expect(() => {
                 validateInspirationByType({ type: 'text', content: undefined })

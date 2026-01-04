@@ -21,10 +21,11 @@ export class InspirationsController {
         const userId = req.user!.id
         const { workspaceId } = req.params
         const body = CreateInspirationSchema.parse(req.body)
-        const file = req.file
+        const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined
+        const file = req.file ?? files?.file?.[0] ?? files?.content?.[0]
 
         this.logger.info('Create inspiration request', { userId, workspaceId, type: body.type })
-
+        this.logger.debug('File: ', { file: req.body.file })
         if ((body.type === 'image' || body.type === 'document') && !file) {
             throw new AppError({
                 errorMessageCode: ErrorMessageCode.VALIDATION_ERROR,
