@@ -5,6 +5,7 @@ export interface ExtractionData {
     tone: string[]
     targetAudience: string
     keyInsights: string[]
+    postIdeas: string[]
     contentStructure: string
     visualStyle?: string
     suggestedTags: string[]

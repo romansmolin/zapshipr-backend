@@ -130,6 +130,7 @@ export class BullMqInspirationWorker implements IInspirationWorker {
             tone: extractionResult.extraction.tone,
             targetAudience: extractionResult.extraction.targetAudience,
             keyInsights: extractionResult.extraction.keyInsights,
+            postIdeas: extractionResult.extraction.postIdeas,
             contentStructure: extractionResult.extraction.contentStructure,
             visualStyle: extractionResult.extraction.visualStyle || null,
             suggestedTags: extractionResult.extraction.suggestedTags,

@@ -108,6 +108,12 @@ If the content is in another language, translate and analyze it, but provide all
                                         items: { type: 'string' },
                                         description: 'Array of 3-5 key takeaways',
                                     },
+                                    postIdeas: {
+                                        type: 'array',
+                                        items: { type: 'string' },
+                                        description:
+                                            'Array of 3-6 post ideas inspired by the content and/or image',
+                                    },
                                     contentStructure: {
                                         type: 'string',
                                         description: 'Description of content structure (hook, body, cta, etc)',
@@ -129,6 +135,7 @@ If the content is in another language, translate and analyze it, but provide all
                                     'tone',
                                     'targetAudience',
                                     'keyInsights',
+                                    'postIdeas',
                                     'contentStructure',
                                     'visualStyle',
                                     'suggestedTags',
@@ -213,6 +220,7 @@ If the content is in another language, translate and analyze it, but provide all
 - Extract 3-7 key topics that represent main themes
 - Identify 2-4 tone attributes (professional, casual, humorous, educational, inspirational, etc.)
 - Provide 3-5 actionable key insights or takeaways
+- Provide 3-6 post ideas that could be created based on this content (and the image, if provided)
 - Suggest 5-10 relevant tags that could categorize this content
 - Describe the content structure (hook, body, call-to-action, etc.)
 - If an image is provided, analyze visual patterns and describe the visual style
@@ -238,6 +246,7 @@ If the content is in another language, translate and analyze it, but provide all
             tone: data.tone,
             targetAudience: data.targetAudience,
             keyInsights: data.keyInsights,
+            postIdeas: data.postIdeas,
             contentStructure: data.contentStructure,
             visualStyle: data.visualStyle || null,
             suggestedTags: data.suggestedTags,

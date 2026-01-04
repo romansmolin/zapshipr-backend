@@ -12,6 +12,7 @@ export interface ExtractionResponse {
     tone: string[]
     targetAudience: string | null
     keyInsights: string[]
+    postIdeas: string[]
     contentStructure: string | null
     visualStyle: string | null
     suggestedTags: string[]
@@ -37,11 +38,11 @@ export function toExtractionResponse(extraction: InspirationsExtraction): Extrac
         tone: extraction.tone,
         targetAudience: extraction.targetAudience,
         keyInsights: extraction.keyInsights,
+        postIdeas: extraction.postIdeas,
         contentStructure: extraction.contentStructure,
         visualStyle: extraction.visualStyle,
         suggestedTags: extraction.suggestedTags,
         createdAt: extraction.createdAt,
     }
 }
-
 

@@ -27,6 +27,10 @@ export const inspirationsExtractions = pgTable('inspirations_extractions', {
         .array()
         .notNull()
         .default(sql`ARRAY[]::text[]`), // Ключевые идеи/takeaways
+    postIdeas: text('post_ideas')
+        .array()
+        .notNull()
+        .default(sql`ARRAY[]::text[]`), // Идеи постов на основе вдохновения
     contentStructure: text('content_structure'), // Описание структуры
     visualStyle: text('visual_style'), // Визуальный стиль (если есть)
     suggestedTags: text('suggested_tags')
