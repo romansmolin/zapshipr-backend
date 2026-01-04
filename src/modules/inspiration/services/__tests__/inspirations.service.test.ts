@@ -6,6 +6,7 @@ import type { IInspirationScheduler } from '@/shared/queue/scheduler/inspiration
 import type { ILogger } from '@/shared/logger/logger.interface'
 import { AppError, ErrorMessageCode } from '@/shared/errors/app-error'
 import type { RawInspiration } from '../../entity/raw-inspiration.schema'
+import type { InspirationWithExtraction } from '../../entity/inspiration-with-extraction'
 
 describe('InspirationsService', () => {
     let service: InspirationsService
@@ -19,7 +20,9 @@ describe('InspirationsService', () => {
         mockRepository = {
             create: jest.fn(),
             findById: jest.fn(),
+            findByIdWithExtraction: jest.fn(),
             findByWorkspaceId: jest.fn(),
+            findByWorkspaceIdWithExtraction: jest.fn(),
             update: jest.fn(),
             delete: jest.fn(),
             checkDuplicateUrl: jest.fn(),
@@ -86,6 +89,7 @@ describe('InspirationsService', () => {
                 content: 'This is a test inspiration',
                 imageUrl: undefined,
                 userDescription: 'Test description',
+                metadata: { source: 'external' },
                 status: 'processing',
             })
             expect(mockScheduler.scheduleInspiration).toHaveBeenCalledWith('123', 'ws-1', 'user-1')
@@ -202,7 +206,7 @@ describe('InspirationsService', () => {
 
     describe('getInspirations', () => {
         it('should return inspirations list with pagination', async () => {
-            const mockInspirations: RawInspiration[] = [
+            const mockInspirations: InspirationWithExtraction[] = [
                 {
                     id: '1',
                     workspaceId: 'ws-1',
@@ -216,6 +220,7 @@ describe('InspirationsService', () => {
                     parsedContent: null,
                     status: 'completed',
                     errorMessage: null,
+                    extraction: null,
                     createdAt: new Date(),
                     updatedAt: new Date(),
                 },
@@ -232,12 +237,13 @@ describe('InspirationsService', () => {
                     parsedContent: null,
                     status: 'completed',
                     errorMessage: null,
+                    extraction: null,
                     createdAt: new Date(),
                     updatedAt: new Date(),
                 },
             ]
 
-            mockRepository.findByWorkspaceId.mockResolvedValue({
+            mockRepository.findByWorkspaceIdWithExtraction.mockResolvedValue({
                 items: mockInspirations,
                 total: 2,
             })
@@ -250,11 +256,11 @@ describe('InspirationsService', () => {
                 limit: 20,
                 offset: 0,
             })
-            expect(mockRepository.findByWorkspaceId).toHaveBeenCalledWith('ws-1', { limit: 20, offset: 0 })
+            expect(mockRepository.findByWorkspaceIdWithExtraction).toHaveBeenCalledWith('ws-1', { limit: 20, offset: 0 })
         })
 
         it('should use default pagination values', async () => {
-            mockRepository.findByWorkspaceId.mockResolvedValue({
+            mockRepository.findByWorkspaceIdWithExtraction.mockResolvedValue({
                 items: [],
                 total: 0,
             })
@@ -268,7 +274,7 @@ describe('InspirationsService', () => {
 
     describe('getInspirationById', () => {
         it('should return inspiration by id', async () => {
-            const mockInspiration: RawInspiration = {
+            const mockInspiration: InspirationWithExtraction = {
                 id: '123',
                 workspaceId: 'ws-1',
                 userId: 'user-1',
@@ -281,22 +287,23 @@ describe('InspirationsService', () => {
                 parsedContent: null,
                 status: 'completed',
                 errorMessage: null,
+                extraction: null,
                 createdAt: new Date(),
                 updatedAt: new Date(),
             }
 
-            mockRepository.findById.mockResolvedValue(mockInspiration)
+            mockRepository.findByIdWithExtraction.mockResolvedValue(mockInspiration)
 
-            const result = await service.getInspirationById('123')
+            const result = await service.getInspirationById('123', 'ws-1')
 
             expect(result).toEqual(mockInspiration)
-            expect(mockRepository.findById).toHaveBeenCalledWith('123')
+            expect(mockRepository.findByIdWithExtraction).toHaveBeenCalledWith('123')
         })
 
         it('should return null if inspiration not found', async () => {
-            mockRepository.findById.mockResolvedValue(undefined)
+            mockRepository.findByIdWithExtraction.mockResolvedValue(undefined)
 
-            const result = await service.getInspirationById('nonexistent')
+            const result = await service.getInspirationById('nonexistent', 'ws-1')
 
             expect(result).toBeNull()
         })
@@ -329,7 +336,7 @@ describe('InspirationsService', () => {
             mockRepository.findById.mockResolvedValue(mockInspiration)
             mockRepository.update.mockResolvedValue(updatedInspiration)
 
-            const result = await service.updateInspiration('123', 'New description')
+            const result = await service.updateInspiration('123', 'ws-1', 'New description')
 
             expect(result).toEqual(updatedInspiration)
             expect(mockRepository.update).toHaveBeenCalledWith('123', { userDescription: 'New description' })
@@ -344,9 +351,11 @@ describe('InspirationsService', () => {
         it('should throw error if inspiration not found', async () => {
             mockRepository.findById.mockResolvedValue(undefined)
 
-            await expect(service.updateInspiration('nonexistent', 'New description')).rejects.toThrow(AppError)
+            await expect(service.updateInspiration('nonexistent', 'ws-1', 'New description')).rejects.toThrow(
+                AppError
+            )
 
-            await expect(service.updateInspiration('nonexistent', 'New description')).rejects.toMatchObject({
+            await expect(service.updateInspiration('nonexistent', 'ws-1', 'New description')).rejects.toMatchObject({
                 errorMessageCode: ErrorMessageCode.INSPIRATION_NOT_FOUND,
                 httpCode: 404,
             })
@@ -375,7 +384,7 @@ describe('InspirationsService', () => {
             mockRepository.findById.mockResolvedValue(mockInspiration)
             mockRepository.delete.mockResolvedValue(true)
 
-            const result = await service.deleteInspiration('123')
+            const result = await service.deleteInspiration('123', 'ws-1')
 
             expect(result).toBe(true)
             expect(mockRepository.delete).toHaveBeenCalledWith('123')
@@ -409,7 +418,7 @@ describe('InspirationsService', () => {
             mockRepository.delete.mockResolvedValue(true)
             mockMediaUploader.delete.mockResolvedValue(undefined)
 
-            await service.deleteInspiration('123')
+            await service.deleteInspiration('123', 'ws-1')
 
             expect(mockMediaUploader.delete).toHaveBeenCalledWith('https://s3.amazonaws.com/test.jpg')
             expect(mockLogger.info).toHaveBeenCalledWith(
@@ -442,7 +451,7 @@ describe('InspirationsService', () => {
             mockRepository.delete.mockResolvedValue(true)
             mockMediaUploader.delete.mockRejectedValue(new Error('S3 error'))
 
-            const result = await service.deleteInspiration('123')
+            const result = await service.deleteInspiration('123', 'ws-1')
 
             expect(result).toBe(true)
             expect(mockLogger.warn).toHaveBeenCalledWith(
@@ -455,9 +464,9 @@ describe('InspirationsService', () => {
         it('should throw error if inspiration not found', async () => {
             mockRepository.findById.mockResolvedValue(undefined)
 
-            await expect(service.deleteInspiration('nonexistent')).rejects.toThrow(AppError)
+            await expect(service.deleteInspiration('nonexistent', 'ws-1')).rejects.toThrow(AppError)
 
-            await expect(service.deleteInspiration('nonexistent')).rejects.toMatchObject({
+            await expect(service.deleteInspiration('nonexistent', 'ws-1')).rejects.toMatchObject({
                 errorMessageCode: ErrorMessageCode.INSPIRATION_NOT_FOUND,
                 httpCode: 404,
             })

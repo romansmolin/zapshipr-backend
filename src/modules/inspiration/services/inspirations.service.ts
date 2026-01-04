@@ -13,6 +13,7 @@ import type {
 import type { RawInspiration } from '../entity/raw-inspiration.schema'
 import type { InspirationWithExtraction } from '../entity/inspiration-with-extraction'
 import { validateInspirationByType } from '../validation/inspirations.schemas'
+import { buildInspirationMetadataSource } from '../utils/inspiration-metadata'
 
 export class InspirationsService implements IInspirationsService {
     constructor(
@@ -62,6 +63,8 @@ export class InspirationsService implements IInspirationsService {
             })
         }
 
+        const metadata = buildInspirationMetadataSource(data.type, data.content)
+
         // Создание inspiration
         const inspiration = await this.inspirationsRepository.create({
             workspaceId: data.workspaceId,
@@ -71,6 +74,7 @@ export class InspirationsService implements IInspirationsService {
             content: data.content,
             imageUrl,
             userDescription: data.userDescription,
+            metadata,
             status: 'processing',
         })
 

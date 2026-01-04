@@ -10,6 +10,7 @@ import type { ILLMExtractionService } from '@/modules/inspiration/services/llm-e
 import type { IInspirationsRepository } from '@/modules/inspiration/repositories/inspirations-repository.interface'
 import type { IInspirationsExtractionRepository } from '@/modules/inspiration/repositories/inspirations-extraction-repository.interface'
 import type { IWorkspaceTagsRepository } from '@/modules/inspiration/repositories/workspace-tags-repository.interface'
+import { buildInspirationMetadataSource } from '@/modules/inspiration/utils/inspiration-metadata'
 
 export class BullMqInspirationWorker implements IInspirationWorker {
     private worker: Worker<InspirationJobData>
@@ -73,6 +74,7 @@ export class BullMqInspirationWorker implements IInspirationWorker {
         if (inspiration.type === 'link') {
             const parsed = await this.contentParser.parseUrl(inspiration.content!)
             parsedContent = parsed.content
+            const sourceMetadata = buildInspirationMetadataSource(inspiration.type, inspiration.content ?? undefined)
             metadata = {
                 title: parsed.title,
                 description: parsed.description,
@@ -80,16 +82,20 @@ export class BullMqInspirationWorker implements IInspirationWorker {
                 domain: parsed.domain,
                 publishedDate: parsed.publishedDate,
                 thumbnailUrl: parsed.thumbnailUrl,
+                ...sourceMetadata,
             }
         } else if (inspiration.type === 'document') {
             // Для документов контент уже должен быть распарсен и сохранен в S3
             // Здесь мы просто используем его
             parsedContent = inspiration.content || ''
+            metadata = buildInspirationMetadataSource(inspiration.type, inspiration.content ?? undefined)
         } else if (inspiration.type === 'text') {
             parsedContent = inspiration.content || ''
+            metadata = buildInspirationMetadataSource(inspiration.type, inspiration.content ?? undefined)
         } else if (inspiration.type === 'image') {
             // Для изображений используем описание пользователя
             parsedContent = inspiration.userDescription || 'Image inspiration'
+            metadata = buildInspirationMetadataSource(inspiration.type, inspiration.content ?? undefined)
         }
 
         // Step 3: Сохранить parsedContent и metadata в БД
