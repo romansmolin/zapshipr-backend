@@ -36,6 +36,13 @@
       "when": 1767505852107,
       "tag": "0004_add_title_to_raw_inspirations",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1767520135407,
+      "tag": "0005_add_post_ideas_to_inspirations_extractions",
+      "breakpoints": true
     }
   ]
 }
