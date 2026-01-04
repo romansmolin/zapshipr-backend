@@ -1,0 +1,1 @@
+ALTER TABLE "raw_inspirations" ADD COLUMN "title" varchar(100) NOT NULL;

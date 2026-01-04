@@ -123,6 +123,7 @@ If the content is in another language, translate and analyze it, but provide all
                                     'targetAudience',
                                     'keyInsights',
                                     'contentStructure',
+                                    'visualStyle',
                                     'suggestedTags',
                                 ],
                                 additionalProperties: false,

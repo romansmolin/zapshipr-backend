@@ -25,7 +25,6 @@ export class InspirationsController {
 
         this.logger.info('Create inspiration request', { userId, workspaceId, type: body.type })
 
-        // Валидация файла для type=image или document
         if ((body.type === 'image' || body.type === 'document') && !file) {
             throw new AppError({
                 errorMessageCode: ErrorMessageCode.VALIDATION_ERROR,
@@ -34,7 +33,6 @@ export class InspirationsController {
             })
         }
 
-        // Валидация content для type=link или text
         if ((body.type === 'link' || body.type === 'text') && !body.content) {
             throw new AppError({
                 errorMessageCode: ErrorMessageCode.VALIDATION_ERROR,
@@ -47,6 +45,7 @@ export class InspirationsController {
             workspaceId,
             userId,
             type: body.type,
+            title: body.title,
             content: body.content,
             userDescription: body.userDescription,
             file,
@@ -69,11 +68,11 @@ export class InspirationsController {
 
     async getById(req: Request, res: Response): Promise<void> {
         const userId = req.user!.id
-        const { id } = req.params
+        const { workspaceId, id } = req.params
 
-        this.logger.info('Get inspiration by id request', { userId, inspirationId: id })
+        this.logger.info('Get inspiration by id request', { userId, workspaceId, inspirationId: id })
 
-        const inspiration = await this.service.getInspirationById(id)
+        const inspiration = await this.service.getInspirationById(id, workspaceId)
 
         if (!inspiration) {
             throw new AppError({
@@ -88,24 +87,35 @@ export class InspirationsController {
 
     async update(req: Request, res: Response): Promise<void> {
         const userId = req.user!.id
-        const { id } = req.params
+        const { workspaceId, id } = req.params
         const body = UpdateInspirationSchema.parse(req.body)
 
-        this.logger.info('Update inspiration request', { userId, inspirationId: id })
+        this.logger.info('Update inspiration request', { userId, workspaceId, inspirationId: id })
 
-        const inspiration = await this.service.updateInspiration(id, body.userDescription)
+        const inspiration = await this.service.updateInspiration(id, workspaceId, body.userDescription)
 
         res.json(inspiration)
     }
 
     async delete(req: Request, res: Response): Promise<void> {
         const userId = req.user!.id
-        const { id } = req.params
+        const { workspaceId, id } = req.params
 
-        this.logger.info('Delete inspiration request', { userId, inspirationId: id })
+        this.logger.info('Delete inspiration request', { userId, workspaceId, inspirationId: id })
 
-        await this.service.deleteInspiration(id)
+        await this.service.deleteInspiration(id, workspaceId)
 
         res.status(204).send()
+    }
+
+    async retry(req: Request, res: Response): Promise<void> {
+        const userId = req.user!.id
+        const { workspaceId, id } = req.params
+
+        this.logger.info('Retry inspiration request', { userId, workspaceId, inspirationId: id })
+
+        const inspiration = await this.service.retryInspiration(id, workspaceId, userId)
+
+        res.json(inspiration)
     }
 }

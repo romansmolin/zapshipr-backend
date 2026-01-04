@@ -54,6 +54,7 @@ describe('InspirationsService', () => {
                 workspaceId: 'ws-1',
                 userId: 'user-1',
                 type: 'text',
+                title: 'Test title',
                 content: 'This is a test inspiration',
                 imageUrl: null,
                 userDescription: 'Test description',
@@ -71,6 +72,7 @@ describe('InspirationsService', () => {
                 workspaceId: 'ws-1',
                 userId: 'user-1',
                 type: 'text',
+                title: 'Test title',
                 content: 'This is a test inspiration',
                 userDescription: 'Test description',
             })
@@ -80,6 +82,7 @@ describe('InspirationsService', () => {
                 workspaceId: 'ws-1',
                 userId: 'user-1',
                 type: 'text',
+                title: 'Test title',
                 content: 'This is a test inspiration',
                 imageUrl: undefined,
                 userDescription: 'Test description',
@@ -103,6 +106,7 @@ describe('InspirationsService', () => {
                     workspaceId: 'ws-1',
                     userId: 'user-1',
                     type: 'link',
+                    title: 'Test title',
                     content: 'https://example.com',
                 })
             ).rejects.toThrow(AppError)
@@ -112,6 +116,7 @@ describe('InspirationsService', () => {
                     workspaceId: 'ws-1',
                     userId: 'user-1',
                     type: 'link',
+                    title: 'Test title',
                     content: 'https://example.com',
                 })
             ).rejects.toMatchObject({
@@ -132,6 +137,7 @@ describe('InspirationsService', () => {
                 workspaceId: 'ws-1',
                 userId: 'user-1',
                 type: 'image',
+                title: 'Test image',
                 content: null,
                 imageUrl: 'https://s3.amazonaws.com/test.jpg',
                 userDescription: null,
@@ -150,6 +156,7 @@ describe('InspirationsService', () => {
                 workspaceId: 'ws-1',
                 userId: 'user-1',
                 type: 'image',
+                title: 'Test image',
                 file: mockFile,
             })
 
@@ -167,6 +174,7 @@ describe('InspirationsService', () => {
                 workspaceId: 'ws-1',
                 userId: 'user-1',
                 type: 'text',
+                title: 'Test title',
                 content: 'Test content',
                 imageUrl: null,
                 userDescription: null,
@@ -184,6 +192,7 @@ describe('InspirationsService', () => {
                 workspaceId: 'ws-1',
                 userId: 'user-1',
                 type: 'text',
+                title: 'Test title',
                 content: 'Test content',
             })
 
@@ -199,6 +208,7 @@ describe('InspirationsService', () => {
                     workspaceId: 'ws-1',
                     userId: 'user-1',
                     type: 'text',
+                    title: 'Test title 1',
                     content: 'Test 1',
                     imageUrl: null,
                     userDescription: null,
@@ -214,6 +224,7 @@ describe('InspirationsService', () => {
                     workspaceId: 'ws-1',
                     userId: 'user-1',
                     type: 'link',
+                    title: 'Test title 2',
                     content: 'https://example.com',
                     imageUrl: null,
                     userDescription: null,
@@ -262,6 +273,7 @@ describe('InspirationsService', () => {
                 workspaceId: 'ws-1',
                 userId: 'user-1',
                 type: 'text',
+                title: 'Test title',
                 content: 'Test',
                 imageUrl: null,
                 userDescription: null,
@@ -297,6 +309,7 @@ describe('InspirationsService', () => {
                 workspaceId: 'ws-1',
                 userId: 'user-1',
                 type: 'text',
+                title: 'Test title',
                 content: 'Test',
                 imageUrl: null,
                 userDescription: 'Old description',
@@ -347,6 +360,7 @@ describe('InspirationsService', () => {
                 workspaceId: 'ws-1',
                 userId: 'user-1',
                 type: 'text',
+                title: 'Test title',
                 content: 'Test',
                 imageUrl: null,
                 userDescription: null,
@@ -379,6 +393,7 @@ describe('InspirationsService', () => {
                 workspaceId: 'ws-1',
                 userId: 'user-1',
                 type: 'image',
+                title: 'Test image',
                 content: null,
                 imageUrl: 'https://s3.amazonaws.com/test.jpg',
                 userDescription: null,
@@ -411,6 +426,7 @@ describe('InspirationsService', () => {
                 workspaceId: 'ws-1',
                 userId: 'user-1',
                 type: 'image',
+                title: 'Test image',
                 content: null,
                 imageUrl: 'https://s3.amazonaws.com/test.jpg',
                 userDescription: null,

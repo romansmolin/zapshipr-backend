@@ -11,6 +11,7 @@ import type {
     InspirationsListResponse,
 } from './inspirations-service.interface'
 import type { RawInspiration } from '../entity/raw-inspiration.schema'
+import type { InspirationWithExtraction } from '../entity/inspiration-with-extraction'
 import { validateInspirationByType } from '../validation/inspirations.schemas'
 
 export class InspirationsService implements IInspirationsService {
@@ -66,6 +67,7 @@ export class InspirationsService implements IInspirationsService {
             workspaceId: data.workspaceId,
             userId: data.userId,
             type: data.type,
+            title: data.title,
             content: data.content,
             imageUrl,
             userDescription: data.userDescription,
@@ -94,7 +96,10 @@ export class InspirationsService implements IInspirationsService {
         workspaceId: string,
         filters?: GetInspirationsFilters
     ): Promise<InspirationsListResponse> {
-        const { items, total } = await this.inspirationsRepository.findByWorkspaceId(workspaceId, filters)
+        const { items, total } = await this.inspirationsRepository.findByWorkspaceIdWithExtraction(
+            workspaceId,
+            filters
+        )
 
         return {
             items,
@@ -104,16 +109,36 @@ export class InspirationsService implements IInspirationsService {
         }
     }
 
-    async getInspirationById(id: string): Promise<RawInspiration | null> {
-        const inspiration = await this.inspirationsRepository.findById(id)
+    async getInspirationById(id: string, workspaceId: string): Promise<InspirationWithExtraction | null> {
+        const inspiration = await this.inspirationsRepository.findByIdWithExtraction(id)
 
-        return inspiration ?? null
+        if (!inspiration) {
+            return null
+        }
+
+        if (inspiration.workspaceId !== workspaceId) {
+            throw new AppError({
+                errorMessageCode: ErrorMessageCode.INSPIRATION_NOT_FOUND,
+                message: 'Inspiration not found',
+                httpCode: 404,
+            })
+        }
+
+        return inspiration
     }
 
-    async updateInspiration(id: string, userDescription: string): Promise<RawInspiration | null> {
+    async updateInspiration(id: string, workspaceId: string, userDescription: string): Promise<RawInspiration | null> {
         const inspiration = await this.inspirationsRepository.findById(id)
 
         if (!inspiration) {
+            throw new AppError({
+                errorMessageCode: ErrorMessageCode.INSPIRATION_NOT_FOUND,
+                message: 'Inspiration not found',
+                httpCode: 404,
+            })
+        }
+
+        if (inspiration.workspaceId !== workspaceId) {
             throw new AppError({
                 errorMessageCode: ErrorMessageCode.INSPIRATION_NOT_FOUND,
                 message: 'Inspiration not found',
@@ -126,15 +151,24 @@ export class InspirationsService implements IInspirationsService {
         this.logger.info('Updated inspiration', {
             operation: 'InspirationsService.updateInspiration',
             inspirationId: id,
+            workspaceId,
         })
 
         return updated ?? null
     }
 
-    async deleteInspiration(id: string): Promise<boolean> {
+    async deleteInspiration(id: string, workspaceId: string): Promise<boolean> {
         const inspiration = await this.inspirationsRepository.findById(id)
 
         if (!inspiration) {
+            throw new AppError({
+                errorMessageCode: ErrorMessageCode.INSPIRATION_NOT_FOUND,
+                message: 'Inspiration not found',
+                httpCode: 404,
+            })
+        }
+
+        if (inspiration.workspaceId !== workspaceId) {
             throw new AppError({
                 errorMessageCode: ErrorMessageCode.INSPIRATION_NOT_FOUND,
                 message: 'Inspiration not found',
@@ -166,8 +200,55 @@ export class InspirationsService implements IInspirationsService {
         this.logger.info('Deleted inspiration', {
             operation: 'InspirationsService.deleteInspiration',
             inspirationId: id,
+            workspaceId,
         })
 
         return deleted
+    }
+
+    async retryInspiration(id: string, workspaceId: string, userId: string): Promise<RawInspiration> {
+        const inspiration = await this.inspirationsRepository.findById(id)
+
+        if (!inspiration) {
+            throw new AppError({
+                errorMessageCode: ErrorMessageCode.INSPIRATION_NOT_FOUND,
+                message: 'Inspiration not found',
+                httpCode: 404,
+            })
+        }
+
+        if (inspiration.workspaceId !== workspaceId) {
+            throw new AppError({
+                errorMessageCode: ErrorMessageCode.INSPIRATION_NOT_FOUND,
+                message: 'Inspiration not found',
+                httpCode: 404,
+            })
+        }
+
+        // Обновляем статус на processing и очищаем errorMessage
+        const updated = await this.inspirationsRepository.update(id, {
+            status: 'processing',
+            errorMessage: null,
+        })
+
+        if (!updated) {
+            throw new AppError({
+                errorMessageCode: ErrorMessageCode.INTERNAL_SERVER_ERROR,
+                message: 'Failed to update inspiration',
+                httpCode: 500,
+            })
+        }
+
+        // Добавляем задачу в очередь для повторной обработки
+        await this.inspirationScheduler.scheduleInspiration(id, workspaceId, userId)
+
+        this.logger.info('Retried inspiration processing', {
+            operation: 'InspirationsService.retryInspiration',
+            inspirationId: id,
+            workspaceId,
+            userId,
+        })
+
+        return updated
     }
 }

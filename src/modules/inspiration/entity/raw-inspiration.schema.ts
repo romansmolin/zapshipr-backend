@@ -17,6 +17,7 @@ export const rawInspirations = pgTable('raw_inspirations', {
 
     type: inspirationType('type').notNull(),
 
+    title: varchar('title', { length: 100 }).notNull(),
     content: text('content'),
     imageUrl: varchar('image_url', { length: 1024 }),
     userDescription: text('user_description'),

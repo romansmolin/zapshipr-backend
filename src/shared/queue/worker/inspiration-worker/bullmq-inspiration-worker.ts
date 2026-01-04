@@ -79,6 +79,7 @@ export class BullMqInspirationWorker implements IInspirationWorker {
                 author: parsed.author,
                 domain: parsed.domain,
                 publishedDate: parsed.publishedDate,
+                thumbnailUrl: parsed.thumbnailUrl,
             }
         } else if (inspiration.type === 'document') {
             // Для документов контент уже должен быть распарсен и сохранен в S3

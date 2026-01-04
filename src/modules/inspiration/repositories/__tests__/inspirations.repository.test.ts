@@ -43,6 +43,7 @@ describe('InspirationsRepository', () => {
                 workspaceId: 'ws-1',
                 userId: 'user-1',
                 type: 'text',
+                title: 'Test title',
                 content: 'Test content',
                 imageUrl: null,
                 userDescription: 'Test description',
@@ -60,6 +61,7 @@ describe('InspirationsRepository', () => {
                 workspaceId: 'ws-1',
                 userId: 'user-1',
                 type: 'text',
+                title: 'Test title',
                 content: 'Test content',
                 userDescription: 'Test description',
                 status: 'processing',
@@ -79,6 +81,7 @@ describe('InspirationsRepository', () => {
                 workspaceId: 'ws-1',
                 userId: 'user-1',
                 type: 'text',
+                title: 'Test title',
                 content: 'Test content',
                 imageUrl: null,
                 userDescription: null,
@@ -119,6 +122,7 @@ describe('InspirationsRepository', () => {
                     workspaceId: 'ws-1',
                     userId: 'user-1',
                     type: 'text',
+                    title: 'Test title',
                     content: 'Test 1',
                     imageUrl: null,
                     userDescription: null,
@@ -152,6 +156,7 @@ describe('InspirationsRepository', () => {
                 workspaceId: 'ws-1',
                 userId: 'user-1',
                 type: 'text',
+                title: 'Test title',
                 content: 'Test content',
                 imageUrl: null,
                 userDescription: 'Updated description',
@@ -217,4 +222,3 @@ describe('InspirationsRepository', () => {
         })
     })
 })
-

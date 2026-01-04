@@ -16,6 +16,7 @@ describe('Inspirations Validation Schemas', () => {
         it('should validate correct inspiration data', () => {
             const validData = {
                 type: 'text',
+                title: 'Test title',
                 content: 'This is a test inspiration',
                 userDescription: 'Test description',
             }
@@ -28,7 +29,7 @@ describe('Inspirations Validation Schemas', () => {
             const types = ['image', 'link', 'text', 'document']
 
             types.forEach((type) => {
-                const result = CreateInspirationSchema.safeParse({ type })
+                const result = CreateInspirationSchema.safeParse({ type, title: 'Test title' })
                 expect(result.success).toBe(true)
             })
         })
@@ -45,6 +46,7 @@ describe('Inspirations Validation Schemas', () => {
         it('should reject userDescription exceeding 1000 characters', () => {
             const invalidData = {
                 type: 'text',
+                title: 'Test title',
                 userDescription: 'a'.repeat(1001),
             }
 
@@ -55,6 +57,7 @@ describe('Inspirations Validation Schemas', () => {
         it('should allow userDescription up to 1000 characters', () => {
             const validData = {
                 type: 'text',
+                title: 'Test title',
                 userDescription: 'a'.repeat(1000),
             }
 
@@ -335,4 +338,3 @@ describe('Inspirations Validation Schemas', () => {
         })
     })
 })
-

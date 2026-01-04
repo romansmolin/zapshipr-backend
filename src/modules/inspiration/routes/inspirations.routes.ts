@@ -30,11 +30,13 @@ export const createInspirationsRouter = (logger: ILogger, db: NodePgDatabase<typ
     const service = new InspirationsService(repository, mediaUploader, scheduler, logger)
     const controller = new InspirationsController(service, logger)
 
-    // Raw Inspirations endpoints
     router.post(
         '/workspaces/:workspaceId/inspirations',
         authMiddleware,
-        upload.single('file'),
+        upload.fields([
+            { name: 'file', maxCount: 1 },
+            { name: 'content', maxCount: 1 },
+        ]),
         asyncHandler(controller.create.bind(controller))
     )
     router.get(
@@ -42,9 +44,26 @@ export const createInspirationsRouter = (logger: ILogger, db: NodePgDatabase<typ
         authMiddleware,
         asyncHandler(controller.getAll.bind(controller))
     )
-    router.get('/inspirations/:id', authMiddleware, asyncHandler(controller.getById.bind(controller)))
-    router.put('/inspirations/:id', authMiddleware, asyncHandler(controller.update.bind(controller)))
-    router.delete('/inspirations/:id', authMiddleware, asyncHandler(controller.delete.bind(controller)))
+    router.get(
+        '/workspaces/:workspaceId/inspirations/:id',
+        authMiddleware,
+        asyncHandler(controller.getById.bind(controller))
+    )
+    router.put(
+        '/workspaces/:workspaceId/inspirations/:id',
+        authMiddleware,
+        asyncHandler(controller.update.bind(controller))
+    )
+    router.delete(
+        '/workspaces/:workspaceId/inspirations/:id',
+        authMiddleware,
+        asyncHandler(controller.delete.bind(controller))
+    )
+    router.post(
+        '/workspaces/:workspaceId/inspirations/:id/retry',
+        authMiddleware,
+        asyncHandler(controller.retry.bind(controller))
+    )
 
     return router
 }
