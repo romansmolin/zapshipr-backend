@@ -4,6 +4,7 @@ import type { IMediaUploader } from '@/shared/media-uploader/media-uploader.inte
 import type { IInspirationScheduler } from '@/shared/queue/scheduler/inspiration-scheduler/inspiration-scheduler.interface'
 
 import type { IInspirationsRepository } from '../repositories/inspirations-repository.interface'
+import type { IContentParserService } from './content-parser/content-parser-service.interface'
 import type {
     IInspirationsService,
     CreateInspirationData,
@@ -20,6 +21,7 @@ export class InspirationsService implements IInspirationsService {
         private readonly inspirationsRepository: IInspirationsRepository,
         private readonly mediaUploader: IMediaUploader,
         private readonly inspirationScheduler: IInspirationScheduler,
+        private readonly contentParser: IContentParserService,
         private readonly logger: ILogger
     ) {}
 
@@ -40,6 +42,7 @@ export class InspirationsService implements IInspirationsService {
         }
 
         let imageUrl: string | undefined
+        let parsedDocumentContent: string | undefined
 
         if (data.file && (data.type === 'image' || data.type === 'document')) {
             const timestamp = Date.now()
@@ -57,6 +60,14 @@ export class InspirationsService implements IInspirationsService {
                 type: data.type,
                 imageUrl,
             })
+
+            if (data.type === 'document') {
+                const parsedDocument = await this.contentParser.parseDocument(
+                    data.file.buffer,
+                    data.file.originalname
+                )
+                parsedDocumentContent = parsedDocument.content
+            }
         }
 
         const metadata = buildInspirationMetadataSource(data.type, data.content)
@@ -66,7 +77,7 @@ export class InspirationsService implements IInspirationsService {
             userId: data.userId,
             type: data.type,
             title: data.title,
-            content: data.content,
+            content: data.type === 'document' ? parsedDocumentContent ?? data.content : data.content,
             imageUrl,
             userDescription: data.userDescription,
             metadata,

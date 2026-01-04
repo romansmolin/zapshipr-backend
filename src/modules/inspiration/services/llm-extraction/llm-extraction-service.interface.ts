@@ -17,6 +17,7 @@ export interface ExtractionInput {
     content: string
     userDescription?: string
     metadata?: InspirationMetadata
+    imageUrl?: string
 }
 
 export interface ExtractionResult {

@@ -117,6 +117,7 @@ export class BullMqInspirationWorker implements IInspirationWorker {
             content: parsedContent,
             userDescription: inspiration.userDescription || undefined,
             metadata,
+            imageUrl: inspiration.type === 'image' ? inspiration.imageUrl || undefined : undefined,
         })
 
         // Step 5: Сохранить extraction в БД

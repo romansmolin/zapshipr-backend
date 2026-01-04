@@ -4,6 +4,7 @@ import type { IInspirationsRepository } from '../../repositories/inspirations-re
 import type { IMediaUploader } from '@/shared/media-uploader/media-uploader.interface'
 import type { IInspirationScheduler } from '@/shared/queue/scheduler/inspiration-scheduler/inspiration-scheduler.interface'
 import type { ILogger } from '@/shared/logger/logger.interface'
+import type { IContentParserService } from '../content-parser/content-parser-service.interface'
 import { AppError, ErrorMessageCode } from '@/shared/errors/app-error'
 import type { RawInspiration } from '../../entity/raw-inspiration.schema'
 import type { InspirationWithExtraction } from '../../entity/inspiration-with-extraction'
@@ -14,6 +15,7 @@ describe('InspirationsService', () => {
     let mockMediaUploader: jest.Mocked<IMediaUploader>
     let mockScheduler: jest.Mocked<IInspirationScheduler>
     let mockLogger: jest.Mocked<ILogger>
+    let mockContentParser: jest.Mocked<IContentParserService>
 
     beforeEach(() => {
         // Mock repository
@@ -39,6 +41,13 @@ describe('InspirationsService', () => {
             scheduleInspiration: jest.fn(),
         } as any
 
+        mockContentParser = {
+            parseUrl: jest.fn(),
+            parseDocument: jest.fn(),
+            extractVideoMetadata: jest.fn(),
+            normalizeContent: jest.fn(),
+        } as any
+
         // Mock logger
         mockLogger = {
             info: jest.fn(),
@@ -47,7 +56,13 @@ describe('InspirationsService', () => {
             debug: jest.fn(),
         } as any
 
-        service = new InspirationsService(mockRepository, mockMediaUploader, mockScheduler, mockLogger)
+        service = new InspirationsService(
+            mockRepository,
+            mockMediaUploader,
+            mockScheduler,
+            mockContentParser,
+            mockLogger
+        )
     })
 
     describe('createInspiration', () => {

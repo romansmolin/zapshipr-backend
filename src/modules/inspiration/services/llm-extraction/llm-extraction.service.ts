@@ -37,6 +37,13 @@ export class LLMExtractionService implements ILLMExtractionService {
                     type: input.type,
                 })
 
+                const userContent: OpenAI.ChatCompletionUserMessageParam['content'] = input.imageUrl
+                    ? [
+                          { type: 'text', text: prompt },
+                          { type: 'image_url', image_url: { url: input.imageUrl } },
+                      ]
+                    : prompt
+
                 const completion = await this.openai.chat.completions.create({
                     model: this.model,
                     messages: [
@@ -50,7 +57,7 @@ If the content is in another language, translate and analyze it, but provide all
                         },
                         {
                             role: 'user',
-                            content: prompt,
+                            content: userContent,
                         },
                     ],
                     temperature: 0.7,
@@ -208,7 +215,8 @@ If the content is in another language, translate and analyze it, but provide all
 - Provide 3-5 actionable key insights or takeaways
 - Suggest 5-10 relevant tags that could categorize this content
 - Describe the content structure (hook, body, call-to-action, etc.)
-- If visual elements are present, describe the visual style
+- If an image is provided, analyze visual patterns and describe the visual style
+- If a user description is provided, use it as context and cross-check it against the image
 - Focus on insights that would help create similar content`
 
         return prompt
