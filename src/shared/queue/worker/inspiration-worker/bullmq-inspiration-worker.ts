@@ -70,20 +70,22 @@ export class BullMqInspirationWorker implements IInspirationWorker {
 
         // Step 2: Парсинг контента
         let parsedContent = ''
-        let metadata: InspirationMetadata = { source: 'external' }
+        let metadata: InspirationMetadata = buildInspirationMetadataSource(
+            inspiration.type,
+            inspiration.content ?? undefined
+        )
 
         if (inspiration.type === 'link') {
             const parsed = await this.contentParser.parseUrl(inspiration.content!)
             parsedContent = parsed.content
-            const sourceMetadata = buildInspirationMetadataSource(inspiration.type, inspiration.content ?? undefined)
             metadata = {
+                ...metadata,
                 title: parsed.title,
                 description: parsed.description,
                 author: parsed.author,
                 domain: parsed.domain,
                 publishedDate: parsed.publishedDate,
                 thumbnailUrl: parsed.thumbnailUrl,
-                ...sourceMetadata,
             }
         } else if (inspiration.type === 'document') {
             // Для документов контент уже должен быть распарсен и сохранен в S3

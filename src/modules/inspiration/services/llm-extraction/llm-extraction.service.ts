@@ -246,7 +246,7 @@ If the content is in another language, translate and analyze it, but provide all
             tone: data.tone,
             targetAudience: data.targetAudience,
             keyInsights: data.keyInsights,
-            postIdeas: data.postIdeas,
+            postIdeas: data.postIdeas ?? [],
             contentStructure: data.contentStructure,
             visualStyle: data.visualStyle || null,
             suggestedTags: data.suggestedTags,
