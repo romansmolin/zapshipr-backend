@@ -13,7 +13,7 @@ export const CreateInspirationSchema = z.object({
     userDescription: z.string().max(1000).optional(),
 })
 
-export const validateInspirationByType = (data: { type: string; content?: string; file?: unknown }) => {
+export const validateInspirationByType = (data: { type: string; content?: string }) => {
     if (data.type === 'link') {
         if (!data.content) {
             throw new Error('content is required for type=link')
@@ -36,13 +36,6 @@ export const validateInspirationByType = (data: { type: string; content?: string
     if (data.type === 'text') {
         if (!data.content || data.content.length < 10) {
             throw new Error('content must be at least 10 characters for type=text')
-        }
-    }
-
-    if (data.type === 'book') {
-        // Для книг требуется либо изображение обложки, либо описание
-        if (!data.file && !data.content) {
-            throw new Error('Book inspiration requires either a cover image (file) or book description (content)')
         }
     }
 }

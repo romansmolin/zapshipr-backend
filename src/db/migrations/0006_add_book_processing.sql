@@ -1,70 +1,31 @@
--- Migration: Add book processing support
--- Adds detected_category and book_metadata to raw_inspirations
--- Creates book_extractions table for deep book analysis
-
--- Add new columns to raw_inspirations
-ALTER TABLE raw_inspirations 
-ADD COLUMN IF NOT EXISTS book_metadata JSONB,
-ADD COLUMN IF NOT EXISTS detected_category VARCHAR(50);
-
--- Create index for detected_category filtering
-CREATE INDEX IF NOT EXISTS idx_raw_inspirations_category 
-ON raw_inspirations(workspace_id, detected_category) 
-WHERE detected_category IS NOT NULL;
-
--- Create book_extractions table
-CREATE TABLE IF NOT EXISTS book_extractions (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    raw_inspiration_id UUID NOT NULL REFERENCES raw_inspirations(id) ON DELETE CASCADE,
-    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-    
-    -- Identification
-    title VARCHAR(500) NOT NULL,
-    authors TEXT[] NOT NULL DEFAULT '{}',
-    isbn VARCHAR(20),
-    isbn13 VARCHAR(20),
-    publication_year INTEGER,
-    publisher VARCHAR(255),
-    genre TEXT[] NOT NULL DEFAULT '{}',
-    category VARCHAR(100),
-    language VARCHAR(10),
-    page_count INTEGER,
-    identification_confidence REAL,
-    
-    -- Semantic Core (JSONB for flexibility)
-    semantic_core JSONB NOT NULL,
-    
-    -- Themes and Patterns
-    themes_and_patterns JSONB NOT NULL,
-    
-    -- Knowledge Connections
-    knowledge_connections JSONB NOT NULL,
-    
-    -- Content Generation Guidelines
-    content_generation_guidelines JSONB NOT NULL,
-    
-    -- Processing Metadata
-    llm_model VARCHAR(50),
-    tokens_used INTEGER,
-    vision_used INTEGER DEFAULT 0,
-    external_sources_used TEXT[] NOT NULL DEFAULT '{}',
-    processing_duration_ms INTEGER,
-    
-    created_at TIMESTAMP NOT NULL DEFAULT NOW()
+CREATE TABLE "book_extractions" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"raw_inspiration_id" uuid NOT NULL,
+	"workspace_id" uuid NOT NULL,
+	"title" varchar(500) NOT NULL,
+	"authors" text[] DEFAULT ARRAY[]::text[] NOT NULL,
+	"isbn" varchar(20),
+	"isbn13" varchar(20),
+	"publication_year" integer,
+	"publisher" varchar(255),
+	"genre" text[] DEFAULT ARRAY[]::text[] NOT NULL,
+	"category" varchar(100),
+	"language" varchar(10),
+	"page_count" integer,
+	"identification_confidence" real,
+	"semantic_core" jsonb NOT NULL,
+	"themes_and_patterns" jsonb NOT NULL,
+	"knowledge_connections" jsonb NOT NULL,
+	"content_generation_guidelines" jsonb NOT NULL,
+	"llm_model" varchar(50),
+	"tokens_used" integer,
+	"vision_used" integer DEFAULT 0,
+	"external_sources_used" text[] DEFAULT ARRAY[]::text[] NOT NULL,
+	"processing_duration_ms" integer,
+	"created_at" timestamp DEFAULT now() NOT NULL
 );
-
--- Create indexes for book_extractions
-CREATE INDEX IF NOT EXISTS idx_book_extractions_workspace 
-ON book_extractions(workspace_id, created_at DESC);
-
-CREATE INDEX IF NOT EXISTS idx_book_extractions_inspiration 
-ON book_extractions(raw_inspiration_id);
-
-CREATE INDEX IF NOT EXISTS idx_book_extractions_title 
-ON book_extractions(workspace_id, title);
-
--- Add comment
-COMMENT ON TABLE book_extractions IS 'Deep semantic extractions for book-type inspirations';
-COMMENT ON COLUMN raw_inspirations.detected_category IS 'Auto-detected content category: book, article, video, social_post, podcast, course, other';
-COMMENT ON COLUMN raw_inspirations.book_metadata IS 'Enriched book metadata from Google Books API or Vision analysis';
-
+--> statement-breakpoint
+ALTER TABLE "raw_inspirations" ADD COLUMN "book_metadata" jsonb;--> statement-breakpoint
+ALTER TABLE "raw_inspirations" ADD COLUMN "detected_category" varchar(50);--> statement-breakpoint
+ALTER TABLE "book_extractions" ADD CONSTRAINT "book_extractions_raw_inspiration_id_raw_inspirations_id_fk" FOREIGN KEY ("raw_inspiration_id") REFERENCES "public"."raw_inspirations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "book_extractions" ADD CONSTRAINT "book_extractions_workspace_id_workspaces_id_fk" FOREIGN KEY ("workspace_id") REFERENCES "public"."workspaces"("id") ON DELETE cascade ON UPDATE no action;

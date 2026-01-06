@@ -241,7 +241,9 @@ If text is partially visible or unclear, indicate lower confidence.`,
             coverAnalysis?.detectedTitle || params.hints?.possibleBookTitle || this.extractTitleFromContent(params)
 
         const searchAuthor =
-            coverAnalysis?.detectedAuthor || params.hints?.possibleAuthors?.[0] || this.extractAuthorFromContent(params)
+            coverAnalysis?.detectedAuthor ||
+            params.hints?.possibleAuthors?.[0] ||
+            this.extractAuthorFromContent(params)
 
         // Step 3: Search Google Books
         if (searchTitle || searchAuthor) {
@@ -334,10 +336,7 @@ If text is partially visible or unclear, indicate lower confidence.`,
         }
     }
 
-    private extractTitleFromContent(params: {
-        userDescription?: string
-        parsedContent?: string
-    }): string | null {
+    private extractTitleFromContent(params: { userDescription?: string; parsedContent?: string }): string | null {
         // Try to extract book title from user description
         if (params.userDescription) {
             // Common patterns like "Книга: Title" or "Book: Title"
@@ -357,10 +356,7 @@ If text is partially visible or unclear, indicate lower confidence.`,
         return null
     }
 
-    private extractAuthorFromContent(params: {
-        userDescription?: string
-        parsedContent?: string
-    }): string | null {
+    private extractAuthorFromContent(params: { userDescription?: string; parsedContent?: string }): string | null {
         if (params.userDescription) {
             // Common patterns like "by Author" or "автор: Author"
             const patterns = [/(?:by|автор|author)[:\s]+["']?([^"'\n,]+)["']?/i]
@@ -427,4 +423,3 @@ If text is partially visible or unclear, indicate lower confidence.`,
         return union.size > 0 ? intersection.size / union.size : 0
     }
 }
-
