@@ -4,7 +4,6 @@ import type { IMediaUploader } from '@/shared/media-uploader/media-uploader.inte
 import type { IInspirationScheduler } from '@/shared/queue/scheduler/inspiration-scheduler/inspiration-scheduler.interface'
 
 import type { IInspirationsRepository } from '../repositories/inspirations-repository.interface'
-import type { IContentParserService } from './content-parser/content-parser-service.interface'
 import type {
     IInspirationsService,
     CreateInspirationData,
@@ -12,22 +11,20 @@ import type {
     InspirationsListResponse,
 } from './inspirations-service.interface'
 import type { RawInspiration } from '../entity/raw-inspiration.schema'
-import type { InspirationWithExtraction } from '../entity/inspiration-with-extraction'
 import { validateInspirationByType } from '../validation/inspirations.schemas'
-import { buildInspirationMetadataSource } from '../utils/inspiration-metadata'
 
 export class InspirationsService implements IInspirationsService {
     constructor(
         private readonly inspirationsRepository: IInspirationsRepository,
         private readonly mediaUploader: IMediaUploader,
         private readonly inspirationScheduler: IInspirationScheduler,
-        private readonly contentParser: IContentParserService,
         private readonly logger: ILogger
     ) {}
 
     async createInspiration(data: CreateInspirationData): Promise<RawInspiration> {
-        if (data.type === 'link' || data.type === 'text')
+        if (data.type === 'link' || data.type === 'text') {
             validateInspirationByType({ type: data.type, content: data.content })
+        }
 
         if (data.type === 'link' && data.content) {
             const isDuplicate = await this.inspirationsRepository.checkDuplicateUrl(data.workspaceId, data.content)
@@ -42,7 +39,6 @@ export class InspirationsService implements IInspirationsService {
         }
 
         let imageUrl: string | undefined
-        let parsedDocumentContent: string | undefined
 
         if (data.file && (data.type === 'image' || data.type === 'document')) {
             const timestamp = Date.now()
@@ -60,27 +56,16 @@ export class InspirationsService implements IInspirationsService {
                 type: data.type,
                 imageUrl,
             })
-
-            if (data.type === 'document') {
-                const parsedDocument = await this.contentParser.parseDocument(
-                    data.file.buffer,
-                    data.file.originalname
-                )
-                parsedDocumentContent = parsedDocument.content
-            }
         }
-
-        const metadata = buildInspirationMetadataSource(data.type, data.content)
 
         const inspiration = await this.inspirationsRepository.create({
             workspaceId: data.workspaceId,
             userId: data.userId,
             type: data.type,
-            title: data.title,
-            content: data.type === 'document' ? parsedDocumentContent ?? data.content : data.content,
+            title: '',
+            content: data.content,
             imageUrl,
             userDescription: data.userDescription,
-            metadata,
             status: 'processing',
         })
 
@@ -105,10 +90,7 @@ export class InspirationsService implements IInspirationsService {
         workspaceId: string,
         filters?: GetInspirationsFilters
     ): Promise<InspirationsListResponse> {
-        const { items, total } = await this.inspirationsRepository.findByWorkspaceIdWithExtraction(
-            workspaceId,
-            filters
-        )
+        const { items, total } = await this.inspirationsRepository.findByWorkspaceId(workspaceId, filters)
 
         return {
             items,
@@ -118,40 +100,16 @@ export class InspirationsService implements IInspirationsService {
         }
     }
 
-    async getInspirationById(id: string, workspaceId: string): Promise<InspirationWithExtraction | null> {
-        const inspiration = await this.inspirationsRepository.findByIdWithExtraction(id)
+    async getInspirationById(id: string): Promise<RawInspiration | null> {
+        const inspiration = await this.inspirationsRepository.findById(id)
 
-        if (!inspiration) {
-            return null
-        }
-
-        if (inspiration.workspaceId !== workspaceId) {
-            throw new AppError({
-                errorMessageCode: ErrorMessageCode.INSPIRATION_NOT_FOUND,
-                message: 'Inspiration not found',
-                httpCode: 404,
-            })
-        }
-
-        return inspiration
+        return inspiration ?? null
     }
 
-    async updateInspiration(
-        id: string,
-        workspaceId: string,
-        userDescription: string
-    ): Promise<RawInspiration | null> {
+    async updateInspiration(id: string, userDescription: string): Promise<RawInspiration | null> {
         const inspiration = await this.inspirationsRepository.findById(id)
 
         if (!inspiration) {
-            throw new AppError({
-                errorMessageCode: ErrorMessageCode.INSPIRATION_NOT_FOUND,
-                message: 'Inspiration not found',
-                httpCode: 404,
-            })
-        }
-
-        if (inspiration.workspaceId !== workspaceId) {
             throw new AppError({
                 errorMessageCode: ErrorMessageCode.INSPIRATION_NOT_FOUND,
                 message: 'Inspiration not found',
@@ -164,13 +122,12 @@ export class InspirationsService implements IInspirationsService {
         this.logger.info('Updated inspiration', {
             operation: 'InspirationsService.updateInspiration',
             inspirationId: id,
-            workspaceId,
         })
 
         return updated ?? null
     }
 
-    async deleteInspiration(id: string, workspaceId: string): Promise<boolean> {
+    async deleteInspiration(id: string): Promise<boolean> {
         const inspiration = await this.inspirationsRepository.findById(id)
 
         if (!inspiration) {
@@ -181,15 +138,6 @@ export class InspirationsService implements IInspirationsService {
             })
         }
 
-        if (inspiration.workspaceId !== workspaceId) {
-            throw new AppError({
-                errorMessageCode: ErrorMessageCode.INSPIRATION_NOT_FOUND,
-                message: 'Inspiration not found',
-                httpCode: 404,
-            })
-        }
-
-        // Удаление файла из S3 (если есть)
         if (inspiration.imageUrl) {
             try {
                 await this.mediaUploader.delete(inspiration.imageUrl)
@@ -199,7 +147,6 @@ export class InspirationsService implements IInspirationsService {
                     imageUrl: inspiration.imageUrl,
                 })
             } catch (error) {
-                // Ошибка удаления из S3 не должна блокировать удаление из БД
                 this.logger.warn('Failed to delete file from S3, continuing with DB deletion', {
                     operation: 'InspirationsService.deleteInspiration',
                     inspirationId: id,
@@ -213,7 +160,6 @@ export class InspirationsService implements IInspirationsService {
         this.logger.info('Deleted inspiration', {
             operation: 'InspirationsService.deleteInspiration',
             inspirationId: id,
-            workspaceId,
         })
 
         return deleted
@@ -230,11 +176,11 @@ export class InspirationsService implements IInspirationsService {
             })
         }
 
-        if (inspiration.workspaceId !== workspaceId) {
+        if (inspiration.status !== 'failed') {
             throw new AppError({
-                errorMessageCode: ErrorMessageCode.INSPIRATION_NOT_FOUND,
-                message: 'Inspiration not found',
-                httpCode: 404,
+                errorMessageCode: ErrorMessageCode.VALIDATION_ERROR,
+                message: 'Only failed inspirations can be retried',
+                httpCode: 400,
             })
         }
 
@@ -245,7 +191,7 @@ export class InspirationsService implements IInspirationsService {
 
         if (!updated) {
             throw new AppError({
-                errorMessageCode: ErrorMessageCode.INTERNAL_SERVER_ERROR,
+                errorMessageCode: ErrorMessageCode.INSPIRATION_NOT_FOUND,
                 message: 'Failed to update inspiration',
                 httpCode: 500,
             })

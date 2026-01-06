@@ -7,10 +7,7 @@ import { formatError } from '@/shared/utils/forma-error'
 
 import { rawInspirations } from '../entity/raw-inspiration.schema'
 import type { RawInspiration, InsertRawInspiration } from '../entity/raw-inspiration.schema'
-import { inspirationsExtractions } from '../entity/inspirations-extraction.schema'
-import type { InspirationWithExtraction } from '../entity/inspiration-with-extraction'
-import { toExtractionResponse } from '../entity/inspiration-with-extraction'
-import type { IInspirationsRepository, InspirationFilters } from './inspirations-repository.interface'
+import type { IInspirationsRepository } from './inspirations-repository.interface'
 
 export class InspirationsRepository implements IInspirationsRepository {
     private readonly db: NodePgDatabase<typeof dbSchema>
@@ -70,48 +67,19 @@ export class InspirationsRepository implements IInspirationsRepository {
         }
     }
 
-    async findByIdWithExtraction(id: string): Promise<InspirationWithExtraction | undefined> {
-        try {
-            const results = await this.db
-                .select({
-                    inspiration: rawInspirations,
-                    extraction: inspirationsExtractions,
-                })
-                .from(rawInspirations)
-                .leftJoin(inspirationsExtractions, eq(rawInspirations.id, inspirationsExtractions.rawInspirationId))
-                .where(eq(rawInspirations.id, id))
-                .limit(1)
-
-            if (results.length === 0) {
-                return undefined
-            }
-
-            const { inspiration, extraction } = results[0]
-
-            return {
-                ...inspiration,
-                extraction: extraction ? toExtractionResponse(extraction) : null,
-            }
-        } catch (error) {
-            this.logger.error('Failed to fetch inspiration with extraction by id', {
-                operation: 'InspirationsRepository.findByIdWithExtraction',
-                entity: 'raw_inspirations',
-                inspirationId: id,
-                error: formatError(error),
-            })
-            throw error
-        }
-    }
-
     async findByWorkspaceId(
         workspaceId: string,
-        filters?: InspirationFilters
+        filters?: {
+            type?: 'image' | 'link' | 'text' | 'document'
+            status?: 'processing' | 'completed' | 'failed'
+            limit?: number
+            offset?: number
+        }
     ): Promise<{ items: RawInspiration[]; total: number }> {
         try {
             const limit = filters?.limit ?? 20
             const offset = filters?.offset ?? 0
 
-            // Build where conditions
             const conditions = [eq(rawInspirations.workspaceId, workspaceId)]
 
             if (filters?.type) {
@@ -124,7 +92,6 @@ export class InspirationsRepository implements IInspirationsRepository {
 
             const whereClause = and(...conditions)
 
-            // Fetch items
             const items = await this.db
                 .select()
                 .from(rawInspirations)
@@ -133,7 +100,6 @@ export class InspirationsRepository implements IInspirationsRepository {
                 .limit(limit)
                 .offset(offset)
 
-            // Count total
             const [{ value: total }] = await this.db
                 .select({ value: count() })
                 .from(rawInspirations)
@@ -143,64 +109,6 @@ export class InspirationsRepository implements IInspirationsRepository {
         } catch (error) {
             this.logger.error('Failed to fetch inspirations by workspace', {
                 operation: 'InspirationsRepository.findByWorkspaceId',
-                entity: 'raw_inspirations',
-                workspaceId,
-                error: formatError(error),
-            })
-            throw error
-        }
-    }
-
-    async findByWorkspaceIdWithExtraction(
-        workspaceId: string,
-        filters?: InspirationFilters
-    ): Promise<{ items: InspirationWithExtraction[]; total: number }> {
-        try {
-            const limit = filters?.limit ?? 20
-            const offset = filters?.offset ?? 0
-
-            // Build where conditions
-            const conditions = [eq(rawInspirations.workspaceId, workspaceId)]
-
-            if (filters?.type) {
-                conditions.push(eq(rawInspirations.type, filters.type))
-            }
-
-            if (filters?.status) {
-                conditions.push(eq(rawInspirations.status, filters.status))
-            }
-
-            const whereClause = and(...conditions)
-
-            // Fetch items with LEFT JOIN to extractions
-            const results = await this.db
-                .select({
-                    inspiration: rawInspirations,
-                    extraction: inspirationsExtractions,
-                })
-                .from(rawInspirations)
-                .leftJoin(inspirationsExtractions, eq(rawInspirations.id, inspirationsExtractions.rawInspirationId))
-                .where(whereClause)
-                .orderBy(desc(rawInspirations.createdAt))
-                .limit(limit)
-                .offset(offset)
-
-            // Map results to InspirationWithExtraction
-            const items: InspirationWithExtraction[] = results.map(({ inspiration, extraction }) => ({
-                ...inspiration,
-                extraction: extraction ? toExtractionResponse(extraction) : null,
-            }))
-
-            // Count total
-            const [{ value: total }] = await this.db
-                .select({ value: count() })
-                .from(rawInspirations)
-                .where(whereClause)
-
-            return { items, total }
-        } catch (error) {
-            this.logger.error('Failed to fetch inspirations with extractions by workspace', {
-                operation: 'InspirationsRepository.findByWorkspaceIdWithExtraction',
                 entity: 'raw_inspirations',
                 workspaceId,
                 error: formatError(error),

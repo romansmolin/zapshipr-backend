@@ -5,7 +5,6 @@ export interface ParsedContent {
     author?: string
     domain?: string
     publishedDate?: string
-    thumbnailUrl?: string
 }
 
 export interface IContentParserService {

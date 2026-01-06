@@ -11,7 +11,7 @@ const pdfParse = pdfParseModule.default || pdfParseModule
 
 export class ContentParserService implements IContentParserService {
     private readonly TIMEOUT = 30000 // 30 seconds
-    private readonly MAX_CONTENT_LENGTH = 50000 // 50KB limit on HTML payload
+    private readonly MAX_CONTENT_LENGTH = 50000 // Макс. размер HTML для парсинга
 
     constructor(private readonly logger: ILogger) {}
 
@@ -61,12 +61,6 @@ export class ContentParserService implements IContentParserService {
             $('meta[name="publish_date"]').attr('content') ||
             ''
 
-        // Извлекаем превью изображение
-        const thumbnailUrl =
-            $('meta[property="og:image"]').attr('content') ||
-            $('meta[name="twitter:image"]').attr('content') ||
-            ''
-
         // Извлекаем основной текст
         let content = ''
 
@@ -114,7 +108,6 @@ export class ContentParserService implements IContentParserService {
             author,
             domain: parsedUrl.hostname,
             publishedDate,
-            thumbnailUrl: thumbnailUrl || undefined,
         }
     }
 
@@ -184,14 +177,10 @@ export class ContentParserService implements IContentParserService {
 
             const data = response.data
 
-            // YouTube thumbnail: используем высококачественный вариант
-            const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
-
             this.logger.info('Extracted YouTube metadata', {
                 operation: 'ContentParserService.extractVideoMetadata',
                 videoId,
                 title: data.title,
-                thumbnailUrl,
             })
 
             return {
@@ -200,7 +189,6 @@ export class ContentParserService implements IContentParserService {
                 content: `YouTube Video: ${data.title}\nAuthor: ${data.author_name}`,
                 author: data.author_name,
                 domain: 'youtube.com',
-                thumbnailUrl,
             }
         }
 
@@ -214,14 +202,10 @@ export class ContentParserService implements IContentParserService {
 
             const data = response.data
 
-            // Vimeo возвращает thumbnail_url в oEmbed ответе
-            const thumbnailUrl = data.thumbnail_url || null
-
             this.logger.info('Extracted Vimeo metadata', {
                 operation: 'ContentParserService.extractVideoMetadata',
                 videoId,
                 title: data.title,
-                thumbnailUrl,
             })
 
             return {
@@ -230,7 +214,6 @@ export class ContentParserService implements IContentParserService {
                 content: `Vimeo Video: ${data.title}\nAuthor: ${data.author_name}`,
                 author: data.author_name,
                 domain: 'vimeo.com',
-                thumbnailUrl,
             }
         }
 
@@ -287,3 +270,4 @@ export class ContentParserService implements IContentParserService {
         return null
     }
 }
+

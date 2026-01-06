@@ -16,9 +16,12 @@ import type { ILogger } from '@/shared/logger/logger.interface'
 
 import { InspirationsRepository } from '@/modules/inspiration/repositories/inspirations.repository'
 import { InspirationsExtractionRepository } from '@/modules/inspiration/repositories/inspirations-extraction.repository'
+import { BookExtractionRepository } from '@/modules/inspiration/repositories/book-extraction.repository'
 import { WorkspaceTagsRepository } from '@/modules/inspiration/repositories/workspace-tags.repository'
 import { ContentParserService } from '@/modules/inspiration/services/content-parser/content-parser.service'
 import { LLMExtractionService } from '@/modules/inspiration/services/llm-extraction/llm-extraction.service'
+import { ContentDetectionService } from '@/modules/inspiration/services/content-detection/content-detection.service'
+import { BookIdentificationService } from '@/modules/inspiration/services/book-identification/book-identification.service'
 
 export interface Workers {
     accessTokensRefreshScheduler: BullMqTokenRefreshScheduler
@@ -49,21 +52,27 @@ export async function initializeWorkers(
     const accessTokensRefreshWorker = new BullMqAccessTokenWorker(logger, socialMediaTokenRefresher)
     accessTokensRefreshWorker.start()
 
-    // Initialize inspiration worker
+    // Initialize inspiration worker with book processing capabilities
     const inspirationsRepository = new InspirationsRepository(db, logger)
     const extractionsRepository = new InspirationsExtractionRepository(db, logger)
+    const bookExtractionsRepository = new BookExtractionRepository(db)
     const tagsRepository = new WorkspaceTagsRepository(db, logger)
     const contentParser = new ContentParserService(logger)
     const llmExtraction = new LLMExtractionService(logger)
+    const contentDetection = new ContentDetectionService(logger)
+    const bookIdentification = new BookIdentificationService(logger)
 
     const inspirationWorker = new BullMqInspirationWorker(
         logger,
         db,
         inspirationsRepository,
         extractionsRepository,
+        bookExtractionsRepository,
         tagsRepository,
         contentParser,
-        llmExtraction
+        llmExtraction,
+        contentDetection,
+        bookIdentification
     )
     inspirationWorker.start()
 
