@@ -1,4 +1,5 @@
 import type { RawInspiration } from '../entity/raw-inspiration.schema'
+import type { InspirationWithExtraction } from '../repositories/inspirations-repository.interface'
 
 export interface CreateInspirationData {
     workspaceId: string
@@ -17,7 +18,7 @@ export interface GetInspirationsFilters {
 }
 
 export interface InspirationsListResponse {
-    items: RawInspiration[]
+    items: InspirationWithExtraction[]
     total: number
     limit: number
     offset: number
@@ -26,7 +27,7 @@ export interface InspirationsListResponse {
 export interface IInspirationsService {
     createInspiration(data: CreateInspirationData): Promise<RawInspiration>
     getInspirations(workspaceId: string, filters?: GetInspirationsFilters): Promise<InspirationsListResponse>
-    getInspirationById(id: string): Promise<RawInspiration | null>
+    getInspirationById(id: string): Promise<InspirationWithExtraction | null>
     updateInspiration(id: string, userDescription: string): Promise<RawInspiration | null>
     deleteInspiration(id: string): Promise<boolean>
     retryInspiration(id: string, workspaceId: string, userId: string): Promise<RawInspiration>

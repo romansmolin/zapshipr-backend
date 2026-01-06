@@ -1,5 +1,10 @@
-import type { InspirationMetadata, BookMetadata } from '../../entity/raw-inspiration.schema'
-import type { BookExtractionData } from '../../entity/book-extraction.schema'
+import type { InspirationMetadata } from '../../entity/raw-inspiration.schema'
+
+export interface PostIdea {
+    idea: string
+    format: string
+    angle: string
+}
 
 export interface ExtractionData {
     summary: string
@@ -8,7 +13,7 @@ export interface ExtractionData {
     tone: string[]
     targetAudience: string
     keyInsights: string[]
-    postIdeas: string[]
+    postIdeas: PostIdea[]
     contentStructure: string
     visualStyle?: string
     suggestedTags: string[]
@@ -19,7 +24,7 @@ export interface ExtractionInput {
     content: string
     userDescription?: string
     metadata?: InspirationMetadata
-    imageUrl?: string
+    imageUrl?: string // For Vision analysis of images
 }
 
 export interface ExtractionResult {
@@ -28,25 +33,10 @@ export interface ExtractionResult {
     tokensUsed: number
 }
 
-// === Book-specific extraction types ===
-
-export interface BookExtractionInput {
-    bookMetadata: BookMetadata
-    parsedContent?: string // Content from the source (book summary, review, description)
-    userDescription?: string
-    imageUrl?: string // Cover image URL
-}
-
-export interface BookExtractionResult {
-    extraction: BookExtractionData
-    llmModel: string
-    tokensUsed: number
-    processingDurationMs: number
-}
-
 export interface ILLMExtractionService {
     /**
-     * Создать extraction на основе контента (generic)
+     * Создать extraction на основе контента
+     * Для изображений использует Vision API для анализа
      */
     createExtraction(input: ExtractionInput): Promise<ExtractionResult>
 
@@ -54,15 +44,4 @@ export interface ILLMExtractionService {
      * Построить промпт для extraction
      */
     buildPromptForExtraction(input: ExtractionInput): string
-
-    /**
-     * Создать глубокий extraction для книги
-     * Включает семантический анализ, ключевые идеи, фреймворки и рекомендации по контенту
-     */
-    createBookExtraction(input: BookExtractionInput): Promise<BookExtractionResult>
-
-    /**
-     * Построить промпт для book extraction
-     */
-    buildBookExtractionPrompt(input: BookExtractionInput): string
 }

@@ -33,10 +33,7 @@ export const createInspirationsRouter = (logger: ILogger, db: NodePgDatabase<typ
     router.post(
         '/workspaces/:workspaceId/inspirations',
         authMiddleware,
-        upload.fields([
-            { name: 'file', maxCount: 1 },
-            { name: 'content', maxCount: 1 },
-        ]),
+        upload.single('file'),
         asyncHandler(controller.create.bind(controller))
     )
     router.get(

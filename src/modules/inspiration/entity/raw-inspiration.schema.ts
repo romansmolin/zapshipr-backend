@@ -16,28 +16,6 @@ export type InspirationMetadata = {
     tikTokMediaId?: string
 }
 
-export type DetectedContentCategory = 'book' | 'article' | 'video' | 'social_post' | 'podcast' | 'course' | 'other'
-
-export type BookMetadata = {
-    title: string
-    authors: string[]
-    isbn?: string
-    isbn13?: string
-    publisher?: string
-    publishedDate?: string
-    pageCount?: number
-    categories?: string[]
-    language?: string
-    description?: string
-    thumbnailUrl?: string
-    previewLink?: string
-    infoLink?: string
-    averageRating?: number
-    ratingsCount?: number
-    identificationConfidence?: number
-    dataSource?: 'google_books' | 'open_library' | 'manual' | 'vision_ocr'
-}
-
 export const inspirationType = pgEnum('inspiration_type', ['image', 'link', 'text', 'document'])
 
 export const inspirationStatus = pgEnum('inspiration_status', ['processing', 'completed', 'failed'])
@@ -59,8 +37,6 @@ export const rawInspirations = pgTable('raw_inspirations', {
     userDescription: text('user_description'),
 
     metadata: jsonb('metadata').$type<InspirationMetadata | null>(),
-    bookMetadata: jsonb('book_metadata').$type<BookMetadata | null>(),
-    detectedCategory: varchar('detected_category', { length: 50 }).$type<DetectedContentCategory | null>(),
     parsedContent: text('parsed_content'),
 
     status: inspirationStatus('status').notNull().default('processing'),

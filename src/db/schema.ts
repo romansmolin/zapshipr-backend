@@ -13,7 +13,6 @@ import {
     inspirationStatus,
 } from '@/modules/inspiration/entity/raw-inspiration.schema'
 import { inspirationsExtractions } from '@/modules/inspiration/entity/inspirations-extraction.schema'
-import { bookExtractions } from '@/modules/inspiration/entity/book-extraction.schema'
 import { workspaceTags, tagCategory } from '@/modules/inspiration/entity/workspace-tag.schema'
 
 export const schema = {
@@ -30,7 +29,6 @@ export const schema = {
     waitlistReferralRewards,
     rawInspirations,
     inspirationsExtractions,
-    bookExtractions,
     workspaceTags,
 }
 
@@ -51,5 +49,4 @@ export {
     inspirationStatus,
 } from '@/modules/inspiration/entity/raw-inspiration.schema'
 export { inspirationsExtractions } from '@/modules/inspiration/entity/inspirations-extraction.schema'
-export { bookExtractions } from '@/modules/inspiration/entity/book-extraction.schema'
 export { workspaceTags, tagCategory } from '@/modules/inspiration/entity/workspace-tag.schema'

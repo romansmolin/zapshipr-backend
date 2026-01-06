@@ -19,7 +19,6 @@ export const authMiddleware = (req: Request, res: Response, next: NextFunction) 
 
     let payload: JwtPayload | string | null = null
 
-    // If token is from Authorization header, try to verify as access token first
     if (tokenFromHeader && accessSecret) {
         try {
             payload = jwt.verify(token, accessSecret) as JwtPayload | string

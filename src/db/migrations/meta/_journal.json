@@ -50,6 +50,13 @@
       "when": 1767696363588,
       "tag": "0006_add_book_processing",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1767698069731,
+      "tag": "0007_busy_triton",
+      "breakpoints": true
     }
   ]
 }

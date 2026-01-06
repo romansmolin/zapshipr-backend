@@ -3,7 +3,7 @@ import type { ILogger } from '@/shared/logger/logger.interface'
 import type { IMediaUploader } from '@/shared/media-uploader/media-uploader.interface'
 import type { IInspirationScheduler } from '@/shared/queue/scheduler/inspiration-scheduler/inspiration-scheduler.interface'
 
-import type { IInspirationsRepository } from '../repositories/inspirations-repository.interface'
+import type { IInspirationsRepository, InspirationWithExtraction } from '../repositories/inspirations-repository.interface'
 import type {
     IInspirationsService,
     CreateInspirationData,
@@ -100,8 +100,8 @@ export class InspirationsService implements IInspirationsService {
         }
     }
 
-    async getInspirationById(id: string): Promise<RawInspiration | null> {
-        const inspiration = await this.inspirationsRepository.findById(id)
+    async getInspirationById(id: string): Promise<InspirationWithExtraction | null> {
+        const inspiration = await this.inspirationsRepository.findByIdWithExtraction(id)
 
         return inspiration ?? null
     }

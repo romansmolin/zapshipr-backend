@@ -12,7 +12,6 @@ export class WorkspaceTagsController {
     async getTags(req: Request, res: Response): Promise<void> {
         const { workspaceId } = req.params
 
-        // Валидация query параметров
         const query = GetTagsQuerySchema.parse(req.query)
 
         const result = await this.tagsService.getTags(workspaceId, query)
@@ -23,7 +22,6 @@ export class WorkspaceTagsController {
     async createTag(req: Request, res: Response): Promise<void> {
         const { workspaceId } = req.params
 
-        // Валидация body
         const data = CreateTagSchema.parse(req.body)
 
         const tag = await this.tagsService.createTag(workspaceId, data)
@@ -34,7 +32,6 @@ export class WorkspaceTagsController {
     async updateTag(req: Request, res: Response): Promise<void> {
         const { tagId } = req.params
 
-        // Валидация body
         const { name } = UpdateTagSchema.parse(req.body)
 
         const tag = await this.tagsService.updateTag(tagId, name)
@@ -50,4 +47,3 @@ export class WorkspaceTagsController {
         res.status(204).send()
     }
 }
-
