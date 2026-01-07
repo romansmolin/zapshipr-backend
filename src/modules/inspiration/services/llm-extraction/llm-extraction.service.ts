@@ -323,25 +323,26 @@ Be SPECIFIC to this video's actual content - no generic advice.`
     private getSystemPrompt(): string {
         return `You are an expert content analyst and strategist. Your task is to analyze content and extract SPECIFIC, ACTIONABLE insights.
 
-FOR VIDEO CONTENT (YouTube, etc.):
-- Identify the main argument/thesis of the video
-- Extract KEY TAKEAWAYS and actionable advice
-- Note any FRAMEWORKS, STRATEGIES, or STEP-BY-STEP methods mentioned
-- Identify memorable quotes or statements
-- Think: "What would someone tweet after watching this?"
+                FOR VIDEO CONTENT (YouTube, etc.):
+                - Identify the main argument/thesis of the video
+                - Extract KEY TAKEAWAYS and actionable advice
+                - Note any FRAMEWORKS, STRATEGIES, or STEP-BY-STEP methods mentioned
+                - Identify memorable quotes or statements
+                - Think: "What would someone tweet after watching this?"
 
-FOR ARTICLES/BLOG POSTS:
-- Extract the core argument and supporting points
-- Identify data, statistics, or research mentioned
-- Note unique perspectives or contrarian views
+                FOR ARTICLES/BLOG POSTS:
+                - Extract the core argument and supporting points
+                - Identify data, statistics, or research mentioned
+                - Note unique perspectives or contrarian views
 
-FOR ALL CONTENT:
-- Generate POST IDEAS that are specific and ready-to-use
-- Each post idea should have a compelling hook
-- Think about different angles: educational, controversial, personal story, how-to
+                FOR ALL CONTENT:
+                - Generate POST IDEAS that are specific and ready-to-use
+                - Each post idea should have a compelling hook
+                - Think about different angles: educational, controversial, personal story, how-to
 
-IMPORTANT: Always respond in English only, regardless of the input content language.
-Be SPECIFIC - avoid generic insights like "provides valuable information".`
+                IMPORTANT: Always respond in English only, regardless of the input content language.
+                Be SPECIFIC - avoid generic insights like "provides valuable information".
+            `
     }
 
     private getVisionSystemPrompt(): string {
@@ -385,7 +386,17 @@ CRITICAL RULES:
                     },
                     contentFormat: {
                         type: 'string',
-                        enum: ['video', 'article', 'thread', 'carousel', 'image', 'infographic', 'story', 'book', 'other'],
+                        enum: [
+                            'video',
+                            'article',
+                            'thread',
+                            'carousel',
+                            'image',
+                            'infographic',
+                            'story',
+                            'book',
+                            'other',
+                        ],
                         description: 'Format of the content',
                     },
                     tone: {
@@ -408,7 +419,10 @@ CRITICAL RULES:
                             type: 'object',
                             properties: {
                                 idea: { type: 'string', description: 'The post idea or hook' },
-                                format: { type: 'string', description: 'Suggested format: carousel, thread, video, story, reel' },
+                                format: {
+                                    type: 'string',
+                                    description: 'Suggested format: carousel, thread, video, story, reel',
+                                },
                                 angle: { type: 'string', description: 'Content angle or perspective' },
                             },
                             required: ['idea', 'format', 'angle'],
