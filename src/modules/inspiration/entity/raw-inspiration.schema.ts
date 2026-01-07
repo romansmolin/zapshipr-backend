@@ -18,7 +18,14 @@ export type InspirationMetadata = {
 
 export const inspirationType = pgEnum('inspiration_type', ['image', 'link', 'text', 'document'])
 
-export const inspirationStatus = pgEnum('inspiration_status', ['processing', 'completed', 'failed'])
+export const inspirationStatus = pgEnum('inspiration_status', [
+    'processing', // Initial state
+    'transcript_fetching', // YouTube: fetching transcript
+    'transcript_ready', // YouTube: transcript fetched, ready for extraction
+    'extracting', // LLM extraction in progress
+    'completed', // Successfully processed
+    'failed', // Processing failed
+])
 
 export const rawInspirations = pgTable('raw_inspirations', {
     id: uuid('id').defaultRandom().primaryKey(),

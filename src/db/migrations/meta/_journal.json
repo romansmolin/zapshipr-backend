@@ -71,6 +71,13 @@
       "when": 1767774443341,
       "tag": "0009_goofy_fallen_one",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1767775199846,
+      "tag": "0010_calm_expediter",
+      "breakpoints": true
     }
   ]
 }
