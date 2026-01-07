@@ -120,69 +120,112 @@ export class YouTubeProcessor implements IYouTubeProcessor {
         // Step 1: Normalize URL
         const videoRef = this.normalizeUrl(url)
 
-        // Step 2: Update status to transcript_fetching
-        await this.updateStatus(inspirationId, 'transcript_fetching')
+        // Step 2: Check for cached transcript
+        const cachedTranscript = await this.transcriptRepository.findByVideoId(videoRef.videoId)
 
-        // Step 3: Fetch transcript (captions or STT)
-        const transcriptData = await this.fetchTranscript(inspirationId, videoRef)
+        let transcript
+        let transcriptSource: 'human_captions' | 'auto_captions' | 'stt'
+        let normalizedText: string
+        let segments: any[]
 
-        // Step 4: Update status to transcript_ready
-        await this.updateStatus(inspirationId, 'transcript_ready')
+        if (cachedTranscript && cachedTranscript.normalizedText) {
+            // Use cached transcript
+            this.logger.info('Using cached transcript', {
+                operation: 'YouTubeProcessor.process',
+                inspirationId,
+                videoId: videoRef.videoId,
+                cachedTranscriptId: cachedTranscript.id,
+            })
 
-        // Step 5: Normalize transcript
-        // For json_segments format from STT, parse as JSON and use normalizeSegments
-        let normalized
-        if (transcriptData.format === 'json_segments') {
-            const segments = JSON.parse(transcriptData.raw)
-            const normalizedSegments = this.transcriptNormalizer.normalizeSegments(segments, { removeDuplicates: true })
-            const normalizedText = normalizedSegments.map(s => s.text).join(' ')
-            normalized = {
-                normalizedText,
-                segments: normalizedSegments,
-                language: transcriptData.language || null,
-                originalFormat: 'text' as const,
-                stats: {
-                    segmentCount: normalizedSegments.length,
-                    totalDurationSec: normalizedSegments.length > 0 ? normalizedSegments[normalizedSegments.length - 1].endSec : 0,
-                    characterCount: normalizedText.length,
-                    wordCount: normalizedText.split(/\s+/).filter(w => w.length > 0).length,
-                    duplicatesRemoved: 0,
-                }
-            }
+            // Create a copy for this inspiration
+            transcript = await this.transcriptRepository.create({
+                inspirationId,
+                videoId: videoRef.videoId,
+                language: cachedTranscript.language || 'en',
+                source: cachedTranscript.source,
+                format: cachedTranscript.format,
+                raw: cachedTranscript.raw,
+                normalizedText: cachedTranscript.normalizedText,
+                segments: cachedTranscript.segments,
+                durationSec: cachedTranscript.durationSec,
+            })
+
+            transcriptSource = cachedTranscript.source as 'human_captions' | 'auto_captions' | 'stt'
+            normalizedText = cachedTranscript.normalizedText
+            segments = cachedTranscript.segments || []
+
+            // Update status directly to transcript_ready (skip fetching)
+            await this.updateStatus(inspirationId, 'transcript_ready')
         } else {
-            normalized = this.transcriptNormalizer.parse(
-                transcriptData.raw,
-                { removeDuplicates: true }
-            )
+            // Fetch new transcript
+            // Step 2: Update status to transcript_fetching
+            await this.updateStatus(inspirationId, 'transcript_fetching')
+
+            // Step 3: Fetch transcript (captions or STT)
+            const transcriptData = await this.fetchTranscript(inspirationId, videoRef)
+
+            // Step 4: Update status to transcript_ready
+            await this.updateStatus(inspirationId, 'transcript_ready')
+
+            // Step 5: Normalize transcript
+            // For json_segments format from STT, parse as JSON and use normalizeSegments
+            let normalized
+            if (transcriptData.format === 'json_segments') {
+                const parsedSegments = JSON.parse(transcriptData.raw)
+                const normalizedSegments = this.transcriptNormalizer.normalizeSegments(parsedSegments, { removeDuplicates: true })
+                const normText = normalizedSegments.map(s => s.text).join(' ')
+                normalized = {
+                    normalizedText: normText,
+                    segments: normalizedSegments,
+                    language: transcriptData.language || null,
+                    originalFormat: 'text' as const,
+                    stats: {
+                        segmentCount: normalizedSegments.length,
+                        totalDurationSec: normalizedSegments.length > 0 ? normalizedSegments[normalizedSegments.length - 1].endSec : 0,
+                        characterCount: normText.length,
+                        wordCount: normText.split(/\s+/).filter(w => w.length > 0).length,
+                        duplicatesRemoved: 0,
+                    }
+                }
+            } else {
+                normalized = this.transcriptNormalizer.parse(
+                    transcriptData.raw,
+                    { removeDuplicates: true }
+                )
+            }
+
+            // Step 6: Save transcript to DB
+            transcript = await this.transcriptRepository.create({
+                inspirationId,
+                videoId: videoRef.videoId,
+                language: normalized.language || transcriptData.language || 'en',
+                source: transcriptData.source,
+                format: transcriptData.format,
+                raw: transcriptData.raw,
+                normalizedText: normalized.normalizedText,
+                segments: normalized.segments,
+                durationSec: String(normalized.stats.totalDurationSec || transcriptData.durationSec || 0),
+            })
+
+            this.logger.info('Transcript saved', {
+                operation: 'YouTubeProcessor.process',
+                inspirationId,
+                transcriptId: transcript.id,
+                source: transcriptData.source,
+                wordCount: normalized.stats.wordCount,
+            })
+
+            transcriptSource = transcriptData.source
+            normalizedText = normalized.normalizedText
+            segments = normalized.segments
         }
-
-        // Step 6: Save transcript to DB
-        const transcript = await this.transcriptRepository.create({
-            inspirationId,
-            videoId: videoRef.videoId,
-            language: normalized.language || transcriptData.language || 'en',
-            source: transcriptData.source,
-            format: transcriptData.format,
-            raw: transcriptData.raw,
-            normalizedText: normalized.normalizedText,
-            segments: normalized.segments,
-            durationSec: String(normalized.stats.totalDurationSec || transcriptData.durationSec || 0),
-        })
-
-        this.logger.info('Transcript saved', {
-            operation: 'YouTubeProcessor.process',
-            inspirationId,
-            transcriptId: transcript.id,
-            source: transcriptData.source,
-            wordCount: normalized.stats.wordCount,
-        })
 
         // Step 7: Update status to extracting
         await this.updateStatus(inspirationId, 'extracting')
 
         // Step 8: Extract (single pass or map-reduce)
-        const tokenCount = estimateTokenCount(normalized.normalizedText)
-        const needsMapReduce = needsChunking(normalized.normalizedText, this.maxTokensForSinglePass)
+        const tokenCount = estimateTokenCount(normalizedText)
+        const needsMapReduce = needsChunking(normalizedText, this.maxTokensForSinglePass)
 
         let extraction: YouTubeExtractionData
         let totalTokensUsed: number
@@ -196,7 +239,7 @@ export class YouTubeProcessor implements IYouTubeProcessor {
                 tokenCount,
             })
 
-            const chunks = chunkTranscript(normalized.segments, { maxTokens: 4000 })
+            const chunks = chunkTranscript(segments, { maxTokens: 4000 })
             wasChunked = true
             chunkCount = chunks.chunks.length
 
@@ -205,7 +248,7 @@ export class YouTubeProcessor implements IYouTubeProcessor {
             totalTokensUsed = result.stats.totalTokensUsed
         } else {
             const result = await this.singlePassExtraction(
-                normalized.normalizedText,
+                normalizedText,
                 metadata
             )
             extraction = result.extraction
@@ -226,7 +269,7 @@ export class YouTubeProcessor implements IYouTubeProcessor {
 
             qualityRetried = true
             const retryResult = await this.retryExtraction(
-                normalized.normalizedText,
+                normalizedText,
                 metadata,
                 qualityResult.issues,
                 qualityResult.suggestions
@@ -251,7 +294,7 @@ export class YouTubeProcessor implements IYouTubeProcessor {
         this.logger.info('YouTube processing completed', {
             operation: 'YouTubeProcessor.process',
             inspirationId,
-            transcriptSource: transcriptData.source,
+            transcriptSource,
             wasChunked,
             chunkCount,
             totalTokensUsed,
@@ -264,7 +307,7 @@ export class YouTubeProcessor implements IYouTubeProcessor {
             extraction,
             transcriptId: transcript.id,
             stats: {
-                transcriptSource: transcriptData.source,
+                transcriptSource,
                 transcriptTokens: tokenCount,
                 wasChunked,
                 chunkCount,
