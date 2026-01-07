@@ -18,12 +18,9 @@ const isYouTubeUrl = (url: string): boolean => {
     return YOUTUBE_URL_PATTERNS.some((pattern) => pattern.test(url))
 }
 
-export const YouTubeUrlSchema = z
-    .string()
-    .url('Invalid URL format')
-    .refine(isYouTubeUrl, {
-        message: 'Only YouTube links are supported (youtube.com/watch, youtu.be, youtube.com/shorts)',
-    })
+export const YouTubeUrlSchema = z.string().url('Invalid URL format').refine(isYouTubeUrl, {
+    message: 'Only YouTube links are supported (youtube.com/watch, youtu.be, youtube.com/shorts)',
+})
 
 export const CreateInspirationSchema = z
     .object({

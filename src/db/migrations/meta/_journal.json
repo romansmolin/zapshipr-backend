@@ -64,6 +64,13 @@
       "when": 1767768541958,
       "tag": "0008_hot_scream",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1767774443341,
+      "tag": "0009_goofy_fallen_one",
+      "breakpoints": true
     }
   ]
 }

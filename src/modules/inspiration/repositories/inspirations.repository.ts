@@ -76,7 +76,10 @@ export class InspirationsRepository implements IInspirationsRepository {
                     extraction: inspirationsExtractions,
                 })
                 .from(rawInspirations)
-                .leftJoin(inspirationsExtractions, eq(rawInspirations.id, inspirationsExtractions.rawInspirationId))
+                .leftJoin(
+                    inspirationsExtractions,
+                    eq(rawInspirations.id, inspirationsExtractions.rawInspirationId)
+                )
                 .where(eq(rawInspirations.id, id))
                 .limit(1)
 
@@ -133,7 +136,10 @@ export class InspirationsRepository implements IInspirationsRepository {
                     extraction: inspirationsExtractions,
                 })
                 .from(rawInspirations)
-                .leftJoin(inspirationsExtractions, eq(rawInspirations.id, inspirationsExtractions.rawInspirationId))
+                .leftJoin(
+                    inspirationsExtractions,
+                    eq(rawInspirations.id, inspirationsExtractions.rawInspirationId)
+                )
                 .where(whereClause)
                 .orderBy(desc(rawInspirations.createdAt))
                 .limit(limit)
