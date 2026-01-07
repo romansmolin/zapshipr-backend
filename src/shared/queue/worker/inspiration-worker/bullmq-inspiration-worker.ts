@@ -136,7 +136,7 @@ export class BullMqInspirationWorker implements IInspirationWorker {
                 targetAudience: 'Content creators and marketers',
                 keyInsights: result.extraction.keyPoints,
                 postIdeas: result.extraction.hooks.slice(0, 10),
-                contentStructure: `Hooks: ${result.extraction.hooks.length}, Quotes: ${result.extraction.quotes.length}, Angles: ${result.extraction.contentAngles.length}`,
+                contentStructure: this.buildYouTubeContentStructure(result.extraction),
                 visualStyle: null,
                 suggestedTags: result.extraction.tags,
                 llmModel: 'gpt-4o',
@@ -369,6 +369,61 @@ export class BullMqInspirationWorker implements IInspirationWorker {
                 error: err.message,
             })
         })
+    }
+
+    /**
+     * Build a descriptive content structure string for YouTube extraction
+     */
+    private buildYouTubeContentStructure(extraction: {
+        hooks: string[]
+        quotes: Array<{ text: string; startSec: number | null }>
+        contentAngles: Array<{ angle: string; whyItWorks: string }>
+        keyPoints: string[]
+        drafts: { threads: string[]; x: string[]; linkedin: string[]; instagramCaption: string[] }
+    }): string {
+        const parts: string[] = []
+
+        // Main content summary
+        parts.push(`Video transcript analyzed with ${extraction.keyPoints.length} key insights extracted.`)
+
+        // Hooks preview
+        if (extraction.hooks.length > 0) {
+            parts.push(`\n\n📌 Top Hooks (${extraction.hooks.length} total):`)
+            extraction.hooks.slice(0, 3).forEach((hook, i) => {
+                parts.push(`${i + 1}. ${hook.substring(0, 100)}${hook.length > 100 ? '...' : ''}`)
+            })
+        }
+
+        // Quotes with timestamps
+        const quotesWithTime = extraction.quotes.filter((q) => q.startSec !== null)
+        if (quotesWithTime.length > 0) {
+            parts.push(`\n\n💬 Notable Quotes (${extraction.quotes.length} total):`)
+            quotesWithTime.slice(0, 2).forEach((quote) => {
+                const mins = Math.floor((quote.startSec || 0) / 60)
+                const secs = (quote.startSec || 0) % 60
+                parts.push(`@${mins}:${secs.toString().padStart(2, '0')} "${quote.text.substring(0, 80)}..."`)
+            })
+        }
+
+        // Content angles
+        if (extraction.contentAngles.length > 0) {
+            parts.push(`\n\n🎯 Content Angles (${extraction.contentAngles.length}):`)
+            extraction.contentAngles.slice(0, 3).forEach((angle) => {
+                parts.push(`• ${angle.angle}`)
+            })
+        }
+
+        // Drafts summary
+        const draftCount =
+            extraction.drafts.threads.length +
+            extraction.drafts.x.length +
+            extraction.drafts.linkedin.length +
+            extraction.drafts.instagramCaption.length
+        if (draftCount > 0) {
+            parts.push(`\n\n✍️ Ready-to-use drafts: ${draftCount} posts across 4 platforms`)
+        }
+
+        return parts.join('\n')
     }
 
     private customBackoffStrategy(attemptsMade: number): number {

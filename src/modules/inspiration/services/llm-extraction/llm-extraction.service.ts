@@ -321,28 +321,39 @@ Be SPECIFIC to this video's actual content - no generic advice.`
     }
 
     private getSystemPrompt(): string {
-        return `You are an expert content analyst and strategist. Your task is to analyze content and extract SPECIFIC, ACTIONABLE insights.
-
-                FOR VIDEO CONTENT (YouTube, etc.):
-                - Identify the main argument/thesis of the video
-                - Extract KEY TAKEAWAYS and actionable advice
-                - Note any FRAMEWORKS, STRATEGIES, or STEP-BY-STEP methods mentioned
-                - Identify memorable quotes or statements
-                - Think: "What would someone tweet after watching this?"
-
-                FOR ARTICLES/BLOG POSTS:
-                - Extract the core argument and supporting points
-                - Identify data, statistics, or research mentioned
-                - Note unique perspectives or contrarian views
-
-                FOR ALL CONTENT:
-                - Generate POST IDEAS that are specific and ready-to-use
-                - Each post idea should have a compelling hook
-                - Think about different angles: educational, controversial, personal story, how-to
-
-                IMPORTANT: Always respond in English only, regardless of the input content language.
-                Be SPECIFIC - avoid generic insights like "provides valuable information".
-            `
+        return `
+      You are an expert content analyst and strategist.
+      
+      Your job: extract SPECIFIC, ACTIONABLE insights and ready-to-use post ideas from the provided content.
+      
+      CRITICAL RULES:
+      - Use ONLY the provided content/transcript. Do NOT invent facts, quotes, frameworks, or statistics.
+      - If the transcript is unclear or missing info, say "Not specified in the transcript."
+      - Be concrete: avoid generic statements (e.g. "valuable", "insightful", "motivational").
+      - Always respond in English only.
+      
+      FOR VIDEO CONTENT (YouTube, etc.):
+      - Identify the main thesis (1–2 sentences).
+      - Extract 5–12 key takeaways with actionable advice.
+      - Extract any frameworks/steps/methods EXACTLY as described (if present).
+      - Provide 5–15 memorable quotes/verbatim-style lines (short, punchy).
+      - Generate 10–20 post hooks (tweet-like).
+      
+      FOR ARTICLES/BLOG POSTS:
+      - Extract the core argument and supporting points.
+      - Include any data/statistics/research ONLY if explicitly present.
+      
+      FOR ALL CONTENT:
+      - Generate 8–15 ready-to-use post ideas.
+      - Each post idea must include:
+        - Hook (one-liner)
+        - Outline (2–5 bullets)
+        - Target platform suggestion (Threads/X/LinkedIn/IG)
+        - Angle type: educational / controversial / personal story / how-to
+        - Evidence: a short supporting snippet from the source (or a referenced segment/timestamp if provided).
+      
+      Think: "What would someone tweet after watching this?"
+      `
     }
 
     private getVisionSystemPrompt(): string {
@@ -410,8 +421,16 @@ CRITICAL RULES:
                     },
                     keyInsights: {
                         type: 'array',
-                        items: { type: 'string' },
-                        description: 'Array of 3-5 key takeaways',
+                        items: {
+                            type: 'object',
+                            properties: {
+                                insight: { type: 'string' },
+                                evidence: { type: 'string' },
+                            },
+                            required: ['insight', 'evidence'],
+                            additionalProperties: false,
+                        },
+                        description: 'Array of 5-12 key takeaways with evidence from transcript',
                     },
                     postIdeas: {
                         type: 'array',
@@ -428,6 +447,8 @@ CRITICAL RULES:
                             required: ['idea', 'format', 'angle'],
                             additionalProperties: false,
                         },
+                        outline: { type: 'array', items: { type: 'string' } },
+                        evidence: { type: 'string' },
                         description: 'Array of 5-7 specific post ideas with hooks and angles',
                     },
                     contentStructure: {
