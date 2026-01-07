@@ -27,7 +27,7 @@ export const CreateInspirationSchema = z
         type: InspirationTypeSchema,
         title: z.string().min(1).max(100),
         content: z.string().optional(),
-        userDescription: z.string().max(1000).optional(),
+        userDescription: z.string().max(1000),
     })
     .superRefine((data, ctx) => {
         // Validate YouTube URL for link type
