@@ -14,6 +14,11 @@ import {
 } from '@/modules/inspiration/entity/raw-inspiration.schema'
 import { inspirationsExtractions } from '@/modules/inspiration/entity/inspirations-extraction.schema'
 import { workspaceTags, tagCategory } from '@/modules/inspiration/entity/workspace-tag.schema'
+import {
+    transcripts,
+    transcriptSource,
+    transcriptFormat,
+} from '@/modules/inspiration/entity/transcript.schema'
 
 export const schema = {
     users,
@@ -30,6 +35,7 @@ export const schema = {
     rawInspirations,
     inspirationsExtractions,
     workspaceTags,
+    transcripts,
 }
 
 export type DBSchema = typeof schema
@@ -50,3 +56,8 @@ export {
 } from '@/modules/inspiration/entity/raw-inspiration.schema'
 export { inspirationsExtractions } from '@/modules/inspiration/entity/inspirations-extraction.schema'
 export { workspaceTags, tagCategory } from '@/modules/inspiration/entity/workspace-tag.schema'
+export {
+    transcripts,
+    transcriptSource,
+    transcriptFormat,
+} from '@/modules/inspiration/entity/transcript.schema'

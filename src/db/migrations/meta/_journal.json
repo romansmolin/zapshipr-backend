@@ -57,6 +57,13 @@
       "when": 1767698069731,
       "tag": "0007_busy_triton",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1767768541958,
+      "tag": "0008_hot_scream",
+      "breakpoints": true
     }
   ]
 }
