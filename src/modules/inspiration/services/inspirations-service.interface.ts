@@ -25,6 +25,16 @@ export interface InspirationsListResponse {
     offset: number
 }
 
+export interface TriggerExtractionOptions {
+    forceRefresh?: boolean
+}
+
+export interface TriggerExtractionResult {
+    status: 'queued' | 'already_processing'
+    inspirationId: string
+    message: string
+}
+
 export interface IInspirationsService {
     createInspiration(data: CreateInspirationData): Promise<RawInspiration>
     getInspirations(workspaceId: string, filters?: GetInspirationsFilters): Promise<InspirationsListResponse>
@@ -32,4 +42,5 @@ export interface IInspirationsService {
     updateInspiration(id: string, userDescription: string): Promise<RawInspiration | null>
     deleteInspiration(id: string): Promise<boolean>
     retryInspiration(id: string, workspaceId: string, userId: string): Promise<RawInspiration>
+    triggerExtraction(id: string, workspaceId: string, userId: string, options?: TriggerExtractionOptions): Promise<TriggerExtractionResult>
 }

@@ -118,4 +118,23 @@ export class InspirationsController {
 
         res.json(inspiration)
     }
+
+    async triggerExtraction(req: Request, res: Response): Promise<void> {
+        const userId = req.user!.id
+        const { id, workspaceId } = req.params
+        const { forceRefresh } = req.body || {}
+
+        this.logger.info('Trigger extraction request', {
+            userId,
+            inspirationId: id,
+            workspaceId,
+            forceRefresh,
+        })
+
+        const result = await this.service.triggerExtraction(id, workspaceId, userId, {
+            forceRefresh: forceRefresh === true,
+        })
+
+        res.json(result)
+    }
 }

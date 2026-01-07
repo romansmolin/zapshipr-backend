@@ -61,6 +61,11 @@ export const createInspirationsRouter = (logger: ILogger, db: NodePgDatabase<typ
         authMiddleware,
         asyncHandler(controller.retry.bind(controller))
     )
+    router.post(
+        '/workspaces/:workspaceId/inspirations/:id/extract',
+        authMiddleware,
+        asyncHandler(controller.triggerExtraction.bind(controller))
+    )
 
     return router
 }

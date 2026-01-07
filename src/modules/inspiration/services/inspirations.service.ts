@@ -12,6 +12,8 @@ import type {
     CreateInspirationData,
     GetInspirationsFilters,
     InspirationsListResponse,
+    TriggerExtractionOptions,
+    TriggerExtractionResult,
 } from './inspirations-service.interface'
 import type { RawInspiration } from '../entity/raw-inspiration.schema'
 import { validateInspirationByType } from '../validation/inspirations.schemas'
@@ -209,5 +211,81 @@ export class InspirationsService implements IInspirationsService {
         })
 
         return updated
+    }
+
+    async triggerExtraction(
+        id: string,
+        workspaceId: string,
+        userId: string,
+        options?: TriggerExtractionOptions
+    ): Promise<TriggerExtractionResult> {
+        const inspiration = await this.inspirationsRepository.findById(id)
+
+        if (!inspiration) {
+            throw new AppError({
+                errorMessageCode: ErrorMessageCode.INSPIRATION_NOT_FOUND,
+                message: 'Inspiration not found',
+                httpCode: 404,
+            })
+        }
+
+        // Check ownership
+        if (inspiration.workspaceId !== workspaceId) {
+            throw new AppError({
+                errorMessageCode: ErrorMessageCode.FORBIDDEN,
+                message: 'Inspiration does not belong to this workspace',
+                httpCode: 403,
+            })
+        }
+
+        // Check if already processing
+        const processingStatuses = ['processing', 'transcript_fetching', 'extracting']
+        if (processingStatuses.includes(inspiration.status)) {
+            return {
+                status: 'already_processing',
+                inspirationId: id,
+                message: `Inspiration is currently ${inspiration.status}`,
+            }
+        }
+
+        // Valid statuses for triggering extraction
+        const validStatuses = ['transcript_ready', 'completed', 'failed']
+        if (!validStatuses.includes(inspiration.status)) {
+            throw new AppError({
+                errorMessageCode: ErrorMessageCode.VALIDATION_ERROR,
+                message: `Cannot trigger extraction for inspiration with status ${inspiration.status}. Valid statuses: ${validStatuses.join(', ')}`,
+                httpCode: 400,
+            })
+        }
+
+        // Reset status based on current state
+        let newStatus: 'processing' | 'extracting' = 'processing'
+        if (inspiration.status === 'transcript_ready') {
+            newStatus = 'extracting'
+        }
+
+        await this.inspirationsRepository.update(id, {
+            status: newStatus,
+            errorMessage: null,
+        })
+
+        // Schedule for processing
+        await this.inspirationScheduler.scheduleInspiration(id, workspaceId, userId)
+
+        this.logger.info('Triggered extraction for inspiration', {
+            operation: 'InspirationsService.triggerExtraction',
+            inspirationId: id,
+            workspaceId,
+            userId,
+            previousStatus: inspiration.status,
+            newStatus,
+            forceRefresh: options?.forceRefresh,
+        })
+
+        return {
+            status: 'queued',
+            inspirationId: id,
+            message: `Extraction queued successfully. Previous status: ${inspiration.status}`,
+        }
     }
 }
