@@ -5,26 +5,23 @@ export interface ParsedContent {
     author?: string
     domain?: string
     publishedDate?: string
+    thumbnailUrl?: string // YouTube video thumbnail
 }
 
 export interface IContentParserService {
     /**
-     * Парсинг веб-страницы
+     * Parse YouTube video URL and extract metadata
+     * Only YouTube links are supported
      */
     parseUrl(url: string): Promise<ParsedContent>
 
     /**
-     * Парсинг документа (PDF, TXT, MD, DOCX)
+     * Parse document (PDF, TXT, MD, DOCX)
      */
     parseDocument(fileBuffer: Buffer, fileName: string): Promise<ParsedContent>
 
     /**
-     * Извлечение метаданных из YouTube/Vimeo видео
-     */
-    extractVideoMetadata(url: string): Promise<ParsedContent>
-
-    /**
-     * Нормализация контента (обрезка до 1500 слов)
+     * Normalize content (truncate to maxWords)
      */
     normalizeContent(content: string, maxWords?: number): string
 }

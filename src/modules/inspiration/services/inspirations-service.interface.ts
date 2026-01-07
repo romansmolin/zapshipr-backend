@@ -5,6 +5,7 @@ export interface CreateInspirationData {
     workspaceId: string
     userId: string
     type: 'image' | 'link' | 'text' | 'document'
+    title: string
     content?: string
     userDescription?: string
     file?: Express.Multer.File

@@ -8,7 +8,6 @@ import {
     CreateInspirationSchema,
     UpdateInspirationSchema,
     GetInspirationsQuerySchema,
-    validateInspirationByType,
 } from '../validation/inspirations.schemas'
 
 export class InspirationsController {
@@ -20,23 +19,18 @@ export class InspirationsController {
     async create(req: Request, res: Response): Promise<void> {
         const userId = req.user!.id
         const { workspaceId } = req.params
+        
+        // Zod schema now validates YouTube URLs for link type
         const body = CreateInspirationSchema.parse(req.body)
         const file = req.file
 
         this.logger.info('Create inspiration request', { userId, workspaceId, type: body.type })
 
+        // File required for image/document types
         if ((body.type === 'image' || body.type === 'document') && !file) {
             throw new AppError({
                 errorMessageCode: ErrorMessageCode.VALIDATION_ERROR,
                 message: `File is required for type=${body.type}`,
-                httpCode: 400,
-            })
-        }
-
-        if ((body.type === 'link' || body.type === 'text') && !body.content) {
-            throw new AppError({
-                errorMessageCode: ErrorMessageCode.VALIDATION_ERROR,
-                message: `content is required for type=${body.type}`,
                 httpCode: 400,
             })
         }
@@ -47,6 +41,7 @@ export class InspirationsController {
             type: body.type,
             content: body.content,
             userDescription: body.userDescription,
+            title: body.title,
             file,
         })
 

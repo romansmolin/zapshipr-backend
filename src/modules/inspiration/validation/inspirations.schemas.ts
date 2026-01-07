@@ -6,30 +6,73 @@ export const InspirationStatusSchema = z.enum(['processing', 'completed', 'faile
 
 export const TagCategorySchema = z.enum(['topic', 'format', 'tone', 'style', 'other'])
 
-export const CreateInspirationSchema = z.object({
-    type: InspirationTypeSchema,
-    title: z.string().min(1).max(100),
-    content: z.string().optional(),
-    userDescription: z.string().max(1000).optional(),
-})
+// YouTube URL regex patterns
+const YOUTUBE_URL_PATTERNS = [
+    /^https?:\/\/(www\.)?youtube\.com\/watch\?v=[\w-]+/i,
+    /^https?:\/\/youtu\.be\/[\w-]+/i,
+    /^https?:\/\/(www\.)?youtube\.com\/embed\/[\w-]+/i,
+    /^https?:\/\/(www\.)?youtube\.com\/shorts\/[\w-]+/i,
+]
 
+const isYouTubeUrl = (url: string): boolean => {
+    return YOUTUBE_URL_PATTERNS.some((pattern) => pattern.test(url))
+}
+
+export const YouTubeUrlSchema = z
+    .string()
+    .url('Invalid URL format')
+    .refine(isYouTubeUrl, {
+        message: 'Only YouTube links are supported (youtube.com/watch, youtu.be, youtube.com/shorts)',
+    })
+
+export const CreateInspirationSchema = z
+    .object({
+        type: InspirationTypeSchema,
+        title: z.string().min(1).max(100),
+        content: z.string().optional(),
+        userDescription: z.string().max(1000).optional(),
+    })
+    .superRefine((data, ctx) => {
+        // Validate YouTube URL for link type
+        if (data.type === 'link') {
+            if (!data.content) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: 'content is required for type=link',
+                    path: ['content'],
+                })
+                return
+            }
+
+            const result = YouTubeUrlSchema.safeParse(data.content)
+            if (!result.success) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: result.error.issues[0]?.message || 'Only YouTube links are supported',
+                    path: ['content'],
+                })
+            }
+        }
+
+        // Validate text content
+        if (data.type === 'text') {
+            if (!data.content || data.content.length < 10) {
+                ctx.addIssue({
+                    code: z.ZodIssueCode.custom,
+                    message: 'content must be at least 10 characters for type=text',
+                    path: ['content'],
+                })
+            }
+        }
+    })
+
+// Legacy function - kept for backwards compatibility but validation is now in schema
 export const validateInspirationByType = (data: { type: string; content?: string }) => {
     if (data.type === 'link') {
-        if (!data.content) {
-            throw new Error('content is required for type=link')
-        }
-        // Проверка валидности URL
-        try {
-            new URL(data.content)
-        } catch {
-            throw new Error('Invalid URL format')
-        }
-        const url = data.content
-        if (/tiktok\.com\//i.test(url)) {
-            throw new Error('TikTok links are not supported yet')
-        }
-        if (/instagram\.com\/reel\//i.test(url)) {
-            throw new Error('Instagram Reels links are not supported yet')
+        if (!data.content) throw new Error('content is required for type=link')
+
+        if (!isYouTubeUrl(data.content)) {
+            throw new Error('Only YouTube links are supported (youtube.com/watch, youtu.be, youtube.com/shorts)')
         }
     }
 

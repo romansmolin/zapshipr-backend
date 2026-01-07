@@ -61,19 +61,21 @@ export class BullMqInspirationWorker implements IInspirationWorker {
             attempt: job.attemptsMade + 1,
         })
 
-        // Step 1: Получить inspiration из БД
         const inspiration = await this.inspirationsRepository.findById(inspirationId)
 
         if (!inspiration) throw new Error(`Inspiration not found: ${inspirationId}`)
 
-        // Step 2: Парсинг контента
         let parsedContent = ''
+        let thumbnailUrl: string | undefined
+
         const baseMetadata = buildInspirationMetadataSource(inspiration.type, inspiration.content || undefined)
+
         let metadata: InspirationMetadata = baseMetadata
 
         if (inspiration.type === 'link') {
             const parsed = await this.contentParser.parseUrl(inspiration.content!)
             parsedContent = parsed.content
+            thumbnailUrl = parsed.thumbnailUrl
             metadata = {
                 ...baseMetadata,
                 title: parsed.title,
@@ -81,6 +83,7 @@ export class BullMqInspirationWorker implements IInspirationWorker {
                 author: parsed.author,
                 domain: parsed.domain,
                 publishedDate: parsed.publishedDate,
+                thumbnailUrl: parsed.thumbnailUrl,
             }
         } else if (inspiration.type === 'document') {
             parsedContent = inspiration.content || ''
@@ -90,33 +93,47 @@ export class BullMqInspirationWorker implements IInspirationWorker {
             parsedContent = inspiration.userDescription || ''
         }
 
-        // Step 3: Сохранить parsedContent и metadata в БД
-        await this.inspirationsRepository.update(inspirationId, {
+        // Update inspiration with parsed content, metadata, and thumbnail
+        const updateData: Record<string, unknown> = {
             parsedContent: this.contentParser.normalizeContent(parsedContent),
             metadata,
-        })
+        }
+
+        // Save thumbnail URL for links (if not already has imageUrl)
+        if (thumbnailUrl && !inspiration.imageUrl) {
+            updateData.imageUrl = thumbnailUrl
+        }
+
+        await this.inspirationsRepository.update(inspirationId, updateData)
 
         this.logger.info('Content parsed successfully', {
             operation: 'BullMqInspirationWorker.handleJob',
             inspirationId,
             contentLength: parsedContent.length,
+            hasThumbnail: !!thumbnailUrl,
+            thumbnailUrl: thumbnailUrl?.substring(0, 100),
         })
 
-        // Step 4: Create extraction through LLM (with Vision for images)
+        // Determine imageUrl for Vision analysis
+        // For images: use the uploaded image
+        // For links: use thumbnail if available
+        const imageUrlForVision =
+            inspiration.type === 'image'
+                ? inspiration.imageUrl || undefined
+                : thumbnailUrl || undefined
+
         const extractionResult = await this.llmExtraction.createExtraction({
             type: inspiration.type,
             content: parsedContent,
             userDescription: inspiration.userDescription || undefined,
-            imageUrl: inspiration.type === 'image' ? inspiration.imageUrl || undefined : undefined,
+            imageUrl: imageUrlForVision,
             metadata,
         })
 
-        // Format postIdeas as readable strings for storage
         const formattedPostIdeas = extractionResult.extraction.postIdeas.map(
             (idea) => `[${idea.format.toUpperCase()}] ${idea.idea} | Angle: ${idea.angle}`
         )
 
-        // Step 5: Save extraction to DB
         const extraction = await this.extractionsRepository.create({
             rawInspirationId: inspirationId,
             workspaceId,
@@ -141,7 +158,6 @@ export class BullMqInspirationWorker implements IInspirationWorker {
             tokensUsed: extractionResult.tokensUsed,
         })
 
-        // Step 7: Обновить статус на "completed"
         await this.inspirationsRepository.update(inspirationId, {
             status: 'completed',
             errorMessage: null,

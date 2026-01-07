@@ -3,7 +3,10 @@ import type { ILogger } from '@/shared/logger/logger.interface'
 import type { IMediaUploader } from '@/shared/media-uploader/media-uploader.interface'
 import type { IInspirationScheduler } from '@/shared/queue/scheduler/inspiration-scheduler/inspiration-scheduler.interface'
 
-import type { IInspirationsRepository, InspirationWithExtraction } from '../repositories/inspirations-repository.interface'
+import type {
+    IInspirationsRepository,
+    InspirationWithExtraction,
+} from '../repositories/inspirations-repository.interface'
 import type {
     IInspirationsService,
     CreateInspirationData,
@@ -22,9 +25,8 @@ export class InspirationsService implements IInspirationsService {
     ) {}
 
     async createInspiration(data: CreateInspirationData): Promise<RawInspiration> {
-        if (data.type === 'link' || data.type === 'text') {
+        if (data.type === 'link' || data.type === 'text')
             validateInspirationByType({ type: data.type, content: data.content })
-        }
 
         if (data.type === 'link' && data.content) {
             const isDuplicate = await this.inspirationsRepository.checkDuplicateUrl(data.workspaceId, data.content)
@@ -62,7 +64,7 @@ export class InspirationsService implements IInspirationsService {
             workspaceId: data.workspaceId,
             userId: data.userId,
             type: data.type,
-            title: '',
+            title: data.title,
             content: data.content,
             imageUrl,
             userDescription: data.userDescription,

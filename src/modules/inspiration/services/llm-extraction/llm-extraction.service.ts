@@ -23,8 +23,8 @@ export class LLMExtractionService implements ILLMExtractionService {
     }
 
     async createExtraction(input: ExtractionInput): Promise<ExtractionResult> {
-        // Use Vision for images
-        if (input.type === 'image' && input.imageUrl) {
+        // Use Vision when imageUrl is available (images or links with thumbnails)
+        if (input.imageUrl) {
             return this.createExtractionWithVision(input)
         }
 
@@ -229,21 +229,57 @@ export class LLMExtractionService implements ILLMExtractionService {
 
         prompt += `Content:\n${input.content}\n\n`
 
-        prompt += `Guidelines:
+        // Add specific guidelines based on content type
+        const isYouTube = input.metadata?.domain === 'youtube.com'
+        const isVideo = isYouTube || input.metadata?.domain === 'vimeo.com'
+
+        if (isVideo) {
+            prompt += `VIDEO ANALYSIS GUIDELINES:
+- What is the MAIN THESIS or argument of this video?
+- What are the KEY TAKEAWAYS someone should remember?
+- Are there any FRAMEWORKS, METHODS, or STEP-BY-STEP processes mentioned?
+- What makes this content unique or valuable?
+- What would someone TWEET after watching this?
+
+POST IDEAS REQUIREMENTS:
+- Generate 5-7 specific post ideas based on this video
+- Each idea should have a HOOK that stops scrolling
+- Include different angles: educational, controversial, "I tried this...", statistics-based
+- Example hooks:
+  * "I watched [Creator]'s video on [Topic] and here's the #1 thing most people miss..."
+  * "Unpopular opinion: [Creator] is wrong about [specific point]..."
+  * "The 3-step framework from [Video] that changed how I think about [Topic]..."
+
+Be SPECIFIC to this video's actual content - no generic advice.`
+        } else {
+            prompt += `Guidelines:
 - Provide a clear 2-3 sentence summary
 - Extract 3-7 key topics that represent main themes
 - Identify 2-4 tone attributes (professional, casual, humorous, educational, inspirational, etc.)
 - Provide 3-5 actionable key insights or takeaways
+- Generate 5-7 specific POST IDEAS with hooks and angles
 - Suggest 5-10 relevant tags that could categorize this content
 - Describe the content structure (hook, body, call-to-action, etc.)
-- If visual elements are present, describe the visual style
 - Focus on insights that would help create similar content`
+        }
 
         return prompt
     }
 
     private buildVisionPrompt(input: ExtractionInput): string {
-        let prompt = `Analyze this image carefully and extract structured insights for content creation.\n\n`
+        let prompt = ''
+
+        // For links with thumbnails, include both image and content
+        if (input.type === 'link' && input.content) {
+            prompt += `Analyze this article/video thumbnail AND its content to extract insights.\n\n`
+            prompt += `=== ARTICLE CONTENT ===\n${input.content.substring(0, 3000)}\n\n`
+            if (input.metadata) {
+                prompt += `Title: ${input.metadata.title || 'Unknown'}\n`
+                prompt += `Domain: ${input.metadata.domain || 'Unknown'}\n\n`
+            }
+        } else {
+            prompt += `Analyze this image carefully and extract structured insights for content creation.\n\n`
+        }
 
         if (input.userDescription) {
             prompt += `User's context: ${input.userDescription}\n\n`
@@ -285,11 +321,27 @@ export class LLMExtractionService implements ILLMExtractionService {
     }
 
     private getSystemPrompt(): string {
-        return `You are an expert content analyst. Your task is to analyze content and extract structured insights.
-Extract key topics, tone, target audience, and actionable insights from the provided content.
+        return `You are an expert content analyst and strategist. Your task is to analyze content and extract SPECIFIC, ACTIONABLE insights.
+
+FOR VIDEO CONTENT (YouTube, etc.):
+- Identify the main argument/thesis of the video
+- Extract KEY TAKEAWAYS and actionable advice
+- Note any FRAMEWORKS, STRATEGIES, or STEP-BY-STEP methods mentioned
+- Identify memorable quotes or statements
+- Think: "What would someone tweet after watching this?"
+
+FOR ARTICLES/BLOG POSTS:
+- Extract the core argument and supporting points
+- Identify data, statistics, or research mentioned
+- Note unique perspectives or contrarian views
+
+FOR ALL CONTENT:
+- Generate POST IDEAS that are specific and ready-to-use
+- Each post idea should have a compelling hook
+- Think about different angles: educational, controversial, personal story, how-to
 
 IMPORTANT: Always respond in English only, regardless of the input content language.
-If the content is in another language, translate and analyze it, but provide all output in English.`
+Be SPECIFIC - avoid generic insights like "provides valuable information".`
     }
 
     private getVisionSystemPrompt(): string {

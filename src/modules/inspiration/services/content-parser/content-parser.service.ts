@@ -11,104 +11,24 @@ const pdfParse = pdfParseModule.default || pdfParseModule
 
 export class ContentParserService implements IContentParserService {
     private readonly TIMEOUT = 30000 // 30 seconds
-    private readonly MAX_CONTENT_LENGTH = 50000 // Макс. размер HTML для парсинга
 
     constructor(private readonly logger: ILogger) {}
 
+    /**
+     * Parse URL - only YouTube videos are supported
+     */
     async parseUrl(url: string): Promise<ParsedContent> {
-        const parsedUrl = new URL(url)
+        const videoId = this.extractYouTubeVideoId(url)
 
-        // Проверяем, является ли это YouTube/Vimeo видео
-        if (this.isVideoUrl(url)) {
-            return this.extractVideoMetadata(url)
+        if (!videoId) {
+            throw new AppError({
+                errorMessageCode: ErrorMessageCode.VALIDATION_ERROR,
+                message: 'Only YouTube links are supported',
+                httpCode: 400,
+            })
         }
 
-        const response = await axios.get(url, {
-            timeout: this.TIMEOUT,
-            maxContentLength: this.MAX_CONTENT_LENGTH,
-            headers: {
-                'User-Agent':
-                    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            },
-        })
-
-        const html = response.data
-        const $ = cheerio.load(html)
-
-        // Удаляем ненужные элементы
-        $('script, style, nav, footer, header, aside, iframe, noscript').remove()
-
-        // Извлекаем метаданные
-        const title =
-            $('meta[property="og:title"]').attr('content') ||
-            $('meta[name="twitter:title"]').attr('content') ||
-            $('title').text() ||
-            ''
-
-        const description =
-            $('meta[property="og:description"]').attr('content') ||
-            $('meta[name="twitter:description"]').attr('content') ||
-            $('meta[name="description"]').attr('content') ||
-            ''
-
-        const author =
-            $('meta[name="author"]').attr('content') ||
-            $('meta[property="article:author"]').attr('content') ||
-            ''
-
-        const publishedDate =
-            $('meta[property="article:published_time"]').attr('content') ||
-            $('meta[name="publish_date"]').attr('content') ||
-            ''
-
-        // Извлекаем основной текст
-        let content = ''
-
-        // Пробуем найти основной контент
-        const mainContentSelectors = [
-            'article',
-            '[role="main"]',
-            '.post-content',
-            '.article-content',
-            '.entry-content',
-            'main',
-            '.content',
-        ]
-
-        for (const selector of mainContentSelectors) {
-            const element = $(selector)
-            if (element.length) {
-                content = element.text()
-                break
-            }
-        }
-
-        // Если не нашли основной контент, берем body
-        if (!content) {
-            content = $('body').text()
-        }
-
-        // Очищаем текст от лишних пробелов и переносов
-        content = content
-            .replace(/\s+/g, ' ')
-            .replace(/\n+/g, '\n')
-            .trim()
-
-        this.logger.info('Parsed URL successfully', {
-            operation: 'ContentParserService.parseUrl',
-            url: parsedUrl.hostname,
-            titleLength: title.length,
-            contentLength: content.length,
-        })
-
-        return {
-            title: title.substring(0, 500),
-            description: description.substring(0, 1000),
-            content: this.normalizeContent(content),
-            author,
-            domain: parsedUrl.hostname,
-            publishedDate,
-        }
+        return this.extractYouTubeVideoDetails(videoId, url)
     }
 
     async parseDocument(fileBuffer: Buffer, fileName: string): Promise<ParsedContent> {
@@ -138,10 +58,7 @@ export class ContentParserService implements IContentParserService {
         }
 
         // Очищаем текст
-        content = content
-            .replace(/\s+/g, ' ')
-            .replace(/\n+/g, '\n')
-            .trim()
+        content = content.replace(/\s+/g, ' ').replace(/\n+/g, '\n').trim()
 
         this.logger.info('Parsed document successfully', {
             operation: 'ContentParserService.parseDocument',
@@ -154,74 +71,6 @@ export class ContentParserService implements IContentParserService {
             title: title.substring(0, 500),
             content: this.normalizeContent(content),
         }
-    }
-
-    async extractVideoMetadata(url: string): Promise<ParsedContent> {
-        const videoId = this.extractVideoId(url)
-
-        if (!videoId) {
-            throw new AppError({
-                errorMessageCode: ErrorMessageCode.VALIDATION_ERROR,
-                message: 'Could not extract video ID from URL',
-                httpCode: 400,
-            })
-        }
-
-        // Для YouTube используем oEmbed API
-        if (url.includes('youtube.com') || url.includes('youtu.be')) {
-            const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`
-
-            const response = await axios.get(oembedUrl, {
-                timeout: this.TIMEOUT,
-            })
-
-            const data = response.data
-
-            this.logger.info('Extracted YouTube metadata', {
-                operation: 'ContentParserService.extractVideoMetadata',
-                videoId,
-                title: data.title,
-            })
-
-            return {
-                title: data.title,
-                description: '',
-                content: `YouTube Video: ${data.title}\nAuthor: ${data.author_name}`,
-                author: data.author_name,
-                domain: 'youtube.com',
-            }
-        }
-
-        // Для Vimeo используем oEmbed API
-        if (url.includes('vimeo.com')) {
-            const oembedUrl = `https://vimeo.com/api/oembed.json?url=${encodeURIComponent(url)}`
-
-            const response = await axios.get(oembedUrl, {
-                timeout: this.TIMEOUT,
-            })
-
-            const data = response.data
-
-            this.logger.info('Extracted Vimeo metadata', {
-                operation: 'ContentParserService.extractVideoMetadata',
-                videoId,
-                title: data.title,
-            })
-
-            return {
-                title: data.title,
-                description: data.description || '',
-                content: `Vimeo Video: ${data.title}\nAuthor: ${data.author_name}`,
-                author: data.author_name,
-                domain: 'vimeo.com',
-            }
-        }
-
-        throw new AppError({
-            errorMessageCode: ErrorMessageCode.VALIDATION_ERROR,
-            message: 'Unsupported video platform. Supported: YouTube, Vimeo',
-            httpCode: 400,
-        })
     }
 
     normalizeContent(content: string, maxWords: number = 1500): string {
@@ -238,36 +87,242 @@ export class ContentParserService implements IContentParserService {
         return content
     }
 
-    private isVideoUrl(url: string): boolean {
-        const videoPatterns = [
-            /youtube\.com\/watch/i,
-            /youtu\.be\//i,
-            /youtube\.com\/embed/i,
-            /vimeo\.com\/\d+/i,
-        ]
+    /**
+     * Extract full YouTube video details including description
+     */
+    private async extractYouTubeVideoDetails(videoId: string, url: string): Promise<ParsedContent> {
+        const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`
 
-        return videoPatterns.some((pattern) => pattern.test(url))
+        // Try to get detailed info via YouTube Data API
+        const apiKey = process.env.YOUTUBE_API_KEY || process.env.GOOGLE_API_KEY
+
+        if (apiKey) {
+            this.logger.debug('WE ARE ABOUT TO USE YOUTUBE')
+
+            try {
+                const apiUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&id=${videoId}&key=${apiKey}`
+
+                const response = await axios.get(apiUrl, { timeout: this.TIMEOUT })
+                const video = response.data.items?.[0]
+
+                if (video) {
+                    const snippet = video.snippet
+                    const stats = video.statistics || {}
+                    const duration = video.contentDetails?.duration || ''
+
+                    // Build rich content from video details
+                    const content = this.buildYouTubeContent({
+                        title: snippet.title,
+                        description: snippet.description || '',
+                        channelTitle: snippet.channelTitle,
+                        tags: snippet.tags || [],
+                        viewCount: stats.viewCount,
+                        likeCount: stats.likeCount,
+                        duration,
+                        publishedAt: snippet.publishedAt,
+                    })
+
+                    this.logger.info('Extracted YouTube video details via API', {
+                        operation: 'ContentParserService.extractYouTubeVideoDetails',
+                        videoId,
+                        title: snippet.title,
+                        descriptionLength: snippet.description?.length || 0,
+                        hasTags: (snippet.tags || []).length > 0,
+                    })
+
+                    return {
+                        title: snippet.title,
+                        description: snippet.description?.substring(0, 1000) || '',
+                        content,
+                        author: snippet.channelTitle,
+                        domain: 'youtube.com',
+                        publishedDate: snippet.publishedAt,
+                        thumbnailUrl,
+                    }
+                }
+            } catch (error) {
+                this.logger.warn('Failed to fetch YouTube API data, falling back to oEmbed', {
+                    operation: 'ContentParserService.extractYouTubeVideoDetails',
+                    videoId,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                })
+            }
+        }
+
+        // Fallback: Try to scrape YouTube page for description
+        try {
+            const pageResponse = await axios.get(`https://www.youtube.com/watch?v=${videoId}`, {
+                timeout: this.TIMEOUT,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                },
+            })
+
+            const html = pageResponse.data
+            const $ = cheerio.load(html)
+
+            // Extract description from meta tags
+            const description =
+                $('meta[name="description"]').attr('content') ||
+                $('meta[property="og:description"]').attr('content') ||
+                ''
+
+            const title =
+                $('meta[property="og:title"]').attr('content') ||
+                $('meta[name="title"]').attr('content') ||
+                $('title').text().replace(' - YouTube', '') ||
+                ''
+
+            const author =
+                $('link[itemprop="name"]').attr('content') ||
+                $('span[itemprop="author"] link[itemprop="name"]').attr('content') ||
+                ''
+
+            // Try to extract more data from JSON-LD
+            let fullDescription = description
+            try {
+                const scriptTags = $('script[type="application/ld+json"]').toArray()
+                for (const script of scriptTags) {
+                    const jsonText = $(script).html()
+                    if (jsonText) {
+                        const jsonData = JSON.parse(jsonText)
+                        if (jsonData.description && jsonData.description.length > fullDescription.length) {
+                            fullDescription = jsonData.description
+                        }
+                    }
+                }
+            } catch {
+                // Ignore JSON parsing errors
+            }
+
+            const content = `YouTube Video: ${title}
+Channel: ${author}
+
+Description:
+${fullDescription}
+
+---
+Analyze this video content and extract key insights, main topics, and actionable takeaways.`
+
+            this.logger.info('Extracted YouTube metadata via page scraping', {
+                operation: 'ContentParserService.extractYouTubeVideoDetails',
+                videoId,
+                title,
+                descriptionLength: fullDescription.length,
+            })
+
+            return {
+                title: title.substring(0, 500),
+                description: fullDescription.substring(0, 1000),
+                content: this.normalizeContent(content),
+                author,
+                domain: 'youtube.com',
+                thumbnailUrl,
+            }
+        } catch (error) {
+            this.logger.warn('Failed to scrape YouTube page, using basic oEmbed', {
+                operation: 'ContentParserService.extractYouTubeVideoDetails',
+                videoId,
+                error: error instanceof Error ? error.message : 'Unknown error',
+            })
+        }
+
+        // Final fallback: oEmbed (basic info only)
+        const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(url)}&format=json`
+        const response = await axios.get(oembedUrl, { timeout: this.TIMEOUT })
+        const data = response.data
+
+        return {
+            title: data.title,
+            description: '',
+            content: `YouTube Video: ${data.title}\nAuthor: ${data.author_name}\n\nNote: Limited metadata available. For better analysis, provide YOUTUBE_API_KEY.`,
+            author: data.author_name,
+            domain: 'youtube.com',
+            thumbnailUrl,
+        }
     }
 
-    private extractVideoId(url: string): string | null {
-        // YouTube
-        const youtubePatterns = [
+    /**
+     * Build rich content string from YouTube video data
+     */
+    private buildYouTubeContent(data: {
+        title: string
+        description: string
+        channelTitle: string
+        tags: string[]
+        viewCount?: string
+        likeCount?: string
+        duration?: string
+        publishedAt?: string
+    }): string {
+        let content = `YouTube Video: ${data.title}
+Channel: ${data.channelTitle}
+`
+
+        if (data.viewCount) {
+            content += `Views: ${parseInt(data.viewCount).toLocaleString()}\n`
+        }
+
+        if (data.likeCount) {
+            content += `Likes: ${parseInt(data.likeCount).toLocaleString()}\n`
+        }
+
+        if (data.duration) {
+            content += `Duration: ${this.formatDuration(data.duration)}\n`
+        }
+
+        if (data.publishedAt) {
+            content += `Published: ${new Date(data.publishedAt).toLocaleDateString()}\n`
+        }
+
+        if (data.tags.length > 0) {
+            content += `\nTags: ${data.tags.slice(0, 15).join(', ')}\n`
+        }
+
+        content += `\n=== VIDEO DESCRIPTION ===\n${data.description}\n`
+
+        content += `\n=== ANALYSIS INSTRUCTIONS ===
+Based on the video title, description, and metadata above:
+1. Identify the main topic and key points the video covers
+2. Extract actionable insights and takeaways
+3. Note any frameworks, strategies, or methods mentioned
+4. Consider the target audience and what value they get
+5. Generate specific post ideas based on this content`
+
+        return content
+    }
+
+    /**
+     * Format ISO 8601 duration (PT1H2M3S) to readable format
+     */
+    private formatDuration(isoDuration: string): string {
+        const match = isoDuration.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/)
+        if (!match) return isoDuration
+
+        const hours = match[1] ? `${match[1]}h ` : ''
+        const minutes = match[2] ? `${match[2]}m ` : ''
+        const seconds = match[3] ? `${match[3]}s` : ''
+
+        return `${hours}${minutes}${seconds}`.trim() || '0s'
+    }
+
+    /**
+     * Extract YouTube video ID from URL
+     */
+    private extractYouTubeVideoId(url: string): string | null {
+        const patterns = [
             /youtube\.com\/watch\?v=([^&]+)/i,
             /youtu\.be\/([^?]+)/i,
             /youtube\.com\/embed\/([^?]+)/i,
+            /youtube\.com\/shorts\/([^?]+)/i,
         ]
 
-        for (const pattern of youtubePatterns) {
+        for (const pattern of patterns) {
             const match = url.match(pattern)
             if (match) return match[1]
         }
 
-        // Vimeo
-        const vimeoPattern = /vimeo\.com\/(\d+)/i
-        const vimeoMatch = url.match(vimeoPattern)
-        if (vimeoMatch) return vimeoMatch[1]
-
         return null
     }
 }
-
