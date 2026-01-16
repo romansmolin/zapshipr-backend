@@ -6,13 +6,32 @@ import type {
     ExtractionResult,
     ExtractionData,
 } from './llm-extraction-service.interface'
+import {
+    buildExtractionPrompt,
+    buildVisionExtractionPrompt,
+    getExtractionJsonSchema,
+    getExtractionSystemPrompt,
+    getVisionExtractionSystemPrompt,
+} from './prompts/extraction-prompts'
+import {
+    buildDocumentMapPrompt,
+    getDocumentMapJsonSchema,
+    getDocumentMapSystemPrompt,
+    DocumentChunkNotes,
+} from './prompts/document-map-prompt'
+import { buildDocumentReducePrompt, getDocumentReduceSystemPrompt } from './prompts/document-reduce-prompt'
 import { AppError, ErrorMessageCode } from '@/shared/errors/app-error'
 import { getEnvVar } from '@/shared/utils/get-env-var'
+import { chunkText, estimateTokenCount, TranscriptChunk } from '../../utils/transcript-chunker'
 
 export class LLMExtractionService implements ILLMExtractionService {
     private readonly openai: OpenAI
     private readonly model: string = 'gpt-4o'
     private readonly maxRetries = 3
+    private readonly longFormTokenThreshold = 6000
+    private readonly maxChunkTokens = 2600
+    private readonly maxConcurrentChunks = 3
+    private mapTokenCounts: Record<number, number> = {}
 
     constructor(private readonly logger: ILogger) {
         const apiKey = getEnvVar('OPENAI_API_KEY')
@@ -23,19 +42,21 @@ export class LLMExtractionService implements ILLMExtractionService {
     }
 
     async createExtraction(input: ExtractionInput): Promise<ExtractionResult> {
-        // Use Vision when imageUrl is available (images or links with thumbnails)
-        if (input.imageUrl) {
-            return this.createExtractionWithVision(input)
+        if (input.imageUrl) return this.createExtractionWithVision(input)
+
+        if (this.shouldUseChunkedExtraction(input)) {
+            return this.createDocumentExtractionWithMapReduce(input)
         }
 
         return this.createTextExtraction(input)
     }
 
-    /**
-     * Standard text-based extraction
-     */
+    buildPromptForExtraction(input: ExtractionInput): string {
+        return buildExtractionPrompt(input)
+    }
+
     private async createTextExtraction(input: ExtractionInput): Promise<ExtractionResult> {
-        const prompt = this.buildPromptForExtraction(input)
+        const prompt = buildExtractionPrompt(input)
 
         let lastError: Error | null = null
 
@@ -53,7 +74,7 @@ export class LLMExtractionService implements ILLMExtractionService {
                     messages: [
                         {
                             role: 'system',
-                            content: this.getSystemPrompt(),
+                            content: getExtractionSystemPrompt(),
                         },
                         {
                             role: 'user',
@@ -61,10 +82,10 @@ export class LLMExtractionService implements ILLMExtractionService {
                         },
                     ],
                     temperature: 0.7,
-                    max_tokens: 1500,
+                    max_tokens: 2200,
                     response_format: {
                         type: 'json_schema',
-                        json_schema: this.getExtractionJsonSchema(),
+                        json_schema: getExtractionJsonSchema(),
                     },
                 })
 
@@ -117,9 +138,6 @@ export class LLMExtractionService implements ILLMExtractionService {
         })
     }
 
-    /**
-     * Vision-based extraction for images
-     */
     private async createExtractionWithVision(input: ExtractionInput): Promise<ExtractionResult> {
         let lastError: Error | null = null
 
@@ -134,7 +152,7 @@ export class LLMExtractionService implements ILLMExtractionService {
                 const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
                     {
                         role: 'system',
-                        content: this.getVisionSystemPrompt(),
+                        content: getVisionExtractionSystemPrompt(),
                     },
                     {
                         role: 'user',
@@ -148,7 +166,7 @@ export class LLMExtractionService implements ILLMExtractionService {
                             },
                             {
                                 type: 'text',
-                                text: this.buildVisionPrompt(input),
+                                text: buildVisionExtractionPrompt(input),
                             },
                         ],
                     },
@@ -158,10 +176,10 @@ export class LLMExtractionService implements ILLMExtractionService {
                     model: this.model,
                     messages,
                     temperature: 0.7,
-                    max_tokens: 2000,
+                    max_tokens: 2500,
                     response_format: {
                         type: 'json_schema',
-                        json_schema: this.getExtractionJsonSchema(),
+                        json_schema: getExtractionJsonSchema(),
                     },
                 })
 
@@ -214,278 +232,10 @@ export class LLMExtractionService implements ILLMExtractionService {
         })
     }
 
-    buildPromptForExtraction(input: ExtractionInput): string {
-        let prompt = `Analyze the following content and extract structured insights.\n\n`
-
-        prompt += `Content Type: ${input.type}\n\n`
-
-        if (input.userDescription) {
-            prompt += `User Description: ${input.userDescription}\n\n`
-        }
-
-        if (input.metadata) {
-            prompt += `Metadata:\n${JSON.stringify(input.metadata, null, 2)}\n\n`
-        }
-
-        prompt += `Content:\n${input.content}\n\n`
-
-        // Add specific guidelines based on content type
-        const isYouTube = input.metadata?.domain === 'youtube.com'
-        const isVideo = isYouTube || input.metadata?.domain === 'vimeo.com'
-
-        if (isVideo) {
-            prompt += `VIDEO ANALYSIS GUIDELINES:
-- What is the MAIN THESIS or argument of this video?
-- What are the KEY TAKEAWAYS someone should remember?
-- Are there any FRAMEWORKS, METHODS, or STEP-BY-STEP processes mentioned?
-- What makes this content unique or valuable?
-- What would someone TWEET after watching this?
-
-POST IDEAS REQUIREMENTS:
-- Generate 5-7 specific post ideas based on this video
-- Each idea should have a HOOK that stops scrolling
-- Include different angles: educational, controversial, "I tried this...", statistics-based
-- Example hooks:
-  * "I watched [Creator]'s video on [Topic] and here's the #1 thing most people miss..."
-  * "Unpopular opinion: [Creator] is wrong about [specific point]..."
-  * "The 3-step framework from [Video] that changed how I think about [Topic]..."
-
-Be SPECIFIC to this video's actual content - no generic advice.`
-        } else {
-            prompt += `Guidelines:
-- Provide a clear 2-3 sentence summary
-- Extract 3-7 key topics that represent main themes
-- Identify 2-4 tone attributes (professional, casual, humorous, educational, inspirational, etc.)
-- Provide 3-5 actionable key insights or takeaways
-- Generate 5-7 specific POST IDEAS with hooks and angles
-- Suggest 5-10 relevant tags that could categorize this content
-- Describe the content structure (hook, body, call-to-action, etc.)
-- Focus on insights that would help create similar content`
-        }
-
-        return prompt
-    }
-
-    private buildVisionPrompt(input: ExtractionInput): string {
-        let prompt = ''
-
-        // For links with thumbnails, include both image and content
-        if (input.type === 'link' && input.content) {
-            prompt += `Analyze this article/video thumbnail AND its content to extract insights.\n\n`
-            prompt += `=== ARTICLE CONTENT ===\n${input.content.substring(0, 3000)}\n\n`
-            if (input.metadata) {
-                prompt += `Title: ${input.metadata.title || 'Unknown'}\n`
-                prompt += `Domain: ${input.metadata.domain || 'Unknown'}\n\n`
-            }
-        } else {
-            prompt += `Analyze this image carefully and extract structured insights for content creation.\n\n`
-        }
-
-        if (input.userDescription) {
-            prompt += `User's context: ${input.userDescription}\n\n`
-        }
-
-        prompt += `ANALYSIS INSTRUCTIONS:
-
-1. IDENTIFY what's in the image:
-   - Book cover → Identify the book, author, and extract the book's core ideas
-   - Infographic → Extract data points, statistics, and insights
-   - Screenshot → Extract the key information shown
-   - Photo/artwork → Describe themes, mood, and content potential
-   - Quote image → Extract and analyze the quote
-
-2. FOR BOOK COVERS specifically:
-   - Identify the book title and author
-   - Extract 3-5 MAIN IDEAS the book is known for (research your knowledge)
-   - Identify KEY FRAMEWORKS or methodologies from the book
-   - Extract MEMORABLE QUOTES or concepts
-   - Think about what makes this book valuable for the target reader
-
-3. GENERATE POST IDEAS:
-   For each insight, create a specific post idea with:
-   - A compelling hook (first line that grabs attention)
-   - The format (carousel, thread, video, story, reel)
-   - The angle (how to present this: personal story, tips, controversy, case study)
-   
-   Examples of good post ideas:
-   - "I read [Book] and here are 5 frameworks that changed my business..."
-   - "The #1 lesson from [Book] that most people miss..."
-   - "Why [Author]'s advice on X is wrong (and what to do instead)..."
-
-4. Be SPECIFIC and ACTIONABLE:
-   - Don't give generic advice
-   - Include specific numbers, names, concepts
-   - Make insights shareable and engaging`
-
-        return prompt
-    }
-
-    private getSystemPrompt(): string {
-        return `
-      You are an expert content analyst and strategist.
-      
-      Your job: extract SPECIFIC, ACTIONABLE insights and ready-to-use post ideas from the provided content.
-      
-      CRITICAL RULES:
-      - Use ONLY the provided content/transcript. Do NOT invent facts, quotes, frameworks, or statistics.
-      - If the transcript is unclear or missing info, say "Not specified in the transcript."
-      - Be concrete: avoid generic statements (e.g. "valuable", "insightful", "motivational").
-      - Always respond in English only.
-      
-      FOR VIDEO CONTENT (YouTube, etc.):
-      - Identify the main thesis (1–2 sentences).
-      - Extract 5–12 key takeaways with actionable advice.
-      - Extract any frameworks/steps/methods EXACTLY as described (if present).
-      - Provide 5–15 memorable quotes/verbatim-style lines (short, punchy).
-      - Generate 10–20 post hooks (tweet-like).
-      
-      FOR ARTICLES/BLOG POSTS:
-      - Extract the core argument and supporting points.
-      - Include any data/statistics/research ONLY if explicitly present.
-      
-      FOR ALL CONTENT:
-      - Generate 8–15 ready-to-use post ideas.
-      - Each post idea must include:
-        - Hook (one-liner)
-        - Outline (2–5 bullets)
-        - Target platform suggestion (Threads/X/LinkedIn/IG)
-        - Angle type: educational / controversial / personal story / how-to
-        - Evidence: a short supporting snippet from the source (or a referenced segment/timestamp if provided).
-      
-      Think: "What would someone tweet after watching this?"
-      `
-    }
-
-    private getVisionSystemPrompt(): string {
-        return `You are a world-class content strategist and book analyst with encyclopedic knowledge of business, self-help, psychology, and popular non-fiction books.
-
-YOUR MISSION: Analyze images and generate SPECIFIC, ACTIONABLE content ideas.
-
-FOR BOOK COVERS:
-- You KNOW the content of most popular books - use that knowledge
-- Extract the book's CORE IDEAS, not just surface-level themes
-- Identify FRAMEWORKS, MODELS, and METHODOLOGIES from the book
-- Generate post ideas that would make readers want to learn more
-
-FOR OTHER IMAGES:
-- Extract meaningful insights, not generic descriptions
-- Think like a social media creator - what would go viral?
-
-CRITICAL RULES:
-1. Be SPECIFIC - use actual concepts, frameworks, quotes from the book
-2. postIdeas must be READY-TO-USE hooks and angles
-3. Each post idea should be different (educational, controversial, personal story, how-to)
-4. If it's a book you recognize, leverage your knowledge of its actual content
-5. Always respond in English only.`
-    }
-
-    private getExtractionJsonSchema() {
-        return {
-            name: 'content_extraction',
-            strict: true,
-            schema: {
-                type: 'object',
-                properties: {
-                    summary: {
-                        type: 'string',
-                        description: 'A 2-3 sentence summary of the content',
-                    },
-                    keyTopics: {
-                        type: 'array',
-                        items: { type: 'string' },
-                        description: 'Array of 3-7 main topics',
-                    },
-                    contentFormat: {
-                        type: 'string',
-                        enum: [
-                            'video',
-                            'article',
-                            'thread',
-                            'carousel',
-                            'image',
-                            'infographic',
-                            'story',
-                            'book',
-                            'other',
-                        ],
-                        description: 'Format of the content',
-                    },
-                    tone: {
-                        type: 'array',
-                        items: { type: 'string' },
-                        description: 'Array of 2-4 tone attributes (e.g., professional, casual, humorous)',
-                    },
-                    targetAudience: {
-                        type: 'string',
-                        description: 'Description of the target audience',
-                    },
-                    keyInsights: {
-                        type: 'array',
-                        items: {
-                            type: 'object',
-                            properties: {
-                                insight: { type: 'string' },
-                                evidence: { type: 'string' },
-                            },
-                            required: ['insight', 'evidence'],
-                            additionalProperties: false,
-                        },
-                        description: 'Array of 5-12 key takeaways with evidence from transcript',
-                    },
-                    postIdeas: {
-                        type: 'array',
-                        items: {
-                            type: 'object',
-                            properties: {
-                                idea: { type: 'string', description: 'The post idea or hook' },
-                                format: {
-                                    type: 'string',
-                                    description: 'Suggested format: carousel, thread, video, story, reel',
-                                },
-                                angle: { type: 'string', description: 'Content angle or perspective' },
-                            },
-                            required: ['idea', 'format', 'angle'],
-                            additionalProperties: false,
-                        },
-                        outline: { type: 'array', items: { type: 'string' } },
-                        evidence: { type: 'string' },
-                        description: 'Array of 5-7 specific post ideas with hooks and angles',
-                    },
-                    contentStructure: {
-                        type: 'string',
-                        description: 'Description of content structure (hook, body, cta, etc)',
-                    },
-                    visualStyle: {
-                        type: 'string',
-                        description: 'Description of visual style if applicable',
-                    },
-                    suggestedTags: {
-                        type: 'array',
-                        items: { type: 'string' },
-                        description: 'Array of 5-10 suggested tags for workspace',
-                    },
-                },
-                required: [
-                    'summary',
-                    'keyTopics',
-                    'contentFormat',
-                    'tone',
-                    'targetAudience',
-                    'keyInsights',
-                    'postIdeas',
-                    'contentStructure',
-                    'visualStyle',
-                    'suggestedTags',
-                ],
-                additionalProperties: false,
-            },
-        }
-    }
-
     private parseExtractionResponse(responseText: string): ExtractionData {
         const data = JSON.parse(responseText)
 
-        if (!data.summary || !data.keyTopics || !data.contentFormat) {
+        if (!data.summary || !data.keyTopics || !data.contentFormat || !data.structuredInsights) {
             throw new Error('Invalid extraction response: missing required fields')
         }
 
@@ -493,14 +243,183 @@ CRITICAL RULES:
             summary: data.summary,
             keyTopics: data.keyTopics,
             contentFormat: data.contentFormat,
-            tone: data.tone,
+            tone: data.tone ?? [],
             targetAudience: data.targetAudience,
             keyInsights: data.keyInsights,
             postIdeas: data.postIdeas ?? [],
             contentStructure: data.contentStructure,
             visualStyle: data.visualStyle || null,
             suggestedTags: data.suggestedTags,
+            structuredInsights: data.structuredInsights,
         }
+    }
+
+    private shouldUseChunkedExtraction(input: ExtractionInput): boolean {
+        if (input.type !== 'document' || !input.content) return false
+        return estimateTokenCount(input.content) > this.longFormTokenThreshold
+    }
+
+    private async createDocumentExtractionWithMapReduce(input: ExtractionInput): Promise<ExtractionResult> {
+        const chunkResult = chunkText(input.content, {
+            maxTokens: this.maxChunkTokens,
+            minTokens: 600,
+            overlapTokens: 150,
+        })
+
+        if (!chunkResult.wasChunked) {
+            return this.createTextExtraction(input)
+        }
+
+        this.logger.info('Using chunked document extraction', {
+            operation: 'LLMExtractionService.createDocumentExtractionWithMapReduce',
+            totalChunks: chunkResult.chunks.length,
+            tokenEstimate: chunkResult.totalTokens,
+        })
+
+        const chunkNotes = await this.mapDocumentChunks(chunkResult.chunks)
+        const mapTokensUsed = Object.values(this.mapTokenCounts).reduce((sum, value) => sum + value, 0)
+        const { extraction, tokensUsed: reduceTokensUsed } = await this.reduceDocumentNotes(chunkNotes, input)
+
+        return {
+            extraction,
+            llmModel: this.model,
+            tokensUsed: mapTokensUsed + reduceTokensUsed,
+        }
+    }
+
+    private async mapDocumentChunks(chunks: TranscriptChunk[]): Promise<DocumentChunkNotes[]> {
+        this.mapTokenCounts = {}
+        const results: DocumentChunkNotes[] = []
+
+        for (let i = 0; i < chunks.length; i += this.maxConcurrentChunks) {
+            const batch = chunks.slice(i, i + this.maxConcurrentChunks)
+            const batchResults = await Promise.all(
+                batch.map((chunk) => this.processDocumentChunk(chunk, chunks.length))
+            )
+            results.push(...batchResults)
+        }
+
+        return results
+    }
+
+    private async processDocumentChunk(chunk: TranscriptChunk, totalChunks: number): Promise<DocumentChunkNotes> {
+        const prompt = buildDocumentMapPrompt(chunk.text, chunk.index, totalChunks)
+        let lastError: Error | null = null
+
+        for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+            try {
+                const completion = await this.openai.chat.completions.create({
+                    model: this.model,
+                    messages: [
+                        { role: 'system', content: getDocumentMapSystemPrompt() },
+                        { role: 'user', content: prompt },
+                    ],
+                    temperature: 0.4,
+                    max_tokens: 1200,
+                    response_format: {
+                        type: 'json_schema',
+                        json_schema: getDocumentMapJsonSchema(),
+                    },
+                })
+
+                const responseText = completion.choices[0]?.message?.content
+                if (!responseText) {
+                    throw new Error('Empty response from OpenAI map phase')
+                }
+
+                const parsed = JSON.parse(responseText)
+                const tokensUsed = completion.usage?.total_tokens || 0
+                this.mapTokenCounts[chunk.index] = tokensUsed
+
+                return {
+                    chunkIndex: chunk.index,
+                    coreIdeas: parsed.coreIdeas || [],
+                    keyInsights: parsed.keyInsights || [],
+                    mentalModels: parsed.mentalModels || [],
+                    themes: parsed.themes || [],
+                    narrativeNotes: parsed.narrativeNotes || [],
+                    authorIntentHints: parsed.authorIntentHints || [],
+                    toneHints: parsed.toneHints || [],
+                }
+            } catch (error) {
+                lastError = error as Error
+                this.logger.warn('Document chunk map failed', {
+                    operation: 'LLMExtractionService.processDocumentChunk',
+                    chunkIndex: chunk.index,
+                    attempt,
+                    error: lastError.message,
+                })
+
+                if (attempt < this.maxRetries) {
+                    await this.delay(Math.pow(2, attempt) * 1000)
+                }
+            }
+        }
+
+        throw new AppError({
+            errorMessageCode: ErrorMessageCode.INTERNAL_SERVER_ERROR,
+            message: `Failed to process document chunk ${chunk.index + 1}: ${lastError?.message}`,
+            httpCode: 500,
+        })
+    }
+
+    private async reduceDocumentNotes(
+        chunkNotes: DocumentChunkNotes[],
+        input: ExtractionInput
+    ): Promise<{ extraction: ExtractionData; tokensUsed: number }> {
+        const prompt = buildDocumentReducePrompt(chunkNotes, {
+            title: input.metadata?.title,
+            author: input.metadata?.author,
+            userDescription: input.userDescription,
+            domain: input.metadata?.domain,
+        })
+
+        let lastError: Error | null = null
+
+        for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+            try {
+                const completion = await this.openai.chat.completions.create({
+                    model: this.model,
+                    messages: [
+                        { role: 'system', content: getDocumentReduceSystemPrompt() },
+                        { role: 'user', content: prompt },
+                    ],
+                    temperature: 0.5,
+                    max_tokens: 2400,
+                    response_format: {
+                        type: 'json_schema',
+                        json_schema: getExtractionJsonSchema(),
+                    },
+                })
+
+                const responseText = completion.choices[0]?.message?.content
+                if (!responseText) {
+                    throw new Error('Empty response from OpenAI reduce phase')
+                }
+
+                const extraction = this.parseExtractionResponse(responseText)
+                const tokensUsed = completion.usage?.total_tokens || 0
+
+                return { extraction, tokensUsed }
+            } catch (error) {
+                lastError = error as Error
+                this.logger.warn('Document reduce failed', {
+                    operation: 'LLMExtractionService.reduceDocumentNotes',
+                    attempt,
+                    error: lastError.message,
+                })
+
+                if (attempt < this.maxRetries) {
+                    await this.delay(Math.pow(2, attempt) * 1000)
+                }
+            }
+        }
+
+        throw new AppError({
+            errorMessageCode: ErrorMessageCode.INTERNAL_SERVER_ERROR,
+            message: `Failed to reduce document notes: ${lastError?.message}`,
+            httpCode: 500,
+        })
     }
 
     private delay(ms: number): Promise<void> {

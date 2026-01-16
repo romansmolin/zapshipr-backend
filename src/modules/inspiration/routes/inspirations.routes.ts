@@ -13,6 +13,7 @@ import { BullMqInspirationScheduler } from '@/shared/queue'
 import { InspirationsRepository } from '../repositories/inspirations.repository'
 import { InspirationsService } from '../services/inspirations.service'
 import { InspirationsController } from '../controllers/inspirations.controller'
+import { ContentParserService } from '../services/content-parser/content-parser.service'
 
 const upload = multer({
     storage: multer.memoryStorage(),
@@ -27,7 +28,8 @@ export const createInspirationsRouter = (logger: ILogger, db: NodePgDatabase<typ
     const repository = new InspirationsRepository(db, logger)
     const mediaUploader = new S3Uploader(logger)
     const scheduler = new BullMqInspirationScheduler()
-    const service = new InspirationsService(repository, mediaUploader, scheduler, logger)
+    const contentParser = new ContentParserService(logger)
+    const service = new InspirationsService(repository, mediaUploader, scheduler, contentParser, logger)
     const controller = new InspirationsController(service, logger)
 
     router.post(

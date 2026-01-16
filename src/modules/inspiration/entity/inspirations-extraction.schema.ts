@@ -27,6 +27,28 @@ export interface YouTubeExtractionJson {
     }
 }
 
+export interface StructuredInsightsJson {
+    documentType: string
+    coreIdeas: string[]
+    repeatedThemes: string[]
+    mentalModels: Array<{
+        name: string
+        description: string
+        steps: string[]
+    }>
+    authorIntent: {
+        problem: string
+        worldview: string
+        intendedOutcome: string
+    }
+    moodTone: string[]
+    narrativeFlow: string[]
+    useCaseInsights: Array<{
+        insight: string
+        useCases: string[]
+    }>
+}
+
 export const inspirationsExtractions = pgTable('inspirations_extractions', {
     id: uuid('id').defaultRandom().primaryKey(),
     rawInspirationId: uuid('raw_inspiration_id')
@@ -61,6 +83,9 @@ export const inspirationsExtractions = pgTable('inspirations_extractions', {
         .array()
         .notNull()
         .default(sql`ARRAY[]::text[]`), // Предложенные теги
+
+    // Structured semantic insights for long-form documents
+    structuredInsights: jsonb('structured_insights').$type<StructuredInsightsJson | null>(),
 
     // YouTube-specific extended fields (JSONB for flexibility)
     youtubeData: jsonb('youtube_data').$type<YouTubeExtractionJson | null>(),

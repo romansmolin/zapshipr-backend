@@ -2,6 +2,7 @@ import { AppError, ErrorMessageCode } from '@/shared/errors/app-error'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import type { IMediaUploader } from '@/shared/media-uploader/media-uploader.interface'
 import type { IInspirationScheduler } from '@/shared/queue/scheduler/inspiration-scheduler/inspiration-scheduler.interface'
+import type { IContentParserService } from '@/modules/inspiration/services/content-parser/content-parser-service.interface'
 
 import type {
     IInspirationsRepository,
@@ -23,6 +24,7 @@ export class InspirationsService implements IInspirationsService {
         private readonly inspirationsRepository: IInspirationsRepository,
         private readonly mediaUploader: IMediaUploader,
         private readonly inspirationScheduler: IInspirationScheduler,
+        private readonly contentParser: IContentParserService,
         private readonly logger: ILogger
     ) {}
 
@@ -43,7 +45,7 @@ export class InspirationsService implements IInspirationsService {
         }
 
         let imageUrl: string | undefined
-
+        let parsedDocumentContent: string | undefined
         if (data.file && (data.type === 'image' || data.type === 'document')) {
             const timestamp = Date.now()
             const fileName = `${data.workspaceId}/${data.type}s/${timestamp}-${data.file.originalname}`
@@ -60,6 +62,11 @@ export class InspirationsService implements IInspirationsService {
                 type: data.type,
                 imageUrl,
             })
+
+            if (data.type === 'document') {
+                const parsed = await this.contentParser.parseDocument(data.file.buffer, data.file.originalname)
+                parsedDocumentContent = parsed.content
+            }
         }
 
         const inspiration = await this.inspirationsRepository.create({
@@ -67,7 +74,8 @@ export class InspirationsService implements IInspirationsService {
             userId: data.userId,
             type: data.type,
             title: data.title,
-            content: data.content,
+            content: data.type === 'document' ? parsedDocumentContent : data.content,
+            parsedContent: data.type === 'document' ? parsedDocumentContent : undefined,
             imageUrl,
             userDescription: data.userDescription,
             status: 'processing',

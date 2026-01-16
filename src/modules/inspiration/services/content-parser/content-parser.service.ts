@@ -1,16 +1,14 @@
 import * as cheerio from 'cheerio'
-import * as pdfParseModule from 'pdf-parse'
+import { PDFParse } from 'pdf-parse'
 import * as mammoth from 'mammoth'
 import axios from 'axios'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import type { IContentParserService, ParsedContent } from './content-parser-service.interface'
 import { AppError, ErrorMessageCode } from '@/shared/errors/app-error'
 
-// @ts-ignore - pdf-parse doesn't have proper types
-const pdfParse = pdfParseModule.default || pdfParseModule
-
 export class ContentParserService implements IContentParserService {
     private readonly TIMEOUT = 30000 // 30 seconds
+    private readonly MAX_DOCUMENT_WORDS = 20000
 
     constructor(private readonly logger: ILogger) {}
 
@@ -39,9 +37,27 @@ export class ContentParserService implements IContentParserService {
 
         if (extension === 'pdf') {
             // Парсинг PDF
-            const pdfData = await pdfParse(fileBuffer)
-            content = pdfData.text
-            title = pdfData.info?.Title || fileName
+            // Create a standalone Uint8Array to avoid SharedArrayBuffer transfer issues in pdfjs worker
+            try {
+                const parsed = await this.parsePdfBuffer(this.clonePdfData(fileBuffer), fileName)
+                content = parsed.content
+                title = parsed.title
+            } catch (error) {
+                if (this.isDataCloneError(error)) {
+                    this.logger.warn('PDF parse failed due to DataCloneError, retrying without transfers', {
+                        operation: 'ContentParserService.parseDocument',
+                        fileName,
+                        error: error instanceof Error ? error.message : 'Unknown error',
+                    })
+                    const parsed = await this.withNonTransferStructuredClone(() =>
+                        this.parsePdfBuffer(this.clonePdfData(fileBuffer), fileName)
+                    )
+                    content = parsed.content
+                    title = parsed.title
+                } else {
+                    throw error
+                }
+            }
         } else if (extension === 'docx') {
             // Парсинг DOCX
             const result = await mammoth.extractRawText({ buffer: fileBuffer })
@@ -69,8 +85,59 @@ export class ContentParserService implements IContentParserService {
 
         return {
             title: title.substring(0, 500),
-            content: this.normalizeContent(content),
+            content: this.normalizeContent(content, this.MAX_DOCUMENT_WORDS),
         }
+    }
+
+    private async parsePdfBuffer(
+        pdfData: Uint8Array,
+        fileName: string
+    ): Promise<{ content: string; title: string }> {
+        const parser = new PDFParse({ data: pdfData })
+        try {
+            const [textResult, infoResult] = await Promise.all([parser.getText(), parser.getInfo()])
+            return {
+                content: textResult.text,
+                title: infoResult.info?.Title || fileName,
+            }
+        } finally {
+            await parser.destroy()
+        }
+    }
+
+    private isDataCloneError(error: unknown): boolean {
+        if (!(error instanceof Error)) return false
+
+        return (
+            error.name === 'DataCloneError' ||
+            error.message.includes('ArrayBuffer is detached') ||
+            error.message.includes('Cannot transfer object of unsupported type')
+        )
+    }
+
+    private async withNonTransferStructuredClone<T>(operation: () => Promise<T>): Promise<T> {
+        const originalStructuredClone = globalThis.structuredClone as undefined | ((value: unknown) => unknown)
+
+        if (!originalStructuredClone) {
+            return operation()
+        }
+
+        const safeStructuredClone = (value: unknown) => originalStructuredClone(value)
+
+        try {
+            ;(globalThis as { structuredClone?: (value: unknown) => unknown }).structuredClone =
+                safeStructuredClone
+            return await operation()
+        } finally {
+            ;(globalThis as { structuredClone?: (value: unknown) => unknown }).structuredClone =
+                originalStructuredClone
+        }
+    }
+
+    private clonePdfData(fileBuffer: Buffer): Uint8Array {
+        const pdfData = new Uint8Array(fileBuffer.byteLength)
+        pdfData.set(fileBuffer)
+        return pdfData
     }
 
     normalizeContent(content: string, maxWords: number = 1500): string {

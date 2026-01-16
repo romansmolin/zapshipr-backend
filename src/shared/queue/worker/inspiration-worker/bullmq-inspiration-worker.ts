@@ -201,14 +201,25 @@ export class BullMqInspirationWorker implements IInspirationWorker {
      */
     private async handleStandardJob(
         job: Job<InspirationJobData>,
-        inspiration: { id: string; content: string | null; type: string; userDescription: string | null; imageUrl: string | null }
+        inspiration: {
+            id: string
+            content: string | null
+            parsedContent: string | null
+            title: string
+            type: string
+            userDescription: string | null
+            imageUrl: string | null
+        }
     ): Promise<void> {
         const { inspirationId, workspaceId } = job.data
 
         let parsedContent = ''
         let thumbnailUrl: string | undefined
 
-        const baseMetadata = buildInspirationMetadataSource(inspiration.type as any, inspiration.content || undefined)
+        const baseMetadata = buildInspirationMetadataSource(
+            inspiration.type as any,
+            inspiration.content || undefined
+        )
 
         let metadata: InspirationMetadata = baseMetadata
 
@@ -226,7 +237,11 @@ export class BullMqInspirationWorker implements IInspirationWorker {
                 thumbnailUrl: parsed.thumbnailUrl,
             }
         } else if (inspiration.type === 'document') {
-            parsedContent = inspiration.content || ''
+            parsedContent = inspiration.parsedContent || inspiration.content || ''
+            metadata = {
+                ...baseMetadata,
+                title: inspiration.title,
+            }
         } else if (inspiration.type === 'text') {
             parsedContent = inspiration.content || ''
         } else if (inspiration.type === 'image') {
@@ -258,9 +273,7 @@ export class BullMqInspirationWorker implements IInspirationWorker {
         // For images: use the uploaded image
         // For links: use thumbnail if available
         const imageUrlForVision =
-            inspiration.type === 'image'
-                ? inspiration.imageUrl || undefined
-                : thumbnailUrl || undefined
+            inspiration.type === 'image' ? inspiration.imageUrl || undefined : thumbnailUrl || undefined
 
         const extractionResult = await this.llmExtraction.createExtraction({
             type: inspiration.type as any,
@@ -273,6 +286,7 @@ export class BullMqInspirationWorker implements IInspirationWorker {
         const formattedPostIdeas = extractionResult.extraction.postIdeas.map(
             (idea) => `[${idea.format.toUpperCase()}] ${idea.idea} | Angle: ${idea.angle}`
         )
+        const formattedKeyInsights = extractionResult.extraction.keyInsights.map((insight) => insight.insight)
 
         const extraction = await this.extractionsRepository.create({
             rawInspirationId: inspirationId,
@@ -282,11 +296,12 @@ export class BullMqInspirationWorker implements IInspirationWorker {
             contentFormat: extractionResult.extraction.contentFormat,
             tone: extractionResult.extraction.tone,
             targetAudience: extractionResult.extraction.targetAudience,
-            keyInsights: extractionResult.extraction.keyInsights,
+            keyInsights: formattedKeyInsights,
             postIdeas: formattedPostIdeas,
             contentStructure: extractionResult.extraction.contentStructure,
             visualStyle: extractionResult.extraction.visualStyle || null,
             suggestedTags: extractionResult.extraction.suggestedTags,
+            structuredInsights: extractionResult.extraction.structuredInsights,
             llmModel: extractionResult.llmModel,
             tokensUsed: extractionResult.tokensUsed,
         })
