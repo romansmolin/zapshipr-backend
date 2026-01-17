@@ -1,5 +1,5 @@
 import { relations } from "drizzle-orm/relations";
-import { tenants, socialAccounts, userPlans, passwordResetTokens, mediaAssets, posts, magicLinks, waitlistEntries, waitlistReferralRewards, pinterestBoards, waitlistReferralEvents, tiktokPublishJobs, userPlanUsage, tenantSettings, postMediaAssets, postTargets } from "./schema";
+import { tenants, socialAccounts, userPlans, passwordResetTokens, mediaAssets, posts, magicLinks, waitlistEntries, pinterestBoards, tiktokPublishJobs, userPlanUsage, tenantSettings, postMediaAssets, postTargets } from "./schema";
 
 export const socialAccountsRelations = relations(socialAccounts, ({one, many}) => ({
 	tenant: one(tenants, {
@@ -71,21 +71,8 @@ export const waitlistEntriesRelations = relations(waitlistEntries, ({one, many})
 	waitlistEntries: many(waitlistEntries, {
 		relationName: "waitlistEntries_referredById_waitlistEntries_id"
 	}),
-	waitlistReferralRewards: many(waitlistReferralRewards),
-	waitlistReferralEvents_referrerId: many(waitlistReferralEvents, {
-		relationName: "waitlistReferralEvents_referrerId_waitlistEntries_id"
-	}),
-	waitlistReferralEvents_referredEntryId: many(waitlistReferralEvents, {
-		relationName: "waitlistReferralEvents_referredEntryId_waitlistEntries_id"
-	}),
 }));
 
-export const waitlistReferralRewardsRelations = relations(waitlistReferralRewards, ({one}) => ({
-	waitlistEntry: one(waitlistEntries, {
-		fields: [waitlistReferralRewards.waitlistEntryId],
-		references: [waitlistEntries.id]
-	}),
-}));
 
 export const pinterestBoardsRelations = relations(pinterestBoards, ({one}) => ({
 	tenant: one(tenants, {
@@ -98,18 +85,6 @@ export const pinterestBoardsRelations = relations(pinterestBoards, ({one}) => ({
 	}),
 }));
 
-export const waitlistReferralEventsRelations = relations(waitlistReferralEvents, ({one}) => ({
-	waitlistEntry_referrerId: one(waitlistEntries, {
-		fields: [waitlistReferralEvents.referrerId],
-		references: [waitlistEntries.id],
-		relationName: "waitlistReferralEvents_referrerId_waitlistEntries_id"
-	}),
-	waitlistEntry_referredEntryId: one(waitlistEntries, {
-		fields: [waitlistReferralEvents.referredEntryId],
-		references: [waitlistEntries.id],
-		relationName: "waitlistReferralEvents_referredEntryId_waitlistEntries_id"
-	}),
-}));
 
 export const tiktokPublishJobsRelations = relations(tiktokPublishJobs, ({one}) => ({
 	tenant: one(tenants, {

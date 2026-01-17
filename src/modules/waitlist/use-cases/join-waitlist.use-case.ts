@@ -16,8 +16,6 @@ export interface JoinWaitlistInput {
 }
 
 export class JoinWaitlistUseCase {
-    private readonly referralThreshold = 10
-
     constructor(
         private readonly repository: IWaitlistRepository,
         private readonly emailService: IEmailService,
@@ -136,30 +134,6 @@ export class JoinWaitlistUseCase {
                 referrerId: referrer.id,
             })
             return
-        }
-
-        const totalReferrals = await this.repository.countReferrals(referrer.id)
-
-        if (totalReferrals < this.referralThreshold) {
-            return
-        }
-
-        const reward = await this.repository.createReward({
-            waitlistEntryId: referrer.id,
-            type: 'SIX_MONTHS_FREE',
-            status: 'GRANTED',
-            grantedAt: new Date(),
-            meta: {
-                referralsThreshold: this.referralThreshold,
-            },
-        })
-
-        if (reward) {
-            this.logger.info('Waitlist referral reward granted', {
-                operation: 'waitlist_reward_granted',
-                waitlistEntryId: referrer.id,
-                rewardId: reward.id,
-            })
         }
     }
 }
