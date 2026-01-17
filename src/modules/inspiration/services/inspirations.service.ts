@@ -1,3 +1,5 @@
+import path from 'path'
+
 import { AppError, ErrorMessageCode } from '@/shared/errors/app-error'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import type { IMediaUploader } from '@/shared/media-uploader/media-uploader.interface'
@@ -17,6 +19,12 @@ import type {
     TriggerExtractionResult,
 } from './inspirations-service.interface'
 import type { RawInspiration } from '../entity/raw-inspiration.schema'
+import {
+    getThumbnailFromMarkdown,
+    getThumbnailFromPdf,
+    getThumbnailFromTxt,
+    type ThumbnailResult,
+} from '../utils/document-thumbnails'
 import { validateInspirationByType } from '../validation/inspirations.schemas'
 
 export class InspirationsService implements IInspirationsService {
@@ -45,27 +53,54 @@ export class InspirationsService implements IInspirationsService {
         }
 
         let imageUrl: string | undefined
+        let uploadedFileUrl: string | undefined
         let parsedDocumentContent: string | undefined
+
         if (data.file && (data.type === 'image' || data.type === 'document')) {
             const timestamp = Date.now()
             const fileName = `${data.workspaceId}/${data.type}s/${timestamp}-${data.file.originalname}`
 
-            imageUrl = await this.mediaUploader.upload({
+            uploadedFileUrl = await this.mediaUploader.upload({
                 key: fileName,
                 body: data.file.buffer,
                 contentType: data.file.mimetype,
             })
 
+            imageUrl = uploadedFileUrl
+
             this.logger.info('Uploaded inspiration file to S3', {
                 operation: 'InspirationsService.createInspiration',
                 workspaceId: data.workspaceId,
                 type: data.type,
-                imageUrl,
+                imageUrl: uploadedFileUrl,
             })
 
             if (data.type === 'document') {
                 const parsed = await this.contentParser.parseDocument(data.file.buffer, data.file.originalname)
                 parsedDocumentContent = parsed.content
+
+                const thumbnail = await this.createDocumentThumbnail(data.file, parsedDocumentContent, data.title)
+                if (thumbnail) {
+                    const thumbnailKey = this.buildDocumentThumbnailKey(
+                        data.workspaceId,
+                        timestamp,
+                        data.file.originalname,
+                        thumbnail.extension
+                    )
+                    const thumbnailUrl = await this.mediaUploader.upload({
+                        key: thumbnailKey,
+                        body: thumbnail.buffer,
+                        contentType: thumbnail.contentType,
+                    })
+                    imageUrl = thumbnailUrl
+
+                    this.logger.info('Uploaded document thumbnail to S3', {
+                        operation: 'InspirationsService.createInspiration',
+                        workspaceId: data.workspaceId,
+                        type: data.type,
+                        thumbnailUrl,
+                    })
+                }
             }
         }
 
@@ -103,6 +138,8 @@ export class InspirationsService implements IInspirationsService {
         filters?: GetInspirationsFilters
     ): Promise<InspirationsListResponse> {
         const { items, total } = await this.inspirationsRepository.findByWorkspaceId(workspaceId, filters)
+
+        this.logger.info('Inspiration fetched successfully: ', { items, total })
 
         return {
             items,
@@ -295,5 +332,53 @@ export class InspirationsService implements IInspirationsService {
             inspirationId: id,
             message: `Extraction queued successfully. Previous status: ${inspiration.status}`,
         }
+    }
+
+    private async createDocumentThumbnail(
+        file: Express.Multer.File,
+        parsedContent: string | undefined,
+        title: string
+    ): Promise<ThumbnailResult | null> {
+        const extension = this.getDocumentExtension(file)
+
+        if (extension === 'pdf') {
+            return getThumbnailFromPdf(file.buffer, { title })
+        }
+
+        if (extension === 'md') {
+            return getThumbnailFromMarkdown(parsedContent ?? '', { title })
+        }
+
+        if (extension === 'txt') {
+            return getThumbnailFromTxt(parsedContent ?? '', { title })
+        }
+
+        return null
+    }
+
+    private getDocumentExtension(file: Express.Multer.File): 'pdf' | 'md' | 'txt' | null {
+        const extension = path.extname(file.originalname).replace('.', '').toLowerCase()
+
+        if (extension === 'pdf' || extension === 'md' || extension === 'txt') {
+            return extension
+        }
+
+        if (file.mimetype === 'application/pdf') return 'pdf'
+        if (file.mimetype === 'text/markdown' || file.mimetype === 'text/x-markdown') return 'md'
+        if (file.mimetype === 'text/plain') return 'txt'
+
+        return null
+    }
+
+    private buildDocumentThumbnailKey(
+        workspaceId: string,
+        timestamp: number,
+        originalName: string,
+        extension: string
+    ): string {
+        const baseName = path.parse(originalName).name
+        const safeBaseName = baseName.replace(/[^a-zA-Z0-9._-]/g, '_') || 'document'
+
+        return `${workspaceId}/documents/thumbnails/${timestamp}-${safeBaseName}.${extension}`
     }
 }

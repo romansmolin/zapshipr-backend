@@ -6,7 +6,6 @@ export const InspirationStatusSchema = z.enum(['processing', 'completed', 'faile
 
 export const TagCategorySchema = z.enum(['topic', 'format', 'tone', 'style', 'other'])
 
-// YouTube URL regex patterns
 const YOUTUBE_URL_PATTERNS = [
     /^https?:\/\/(www\.)?youtube\.com\/watch\?v=[\w-]+/i,
     /^https?:\/\/youtu\.be\/[\w-]+/i,
@@ -63,7 +62,6 @@ export const CreateInspirationSchema = z
         }
     })
 
-// Legacy function - kept for backwards compatibility but validation is now in schema
 export const validateInspirationByType = (data: { type: string; content?: string }) => {
     if (data.type === 'link') {
         if (!data.content) throw new Error('content is required for type=link')

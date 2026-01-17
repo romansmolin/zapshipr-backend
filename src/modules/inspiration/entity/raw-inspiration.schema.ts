@@ -19,19 +19,21 @@ export type InspirationMetadata = {
 export const inspirationType = pgEnum('inspiration_type', ['image', 'link', 'text', 'document'])
 
 export const inspirationStatus = pgEnum('inspiration_status', [
-    'processing', // Initial state
-    'transcript_fetching', // YouTube: fetching transcript
-    'transcript_ready', // YouTube: transcript fetched, ready for extraction
-    'extracting', // LLM extraction in progress
-    'completed', // Successfully processed
-    'failed', // Processing failed
+    'processing',
+    'transcript_fetching',
+    'transcript_ready',
+    'extracting',
+    'completed',
+    'failed',
 ])
 
 export const rawInspirations = pgTable('raw_inspirations', {
     id: uuid('id').defaultRandom().primaryKey(),
+
     workspaceId: uuid('workspace_id')
         .notNull()
         .references(() => workspaces.id, { onDelete: 'cascade' }),
+
     userId: uuid('user_id')
         .notNull()
         .references(() => users.id, { onDelete: 'cascade' }),

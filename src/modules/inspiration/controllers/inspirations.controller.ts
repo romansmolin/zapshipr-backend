@@ -8,7 +8,6 @@ import {
     CreateInspirationSchema,
     UpdateInspirationSchema,
     GetInspirationsQuerySchema,
-    validateInspirationByType,
 } from '../validation/inspirations.schemas'
 
 export class InspirationsController {
