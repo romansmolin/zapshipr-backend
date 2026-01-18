@@ -5,6 +5,9 @@ FROM node:20-alpine AS base
 
 WORKDIR /app
 
+# Skip youtube-dl-exec Python preinstall check in container builds
+ENV YOUTUBE_DL_SKIP_PYTHON_CHECK=1
+
 # Копируем package files
 COPY package*.json ./
 
@@ -18,6 +21,9 @@ RUN npm ci --only=production && \
 FROM node:20-alpine AS builder
 
 WORKDIR /app
+
+# Skip youtube-dl-exec Python preinstall check in container builds
+ENV YOUTUBE_DL_SKIP_PYTHON_CHECK=1
 
 # Копируем package files
 COPY package*.json ./
@@ -85,5 +91,3 @@ USER nodejs
 ENV NODE_ENV=production
 
 CMD ["node", "dist/worker.js"]
-
-
