@@ -323,16 +323,17 @@ export class InstagramContentPublisherService implements IInstagramContentPublis
                       ? InstagramMediaType.REELS
                       : null
 
-                if (!mediaType) {
+                if (!mediaType)
                     throw new BaseAppError('Unsupported media type for Instagram', ErrorCode.BAD_REQUEST, 400)
-                }
 
                 let processedVideoUrl = mediaAsset.url
+
                 if (mediaType === InstagramMediaType.REELS) {
                     try {
                         const videoResponse = await this.httpClient.get<ArrayBuffer>(mediaAsset.url, {
                             responseType: 'arraybuffer',
                         })
+
                         const videoBuffer = Buffer.isBuffer(videoResponse)
                             ? videoResponse
                             : Buffer.from(videoResponse)
@@ -347,6 +348,7 @@ export class InstagramContentPublisherService implements IInstagramContentPublis
                             body: processedVideoBuffer,
                             contentType: 'video/mp4',
                         })
+
                         temporaryUploads.push(uploadedVideoUrl)
 
                         this.logger.info('Instagram video processed successfully', {
