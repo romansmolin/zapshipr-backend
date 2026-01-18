@@ -98,6 +98,72 @@
 - Отправка транзакционных писем
 - Уведомления о публикациях
 
+## Inspiration Module (`src/modules/inspiration/`)
+
+**Назначение**: Система сбора и анализа вдохновений для контента
+
+**Функции**:
+- Создание inspirations из различных источников (ссылки, изображения, тексты, документы)
+- Автоматический парсинг контента из URL
+- Извлечение транскриптов из YouTube видео
+- LLM-анализ контента и генерация идей для постов
+- Хранение и поиск inspirations
+
+### YouTube Transcript Pipeline
+
+Специализированная обработка YouTube видео:
+
+1. **URL Normalizer** (`utils/youtube-url-normalizer.ts`)
+   - Нормализация различных форматов YouTube URL (watch, youtu.be, shorts, embed)
+   - Извлечение videoId, timestamp, playlist ID
+   - Игнорирование маркетинговых параметров
+
+2. **Transcript Provider** (`services/transcript-provider/`)
+   - Получение субтитров через yt-dlp (human → auto captions)
+   - Fallback на OpenAI Whisper STT при отсутствии субтитров
+   - Кэширование транскриптов по videoId
+
+3. **Transcript Normalizer** (`services/transcript-normalizer/`)
+   - Парсинг VTT/SRT форматов
+   - Удаление дубликатов фраз
+   - Сохранение таймкодов сегментов
+
+4. **Chunking** (`utils/transcript-chunker.ts`)
+   - Разбиение длинных транскриптов на токен-ограниченные чанки
+   - Сохранение границ предложений и таймингов
+
+5. **LLM Extraction** (`services/llm-extraction/`)
+   - **Single Pass**: для коротких транскриптов (< 6000 токенов)
+   - **Map-Reduce**: для длинных транскриптов
+     - Map: извлечение тезисов из каждого чанка
+     - Reduce: синтез финального extraction
+   - **Quality Gate**: валидация качества с автоматическим retry
+
+### YouTube Extraction Schema
+
+```typescript
+interface YouTubeExtractionData {
+  titleGuess: string       // Угаданное название видео
+  language: string         // Язык контента
+  summary: string          // Краткое содержание
+  keyPoints: string[]      // 5-15 ключевых тезисов
+  hooks: string[]          // 10-30 хуков для постов
+  quotes: YouTubeQuote[]   // Цитаты с таймкодами
+  contentAngles: ContentAngle[]  // Углы подачи
+  drafts: PlatformDrafts   // Готовые черновики
+  tags: string[]           // 5-25 тегов
+  tone: string            // Тон контента
+}
+```
+
+### API Endpoints
+
+- `POST /workspaces/:workspaceId/inspirations` — создать inspiration
+- `GET /workspaces/:workspaceId/inspirations` — список inspirations
+- `GET /workspaces/:workspaceId/inspirations/:id` — получить с extraction
+- `POST /workspaces/:workspaceId/inspirations/:id/retry` — повторить обработку
+- `POST /workspaces/:workspaceId/inspirations/:id/extract` — запустить extraction
+
 ## Waitlist Module (`src/modules/waitlist/`)
 
 **Назначение**: Управление waitlist и реферальной программой

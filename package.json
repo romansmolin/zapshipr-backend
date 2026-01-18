@@ -5,6 +5,10 @@
     "main": "index.js",
     "scripts": {
         "build": "tsc && tsc-alias",
+        "db:baseline": "ts-node scripts/baseline-drizzle.ts",
+        "db:generate": "drizzle-kit generate",
+        "db:migrate": "drizzle-kit migrate",
+        "db:studio": "drizzle-kit studio",
         "start": "node dist/server.js",
         "worker": "npm run worker:start",
         "worker:start": "node dist/worker.js",
@@ -76,6 +80,7 @@
         "qs": "^6.12.0",
         "sharp": "^0.34.5",
         "uuid": "^9.0.1",
+        "youtube-dl-exec": "^3.0.28",
         "zod": "^4.1.13"
     }
 }

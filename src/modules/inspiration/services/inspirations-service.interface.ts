@@ -1,5 +1,5 @@
 import type { RawInspiration } from '../entity/raw-inspiration.schema'
-import type { InspirationWithExtraction } from '../entity/inspiration-with-extraction'
+import type { InspirationWithExtraction } from '../repositories/inspirations-repository.interface'
 
 export interface CreateInspirationData {
     workspaceId: string
@@ -25,11 +25,22 @@ export interface InspirationsListResponse {
     offset: number
 }
 
+export interface TriggerExtractionOptions {
+    forceRefresh?: boolean
+}
+
+export interface TriggerExtractionResult {
+    status: 'queued' | 'already_processing'
+    inspirationId: string
+    message: string
+}
+
 export interface IInspirationsService {
     createInspiration(data: CreateInspirationData): Promise<RawInspiration>
     getInspirations(workspaceId: string, filters?: GetInspirationsFilters): Promise<InspirationsListResponse>
-    getInspirationById(id: string, workspaceId: string): Promise<InspirationWithExtraction | null>
-    updateInspiration(id: string, workspaceId: string, userDescription: string): Promise<RawInspiration | null>
-    deleteInspiration(id: string, workspaceId: string): Promise<boolean>
+    getInspirationById(id: string): Promise<InspirationWithExtraction | null>
+    updateInspiration(id: string, userDescription: string): Promise<RawInspiration | null>
+    deleteInspiration(id: string): Promise<boolean>
     retryInspiration(id: string, workspaceId: string, userId: string): Promise<RawInspiration>
+    triggerExtraction(id: string, workspaceId: string, userId: string, options?: TriggerExtractionOptions): Promise<TriggerExtractionResult>
 }

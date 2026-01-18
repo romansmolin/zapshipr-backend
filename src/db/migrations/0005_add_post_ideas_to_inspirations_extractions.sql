@@ -1,0 +1,1 @@
+ALTER TABLE "inspirations_extractions" ADD COLUMN "post_ideas" text[] DEFAULT ARRAY[]::text[] NOT NULL;

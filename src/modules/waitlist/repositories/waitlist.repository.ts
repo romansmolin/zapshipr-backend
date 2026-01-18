@@ -8,21 +8,10 @@ import type { ILogger } from '@/shared/logger/logger.interface'
 import { formatError } from '@/shared/utils/forma-error'
 
 import { WaitlistEntry } from '@/modules/waitlist/entity/waitlist-entry'
-import { WaitlistReferralReward } from '@/modules/waitlist/entity/waitlist-referral-reward'
-import type { WaitlistRewardStatus, WaitlistRewardType } from '@/modules/waitlist/entity/waitlist.types'
-import {
-    toWaitlistEntry,
-    toWaitlistReferralReward,
-} from '@/modules/waitlist/entity/waitlist.mappers'
-import {
-    waitlistEntries,
-    waitlistReferralEvents,
-    waitlistReferralRewards,
-} from '@/modules/waitlist/entity/waitlist.schema'
+import { toWaitlistEntry } from '@/modules/waitlist/entity/waitlist.mappers'
+import { waitlistEntries } from '@/modules/waitlist/entity/waitlist.schema'
 
 import type { IWaitlistRepository } from './waitlist.repository.interface'
-
-const REFERRAL_CONFLICT = 'WAITLIST_REFERRAL_CONFLICT'
 
 export class WaitlistRepository implements IWaitlistRepository {
     private readonly db: NodePgDatabase<typeof dbSchema>
@@ -119,44 +108,17 @@ export class WaitlistRepository implements IWaitlistRepository {
 
     async applyReferral(params: { referrerId: string; referredEntryId: string }): Promise<boolean> {
         try {
-            const result = await this.db.transaction(async (tx) => {
-                const [updated] = await tx
-                    .update(waitlistEntries)
-                    .set({
-                        referredById: params.referrerId,
-                        referredAt: new Date(),
-                    })
-                    .where(
-                        and(eq(waitlistEntries.id, params.referredEntryId), isNull(waitlistEntries.referredById))
-                    )
-                    .returning({ id: waitlistEntries.id })
+            const [updated] = await this.db
+                .update(waitlistEntries)
+                .set({
+                    referredById: params.referrerId,
+                    referredAt: new Date(),
+                })
+                .where(and(eq(waitlistEntries.id, params.referredEntryId), isNull(waitlistEntries.referredById)))
+                .returning({ id: waitlistEntries.id })
 
-                if (!updated) {
-                    return false
-                }
-
-                const [eventRow] = await tx
-                    .insert(waitlistReferralEvents)
-                    .values({
-                        referrerId: params.referrerId,
-                        referredEntryId: params.referredEntryId,
-                    })
-                    .onConflictDoNothing({ target: waitlistReferralEvents.referredEntryId })
-                    .returning({ id: waitlistReferralEvents.id })
-
-                if (!eventRow) {
-                    throw new Error(REFERRAL_CONFLICT)
-                }
-
-                return true
-            })
-
-            return result
+            return Boolean(updated)
         } catch (error) {
-            if (error instanceof Error && error.message === REFERRAL_CONFLICT) {
-                return false
-            }
-
             this.logger.error('Failed to apply waitlist referral', {
                 operation: 'WaitlistRepository.applyReferral',
                 error: formatError(error),
@@ -171,8 +133,8 @@ export class WaitlistRepository implements IWaitlistRepository {
                 .select({
                     total: sql<number>`count(*)`,
                 })
-                .from(waitlistReferralEvents)
-                .where(eq(waitlistReferralEvents.referrerId, referrerId))
+                .from(waitlistEntries)
+                .where(eq(waitlistEntries.referredById, referrerId))
 
             return Number(row?.total ?? 0)
         } catch (error) {
@@ -181,42 +143,6 @@ export class WaitlistRepository implements IWaitlistRepository {
                 error: formatError(error),
             })
             throw new BaseAppError('Failed to count referrals', ErrorCode.UNKNOWN_ERROR, 500)
-        }
-    }
-
-    async createReward(params: {
-        waitlistEntryId: string
-        type: WaitlistRewardType
-        status: WaitlistRewardStatus
-        meta?: Record<string, unknown> | null
-        grantedAt?: Date | null
-    }): Promise<WaitlistReferralReward | null> {
-        try {
-            const [row] = await this.db
-                .insert(waitlistReferralRewards)
-                .values({
-                    waitlistEntryId: params.waitlistEntryId,
-                    type: params.type,
-                    status: params.status,
-                    grantedAt: params.grantedAt ?? null,
-                    meta: params.meta ?? null,
-                })
-                .onConflictDoNothing({
-                    target: [waitlistReferralRewards.waitlistEntryId, waitlistReferralRewards.type],
-                })
-                .returning()
-
-            if (!row) {
-                return null
-            }
-
-            return toWaitlistReferralReward(row)
-        } catch (error) {
-            this.logger.error('Failed to create waitlist reward', {
-                operation: 'WaitlistRepository.createReward',
-                error: formatError(error),
-            })
-            throw new BaseAppError('Failed to create waitlist reward', ErrorCode.UNKNOWN_ERROR, 500)
         }
     }
 }

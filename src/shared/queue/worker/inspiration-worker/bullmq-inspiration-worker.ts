@@ -10,7 +10,9 @@ import type { ILLMExtractionService } from '@/modules/inspiration/services/llm-e
 import type { IInspirationsRepository } from '@/modules/inspiration/repositories/inspirations-repository.interface'
 import type { IInspirationsExtractionRepository } from '@/modules/inspiration/repositories/inspirations-extraction-repository.interface'
 import type { IWorkspaceTagsRepository } from '@/modules/inspiration/repositories/workspace-tags-repository.interface'
+import type { InspirationMetadata } from '@/modules/inspiration/entity/raw-inspiration.schema'
 import { buildInspirationMetadataSource } from '@/modules/inspiration/utils/inspiration-metadata'
+import { IYouTubeProcessor, YouTubeProcessorError } from './youtube-processor'
 
 export class BullMqInspirationWorker implements IInspirationWorker {
     private worker: Worker<InspirationJobData>
@@ -22,11 +24,12 @@ export class BullMqInspirationWorker implements IInspirationWorker {
         private readonly extractionsRepository: IInspirationsExtractionRepository,
         private readonly tagsRepository: IWorkspaceTagsRepository,
         private readonly contentParser: IContentParserService,
-        private readonly llmExtraction: ILLMExtractionService
+        private readonly llmExtraction: ILLMExtractionService,
+        private readonly youtubeProcessor?: IYouTubeProcessor
     ) {
         this.worker = new Worker<InspirationJobData>('inspirations-process', async (job) => this.handleJob(job), {
             connection: redisConnection,
-            concurrency: 2, // Обрабатываем по 2 inspiration одновременно
+            concurrency: 2,
             settings: {
                 backoffStrategy: this.customBackoffStrategy.bind(this),
             },
@@ -50,7 +53,7 @@ export class BullMqInspirationWorker implements IInspirationWorker {
     }
 
     private async handleJob(job: Job<InspirationJobData>): Promise<void> {
-        const { inspirationId, workspaceId, userId } = job.data
+        const { inspirationId, workspaceId } = job.data
 
         this.logger.info('Processing inspiration job', {
             operation: 'BullMqInspirationWorker.handleJob',
@@ -60,65 +63,231 @@ export class BullMqInspirationWorker implements IInspirationWorker {
             attempt: job.attemptsMade + 1,
         })
 
-        // Step 1: Получить inspiration из БД
         const inspiration = await this.inspirationsRepository.findById(inspirationId)
 
-        if (!inspiration) {
-            throw new Error(`Inspiration not found: ${inspirationId}`)
+        if (!inspiration) throw new Error(`Inspiration not found: ${inspirationId}`)
+
+        // Check if this is a YouTube URL and we have YouTube processor
+        const isYouTubeLink =
+            inspiration.type === 'link' &&
+            inspiration.content &&
+            this.youtubeProcessor?.isYouTubeUrl(inspiration.content)
+
+        if (isYouTubeLink && this.youtubeProcessor) {
+            await this.handleYouTubeJob(job, inspiration)
+            return
         }
 
-        // Step 2: Парсинг контента
-        let parsedContent = ''
-        let metadata: Record<string, any> = {}
+        // Standard processing for non-YouTube content
+        await this.handleStandardJob(job, inspiration)
+    }
 
-        if (inspiration.type === 'link') {
+    /**
+     * Handle YouTube video processing with transcript extraction
+     */
+    private async handleYouTubeJob(
+        job: Job<InspirationJobData>,
+        inspiration: { id: string; content: string | null; type: string; userDescription: string | null }
+    ): Promise<void> {
+        const { inspirationId, workspaceId } = job.data
+
+        this.logger.info('Processing YouTube inspiration', {
+            operation: 'BullMqInspirationWorker.handleYouTubeJob',
+            jobId: job.id,
+            inspirationId,
+        })
+
+        try {
+            // First, parse URL to get metadata
             const parsed = await this.contentParser.parseUrl(inspiration.content!)
-            parsedContent = parsed.content
-            const sourceMetadata = buildInspirationMetadataSource(inspiration.type, inspiration.content ?? undefined)
-            metadata = {
+            const baseMetadata = buildInspirationMetadataSource('link', inspiration.content || undefined)
+
+            const metadata: InspirationMetadata = {
+                ...baseMetadata,
                 title: parsed.title,
                 description: parsed.description,
                 author: parsed.author,
                 domain: parsed.domain,
                 publishedDate: parsed.publishedDate,
                 thumbnailUrl: parsed.thumbnailUrl,
-                ...sourceMetadata,
+            }
+
+            // Update with metadata and thumbnail
+            await this.inspirationsRepository.update(inspirationId, {
+                metadata,
+                imageUrl: parsed.thumbnailUrl || undefined,
+            })
+
+            // Process with YouTube processor
+            const result = await this.youtubeProcessor!.process(inspirationId, inspiration.content!, {
+                title: parsed.title,
+                channelTitle: parsed.author,
+                duration: undefined, // Could be extracted from metadata
+            })
+
+            // Create extraction with YouTube-specific data
+            const extraction = await this.extractionsRepository.create({
+                rawInspirationId: inspirationId,
+                workspaceId,
+                summary: result.extraction.summary,
+                keyTopics: result.extraction.tags.slice(0, 7),
+                contentFormat: 'video',
+                tone: [result.extraction.tone],
+                targetAudience: 'Content creators and marketers',
+                keyInsights: result.extraction.keyPoints,
+                postIdeas: result.extraction.hooks.slice(0, 10),
+                contentStructure: this.buildYouTubeContentStructure(result.extraction),
+                visualStyle: null,
+                suggestedTags: result.extraction.tags,
+                llmModel: 'gpt-4o',
+                tokensUsed: result.stats.totalTokensUsed,
+                extractionType: 'youtube',
+                youtubeData: {
+                    titleGuess: result.extraction.titleGuess,
+                    language: result.extraction.language,
+                    hooks: result.extraction.hooks,
+                    quotes: result.extraction.quotes,
+                    contentAngles: result.extraction.contentAngles,
+                    drafts: result.extraction.drafts,
+                },
+            })
+
+            this.logger.info('YouTube extraction created', {
+                operation: 'BullMqInspirationWorker.handleYouTubeJob',
+                inspirationId,
+                extractionId: extraction.id,
+                transcriptId: result.transcriptId,
+                stats: result.stats,
+            })
+
+            await this.inspirationsRepository.update(inspirationId, {
+                status: 'completed',
+                errorMessage: null,
+            })
+
+            this.logger.info('YouTube inspiration processing completed', {
+                operation: 'BullMqInspirationWorker.handleYouTubeJob',
+                jobId: job.id,
+                inspirationId,
+            })
+        } catch (error) {
+            if (error instanceof YouTubeProcessorError) {
+                this.logger.error('YouTube processing failed', {
+                    operation: 'BullMqInspirationWorker.handleYouTubeJob',
+                    inspirationId,
+                    errorCode: error.code,
+                    error: error.message,
+                })
+
+                // Map error codes to user-friendly messages
+                const errorMessages: Record<string, string> = {
+                    VIDEO_UNAVAILABLE: 'Video is unavailable or has been removed',
+                    VIDEO_PRIVATE: 'Video is private and cannot be accessed',
+                    VIDEO_AGE_RESTRICTED: 'Video is age-restricted and cannot be processed',
+                    NO_TRANSCRIPT_AVAILABLE: 'No captions available and audio transcription failed',
+                    STT_FAILED: 'Failed to transcribe audio from the video',
+                    EXTRACTION_FAILED: 'Failed to extract content from the transcript',
+                    QUALITY_CHECK_FAILED: 'Extraction quality was too low',
+                }
+
+                throw new Error(errorMessages[error.code] || error.message)
+            }
+            throw error
+        }
+    }
+
+    /**
+     * Handle standard (non-YouTube) content processing
+     */
+    private async handleStandardJob(
+        job: Job<InspirationJobData>,
+        inspiration: {
+            id: string
+            content: string | null
+            parsedContent: string | null
+            title: string
+            type: string
+            userDescription: string | null
+            imageUrl: string | null
+        }
+    ): Promise<void> {
+        const { inspirationId, workspaceId } = job.data
+
+        let parsedContent = ''
+        let thumbnailUrl: string | undefined
+
+        const baseMetadata = buildInspirationMetadataSource(
+            inspiration.type as any,
+            inspiration.content || undefined
+        )
+
+        let metadata: InspirationMetadata = baseMetadata
+
+        if (inspiration.type === 'link') {
+            const parsed = await this.contentParser.parseUrl(inspiration.content!)
+            parsedContent = parsed.content
+            thumbnailUrl = parsed.thumbnailUrl
+            metadata = {
+                ...baseMetadata,
+                title: parsed.title,
+                description: parsed.description,
+                author: parsed.author,
+                domain: parsed.domain,
+                publishedDate: parsed.publishedDate,
+                thumbnailUrl: parsed.thumbnailUrl,
             }
         } else if (inspiration.type === 'document') {
-            // Для документов контент уже должен быть распарсен и сохранен в S3
-            // Здесь мы просто используем его
-            parsedContent = inspiration.content || ''
-            metadata = buildInspirationMetadataSource(inspiration.type, inspiration.content ?? undefined)
+            parsedContent = inspiration.parsedContent || inspiration.content || ''
+            metadata = {
+                ...baseMetadata,
+                title: inspiration.title,
+            }
         } else if (inspiration.type === 'text') {
             parsedContent = inspiration.content || ''
-            metadata = buildInspirationMetadataSource(inspiration.type, inspiration.content ?? undefined)
         } else if (inspiration.type === 'image') {
-            // Для изображений используем описание пользователя
-            parsedContent = inspiration.userDescription || 'Image inspiration'
-            metadata = buildInspirationMetadataSource(inspiration.type, inspiration.content ?? undefined)
+            parsedContent = inspiration.userDescription || ''
         }
 
-        // Step 3: Сохранить parsedContent и metadata в БД
-        await this.inspirationsRepository.update(inspirationId, {
+        // Update inspiration with parsed content, metadata, and thumbnail
+        const updateData: Record<string, unknown> = {
             parsedContent: this.contentParser.normalizeContent(parsedContent),
             metadata,
-        })
+        }
+
+        // Save thumbnail URL for links (if not already has imageUrl)
+        if (thumbnailUrl && !inspiration.imageUrl) {
+            updateData.imageUrl = thumbnailUrl
+        }
+
+        await this.inspirationsRepository.update(inspirationId, updateData)
 
         this.logger.info('Content parsed successfully', {
-            operation: 'BullMqInspirationWorker.handleJob',
+            operation: 'BullMqInspirationWorker.handleStandardJob',
             inspirationId,
             contentLength: parsedContent.length,
+            hasThumbnail: !!thumbnailUrl,
+            thumbnailUrl: thumbnailUrl?.substring(0, 100),
         })
 
-        // Step 4: Создать extraction через LLM
+        // Determine imageUrl for Vision analysis
+        // For images: use the uploaded image
+        // For links: use thumbnail if available
+        const imageUrlForVision =
+            inspiration.type === 'image' ? inspiration.imageUrl || undefined : thumbnailUrl || undefined
+
         const extractionResult = await this.llmExtraction.createExtraction({
-            type: inspiration.type,
+            type: inspiration.type as any,
             content: parsedContent,
             userDescription: inspiration.userDescription || undefined,
+            imageUrl: imageUrlForVision,
             metadata,
         })
 
-        // Step 5: Сохранить extraction в БД
+        const formattedPostIdeas = extractionResult.extraction.postIdeas.map(
+            (idea) => `[${idea.format.toUpperCase()}] ${idea.idea} | Angle: ${idea.angle}`
+        )
+        const formattedKeyInsights = extractionResult.extraction.keyInsights.map((insight) => insight.insight)
+
         const extraction = await this.extractionsRepository.create({
             rawInspirationId: inspirationId,
             workspaceId,
@@ -127,52 +296,46 @@ export class BullMqInspirationWorker implements IInspirationWorker {
             contentFormat: extractionResult.extraction.contentFormat,
             tone: extractionResult.extraction.tone,
             targetAudience: extractionResult.extraction.targetAudience,
-            keyInsights: extractionResult.extraction.keyInsights,
+            keyInsights: formattedKeyInsights,
+            postIdeas: formattedPostIdeas,
             contentStructure: extractionResult.extraction.contentStructure,
             visualStyle: extractionResult.extraction.visualStyle || null,
             suggestedTags: extractionResult.extraction.suggestedTags,
+            structuredInsights: extractionResult.extraction.structuredInsights,
             llmModel: extractionResult.llmModel,
             tokensUsed: extractionResult.tokensUsed,
         })
 
-        this.logger.info('Extraction created successfully', {
-            operation: 'BullMqInspirationWorker.handleJob',
+        this.logger.info('Extraction created', {
+            operation: 'BullMqInspirationWorker.handleStandardJob',
             inspirationId,
             extractionId: extraction.id,
             tokensUsed: extractionResult.tokensUsed,
         })
 
-        // Step 6: Обновить workspace tags
-        await this.updateWorkspaceTags(workspaceId, extractionResult.extraction.suggestedTags)
-
-        // Step 7: Обновить статус на "completed"
         await this.inspirationsRepository.update(inspirationId, {
             status: 'completed',
             errorMessage: null,
         })
 
         this.logger.info('Inspiration processing completed', {
-            operation: 'BullMqInspirationWorker.handleJob',
+            operation: 'BullMqInspirationWorker.handleStandardJob',
             jobId: job.id,
             inspirationId,
         })
     }
 
     private async updateWorkspaceTags(workspaceId: string, suggestedTags: string[]): Promise<void> {
-        // Создаем/обновляем теги на основе suggestedTags
         for (const tagName of suggestedTags) {
-            // Проверяем, существует ли тег
             const existingTag = await this.tagsRepository.findByNameAndCategory(
                 workspaceId,
                 tagName.toLowerCase(),
-                'other' // По умолчанию категория "other"
+                'other'
             )
 
             if (existingTag) {
-                // Увеличиваем usage count
                 await this.tagsRepository.incrementUsageCount(existingTag.id)
             } else {
-                // Создаем новый тег
                 await this.tagsRepository.create({
                     workspaceId,
                     name: tagName.toLowerCase(),
@@ -207,7 +370,6 @@ export class BullMqInspirationWorker implements IInspirationWorker {
                 attempt: job?.attemptsMade,
             })
 
-            // Обновить статус inspiration на "failed"
             if (job) {
                 await this.inspirationsRepository.update(job.data.inspirationId, {
                     status: 'failed',
@@ -224,9 +386,62 @@ export class BullMqInspirationWorker implements IInspirationWorker {
         })
     }
 
+    /**
+     * Build a descriptive content structure string for YouTube extraction
+     */
+    private buildYouTubeContentStructure(extraction: {
+        hooks: string[]
+        quotes: Array<{ text: string; startSec: number | null }>
+        contentAngles: Array<{ angle: string; whyItWorks: string }>
+        keyPoints: string[]
+        drafts: { threads: string[]; x: string[]; linkedin: string[]; instagramCaption: string[] }
+    }): string {
+        const parts: string[] = []
+
+        // Main content summary
+        parts.push(`Video transcript analyzed with ${extraction.keyPoints.length} key insights extracted.`)
+
+        // Hooks preview
+        if (extraction.hooks.length > 0) {
+            parts.push(`\n\n📌 Top Hooks (${extraction.hooks.length} total):`)
+            extraction.hooks.slice(0, 3).forEach((hook, i) => {
+                parts.push(`${i + 1}. ${hook.substring(0, 100)}${hook.length > 100 ? '...' : ''}`)
+            })
+        }
+
+        // Quotes with timestamps
+        const quotesWithTime = extraction.quotes.filter((q) => q.startSec !== null)
+        if (quotesWithTime.length > 0) {
+            parts.push(`\n\n💬 Notable Quotes (${extraction.quotes.length} total):`)
+            quotesWithTime.slice(0, 2).forEach((quote) => {
+                const mins = Math.floor((quote.startSec || 0) / 60)
+                const secs = (quote.startSec || 0) % 60
+                parts.push(`@${mins}:${secs.toString().padStart(2, '0')} "${quote.text.substring(0, 80)}..."`)
+            })
+        }
+
+        // Content angles
+        if (extraction.contentAngles.length > 0) {
+            parts.push(`\n\n🎯 Content Angles (${extraction.contentAngles.length}):`)
+            extraction.contentAngles.slice(0, 3).forEach((angle) => {
+                parts.push(`• ${angle.angle}`)
+            })
+        }
+
+        // Drafts summary
+        const draftCount =
+            extraction.drafts.threads.length +
+            extraction.drafts.x.length +
+            extraction.drafts.linkedin.length +
+            extraction.drafts.instagramCaption.length
+        if (draftCount > 0) {
+            parts.push(`\n\n✍️ Ready-to-use drafts: ${draftCount} posts across 4 platforms`)
+        }
+
+        return parts.join('\n')
+    }
+
     private customBackoffStrategy(attemptsMade: number): number {
-        // Exponential backoff: 2^attempt * 1000ms
-        // Attempt 1: 2s, Attempt 2: 4s, Attempt 3: 8s
         return Math.pow(2, attemptsMade) * 1000
     }
 }

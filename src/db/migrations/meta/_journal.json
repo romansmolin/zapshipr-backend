@@ -1,41 +1,90 @@
 {
-  "version": "7",
-  "dialect": "postgresql",
-  "entries": [
-    {
-      "idx": 0,
-      "version": "7",
-      "when": 1767012096166,
-      "tag": "0000_ambiguous_magma",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1767327672303,
-      "tag": "0001_furry_apocalypse",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1767331832829,
-      "tag": "0002_magenta_black_knight",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1767339104128,
-      "tag": "0003_familiar_aaron_stack",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1767505852107,
-      "tag": "0004_add_title_to_raw_inspirations",
-      "breakpoints": true
-    }
-  ]
+    "version": "7",
+    "dialect": "postgresql",
+    "entries": [
+        {
+            "idx": 0,
+            "version": "7",
+            "when": 1767012096166,
+            "tag": "0000_ambiguous_magma",
+            "breakpoints": true
+        },
+        {
+            "idx": 1,
+            "version": "7",
+            "when": 1767327672303,
+            "tag": "0001_furry_apocalypse",
+            "breakpoints": true
+        },
+        {
+            "idx": 2,
+            "version": "7",
+            "when": 1767331832829,
+            "tag": "0002_magenta_black_knight",
+            "breakpoints": true
+        },
+        {
+            "idx": 3,
+            "version": "7",
+            "when": 1767339104128,
+            "tag": "0003_familiar_aaron_stack",
+            "breakpoints": true
+        },
+        {
+            "idx": 4,
+            "version": "7",
+            "when": 1767505852107,
+            "tag": "0004_add_title_to_raw_inspirations",
+            "breakpoints": true
+        },
+        {
+            "idx": 5,
+            "version": "7",
+            "when": 1767520135407,
+            "tag": "0005_add_post_ideas_to_inspirations_extractions",
+            "breakpoints": true
+        },
+        {
+            "idx": 6,
+            "version": "7",
+            "when": 1767696363588,
+            "tag": "0006_add_book_processing",
+            "breakpoints": true
+        },
+        {
+            "idx": 7,
+            "version": "7",
+            "when": 1767698069731,
+            "tag": "0007_busy_triton",
+            "breakpoints": true
+        },
+        {
+            "idx": 8,
+            "version": "7",
+            "when": 1767768541958,
+            "tag": "0008_hot_scream",
+            "breakpoints": true
+        },
+        {
+            "idx": 9,
+            "version": "7",
+            "when": 1767774443341,
+            "tag": "0009_goofy_fallen_one",
+            "breakpoints": true
+        },
+        {
+            "idx": 10,
+            "version": "7",
+            "when": 1767775199846,
+            "tag": "0010_calm_expediter",
+            "breakpoints": true
+        },
+        {
+            "idx": 11,
+            "version": "7",
+            "when": 1767940000000,
+            "tag": "0011_structured_insights",
+            "breakpoints": true
+        }
+    ]
 }

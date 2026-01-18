@@ -28,6 +28,51 @@
 - Оптимизация изображений
 - Загрузка в S3
 
+#### 4. Обработка Inspirations
+- Парсинг контента из URL
+- Извлечение транскриптов из YouTube
+- LLM extraction и генерация идей
+
+### YouTube Inspiration Workflow
+
+```
+┌──────────────┐     ┌─────────────────────┐     ┌────────────────────┐
+│  processing  │────▶│ transcript_fetching │────▶│  transcript_ready  │
+└──────────────┘     └─────────────────────┘     └────────────────────┘
+                                                          │
+                     ┌──────────┐                         ▼
+                     │  failed  │◀────────────┬──────────────────────┐
+                     └──────────┘             │       extracting     │
+                                              │ └────────────────────┘
+                     ┌───────────┐            │           │
+                     │ completed │◀───────────┴───────────┘
+                     └───────────┘
+```
+
+**Статусы YouTube workflow:**
+
+| Статус | Описание |
+|--------|----------|
+| `processing` | Начальное состояние, парсинг URL |
+| `transcript_fetching` | Получение транскрипта (captions или STT) |
+| `transcript_ready` | Транскрипт получен, готов к extraction |
+| `extracting` | LLM extraction в процессе |
+| `completed` | Успешная обработка |
+| `failed` | Ошибка на любом этапе |
+
+**Fallback стратегия для транскриптов:**
+
+1. Human captions (preferred language)
+2. Human captions (any language)
+3. Auto-generated captions (preferred language)
+4. Auto-generated captions (any language)
+5. OpenAI Whisper STT (audio download + transcription)
+
+**Кэширование:**
+- Транскрипты кэшируются по `videoId`
+- Повторные inspiration для того же видео используют кэш
+- Сокращение API-вызовов к YouTube и OpenAI
+
 ### Запуск воркеров
 
 ```bash

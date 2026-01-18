@@ -12,7 +12,6 @@ export const workspaceTags = pgTable('workspace_tags', {
     name: varchar('name', { length: 100 }).notNull(),
     category: tagCategory('category').notNull(),
 
-    // Метрики
     usageCount: integer('usage_count').notNull().default(0),
     isUserCreated: boolean('is_user_created').notNull().default(false),
 

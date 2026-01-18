@@ -67,6 +67,28 @@ SMTP_USER=your-email@example.com
 SMTP_PASSWORD=your-password
 ```
 
+### OpenAI (для Inspirations LLM extraction)
+
+```env
+OPENAI_API_KEY=sk-...  # API ключ для LLM extraction и Whisper STT
+```
+
+### YouTube (опционально)
+
+```env
+# YouTube Data API (опционально, для дополнительных метаданных)
+YOUTUBE_API_KEY=your-youtube-api-key
+
+# yt-dlp используется автоматически, но можно указать путь:
+# YT_DLP_PATH=/usr/local/bin/yt-dlp
+```
+
+**Примечание по YouTube:**
+- Основной функционал (transcript extraction) работает через `yt-dlp` без API ключа
+- `YOUTUBE_API_KEY` используется опционально для получения расширенных метаданных
+- `yt-dlp` устанавливается как npm dependency (`youtube-dl-exec`)
+- Для STT fallback требуется `OPENAI_API_KEY` (Whisper API)
+
 ## Скрипты
 
 ### Development
@@ -123,5 +145,6 @@ AWS_ACCESS_KEY_ID=your-key
 AWS_SECRET_ACCESS_KEY=your-secret
 AWS_S3_BUCKET_NAME=your-bucket
 REDIS_URL=redis://localhost:6379
+OPENAI_API_KEY=sk-your-openai-key
 ```
 

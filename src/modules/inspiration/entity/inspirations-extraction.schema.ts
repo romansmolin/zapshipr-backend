@@ -1,7 +1,53 @@
-import { pgTable, uuid, text, varchar, timestamp, integer } from 'drizzle-orm/pg-core'
+import { pgTable, uuid, text, varchar, timestamp, integer, jsonb } from 'drizzle-orm/pg-core'
 import { sql } from 'drizzle-orm'
 import { workspaces } from '@/modules/workspace/entity/workspace.schema'
 import { rawInspirations } from './raw-inspiration.schema'
+
+/**
+ * YouTube-specific extraction data stored in JSONB
+ */
+export interface YouTubeExtractionJson {
+    titleGuess?: string
+    language?: string
+    hooks?: string[]
+    quotes?: Array<{
+        text: string
+        startSec: number | null
+        endSec: number | null
+    }>
+    contentAngles?: Array<{
+        angle: string
+        whyItWorks: string
+    }>
+    drafts?: {
+        threads?: string[]
+        x?: string[]
+        linkedin?: string[]
+        instagramCaption?: string[]
+    }
+}
+
+export interface StructuredInsightsJson {
+    documentType: string
+    coreIdeas: string[]
+    repeatedThemes: string[]
+    mentalModels: Array<{
+        name: string
+        description: string
+        steps: string[]
+    }>
+    authorIntent: {
+        problem: string
+        worldview: string
+        intendedOutcome: string
+    }
+    moodTone: string[]
+    narrativeFlow: string[]
+    useCaseInsights: Array<{
+        insight: string
+        useCases: string[]
+    }>
+}
 
 export const inspirationsExtractions = pgTable('inspirations_extractions', {
     id: uuid('id').defaultRandom().primaryKey(),
@@ -27,12 +73,25 @@ export const inspirationsExtractions = pgTable('inspirations_extractions', {
         .array()
         .notNull()
         .default(sql`ARRAY[]::text[]`), // Ключевые идеи/takeaways
+    postIdeas: text('post_ideas')
+        .array()
+        .notNull()
+        .default(sql`ARRAY[]::text[]`), // Идеи постов на основе вдохновения
     contentStructure: text('content_structure'), // Описание структуры
     visualStyle: text('visual_style'), // Визуальный стиль (если есть)
     suggestedTags: text('suggested_tags')
         .array()
         .notNull()
         .default(sql`ARRAY[]::text[]`), // Предложенные теги
+
+    // Structured semantic insights for long-form documents
+    structuredInsights: jsonb('structured_insights').$type<StructuredInsightsJson | null>(),
+
+    // YouTube-specific extended fields (JSONB for flexibility)
+    youtubeData: jsonb('youtube_data').$type<YouTubeExtractionJson | null>(),
+
+    // Extraction type: 'generic' | 'youtube' for routing logic
+    extractionType: varchar('extraction_type', { length: 20 }).default('generic'),
 
     // Мета
     llmModel: varchar('llm_model', { length: 50 }), // Модель OpenAI

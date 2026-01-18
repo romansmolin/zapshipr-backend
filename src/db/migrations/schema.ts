@@ -200,26 +200,6 @@ export const waitlistEntries = pgTable("waitlist_entries", {
 	check("waitlist_entries_status_check", sql`status = ANY (ARRAY['ACTIVE'::text, 'UNSUBSCRIBED'::text])`),
 ]);
 
-export const waitlistReferralRewards = pgTable("waitlist_referral_rewards", {
-	id: uuid().default(sql`uuid_generate_v4()`).primaryKey().notNull(),
-	waitlistEntryId: uuid("waitlist_entry_id").notNull(),
-	type: text().notNull(),
-	status: text().notNull(),
-	grantedAt: timestamp("granted_at", { withTimezone: true, mode: 'string' }),
-	meta: jsonb(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-	updatedAt: timestamp("updated_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => [
-	index("idx_waitlist_referral_rewards_entry_id").using("btree", table.waitlistEntryId.asc().nullsLast().op("uuid_ops")),
-	foreignKey({
-			columns: [table.waitlistEntryId],
-			foreignColumns: [waitlistEntries.id],
-			name: "waitlist_referral_rewards_waitlist_entry_id_fkey"
-		}).onDelete("cascade"),
-	unique("waitlist_referral_rewards_unique").on(table.waitlistEntryId, table.type),
-	check("waitlist_referral_rewards_type_check", sql`type = 'SIX_MONTHS_FREE'::text`),
-	check("waitlist_referral_rewards_status_check", sql`status = ANY (ARRAY['PENDING'::text, 'GRANTED'::text, 'REDEEMED'::text])`),
-]);
 
 export const pinterestBoards = pgTable("pinterest_boards", {
 	id: uuid().defaultRandom().primaryKey().notNull(),
@@ -249,25 +229,6 @@ export const pinterestBoards = pgTable("pinterest_boards", {
 	check("pinterest_boards_privacy_check", sql`privacy = ANY (ARRAY['PUBLIC'::text, 'PROTECTED'::text, 'SECRET'::text])`),
 ]);
 
-export const waitlistReferralEvents = pgTable("waitlist_referral_events", {
-	id: uuid().default(sql`uuid_generate_v4()`).primaryKey().notNull(),
-	referrerId: uuid("referrer_id").notNull(),
-	referredEntryId: uuid("referred_entry_id").notNull(),
-	createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' }).defaultNow().notNull(),
-}, (table) => [
-	index("idx_waitlist_referral_events_referrer_id").using("btree", table.referrerId.asc().nullsLast().op("uuid_ops")),
-	foreignKey({
-			columns: [table.referrerId],
-			foreignColumns: [waitlistEntries.id],
-			name: "waitlist_referral_events_referrer_id_fkey"
-		}).onDelete("cascade"),
-	foreignKey({
-			columns: [table.referredEntryId],
-			foreignColumns: [waitlistEntries.id],
-			name: "waitlist_referral_events_referred_entry_id_fkey"
-		}).onDelete("cascade"),
-	unique("waitlist_referral_events_referred_entry_key").on(table.referredEntryId),
-]);
 
 export const tiktokPublishJobs = pgTable("tiktok_publish_jobs", {
 	id: uuid().default(sql`uuid_generate_v4()`).primaryKey().notNull(),
