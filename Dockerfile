@@ -56,7 +56,9 @@ COPY package.json ./
 
 # Создаем непривилегированного пользователя
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+    adduser -S nodejs -u 1001 && \
+    mkdir -p /app/temp && \
+    chown -R nodejs:nodejs /app
 
 USER nodejs
 
@@ -84,7 +86,9 @@ COPY package.json ./
 
 # Создаем непривилегированного пользователя
 RUN addgroup -g 1001 -S nodejs && \
-    adduser -S nodejs -u 1001
+    adduser -S nodejs -u 1001 && \
+    mkdir -p /app/temp && \
+    chown -R nodejs:nodejs /app
 
 USER nodejs
 
