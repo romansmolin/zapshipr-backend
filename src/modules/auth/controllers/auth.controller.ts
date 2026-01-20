@@ -131,6 +131,7 @@ export class AuthController implements IAuthController {
             httpOnly: true,
             sameSite: 'lax' as const,
             secure: process.env.NODE_ENV === 'production',
+            domain: '.zapshipr.com',
             maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
         }
     }
