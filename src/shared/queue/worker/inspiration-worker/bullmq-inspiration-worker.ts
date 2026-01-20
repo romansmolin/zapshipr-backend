@@ -67,7 +67,6 @@ export class BullMqInspirationWorker implements IInspirationWorker {
 
         if (!inspiration) throw new Error(`Inspiration not found: ${inspirationId}`)
 
-        // Check if this is a YouTube URL and we have YouTube processor
         const isYouTubeLink =
             inspiration.type === 'link' &&
             inspiration.content &&
@@ -78,13 +77,9 @@ export class BullMqInspirationWorker implements IInspirationWorker {
             return
         }
 
-        // Standard processing for non-YouTube content
         await this.handleStandardJob(job, inspiration)
     }
 
-    /**
-     * Handle YouTube video processing with transcript extraction
-     */
     private async handleYouTubeJob(
         job: Job<InspirationJobData>,
         inspiration: { id: string; content: string | null; type: string; userDescription: string | null }
