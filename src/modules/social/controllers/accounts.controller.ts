@@ -58,8 +58,8 @@ export class AccountsController {
         const { code, state, error, error_description } = this.parseOAuthCallback(req)
         this.assertNoOAuthError(error, error_description)
 
-        const userId = this.getUserId(req)
-        this.validateState(userId, state)
+        const statePayload = this.requireState(state)
+        const userId = statePayload.userId
 
         const authCode = this.requireCode(code)
         const result = await this.connectorService.connectFacebookAccount(userId, authCode)
@@ -70,8 +70,8 @@ export class AccountsController {
         const { code, state, error, error_description } = this.parseOAuthCallback(req)
         this.assertNoOAuthError(error, error_description)
 
-        const userId = this.getUserId(req)
-        this.validateState(userId, state)
+        const statePayload = this.requireState(state)
+        const userId = statePayload.userId
 
         const authCode = this.requireCode(code)
         const result = await this.connectorService.connectThreadsAccount(userId, authCode)
@@ -82,8 +82,8 @@ export class AccountsController {
         const { code, state, error, error_description } = this.parseOAuthCallback(req)
         this.assertNoOAuthError(error, error_description)
 
-        const userId = this.getUserId(req)
-        this.validateState(userId, state)
+        const statePayload = this.requireState(state)
+        const userId = statePayload.userId
 
         const authCode = this.requireCode(code)
         const result = await this.connectorService.connectTikTokAccount(userId, authCode)
@@ -94,8 +94,8 @@ export class AccountsController {
         const { code, state, error, error_description } = this.parseOAuthCallback(req)
         this.assertNoOAuthError(error, error_description)
 
-        const userId = this.getUserId(req)
-        this.validateState(userId, state)
+        const statePayload = this.requireState(state)
+        const userId = statePayload.userId
 
         const authCode = this.requireCode(code)
         const result = await this.connectorService.connectYouTubeAccount(userId, authCode)
@@ -106,8 +106,8 @@ export class AccountsController {
         const { code, state, error, error_description, code_verifier } = this.parseOAuthCallback(req)
         this.assertNoOAuthError(error, error_description)
 
-        const userId = this.getUserId(req)
-        const statePayload = this.validateState(userId, state)
+        const statePayload = this.requireState(state)
+        const userId = statePayload.userId
         const authCode = this.requireCode(code)
 
         const resolvedCodeVerifier = code_verifier ?? statePayload?.codeVerifier
@@ -123,8 +123,8 @@ export class AccountsController {
         const { code, state, error, error_description } = this.parseOAuthCallback(req)
         this.assertNoOAuthError(error, error_description)
 
-        const userId = this.getUserId(req)
-        this.validateState(userId, state)
+        const statePayload = this.requireState(state)
+        const userId = statePayload.userId
 
         const authCode = this.requireCode(code)
         const result = await this.connectorService.connectPinterestAccount(userId, authCode)
@@ -135,8 +135,8 @@ export class AccountsController {
         const { code, state, error, error_description } = this.parseOAuthCallback(req)
         this.assertNoOAuthError(error, error_description)
 
-        const userId = this.getUserId(req)
-        this.validateState(userId, state)
+        const statePayload = this.requireState(state)
+        const userId = statePayload.userId
 
         const authCode = this.requireCode(code)
         const result = await this.connectorService.connectInstagramAccount(userId, authCode)
@@ -147,8 +147,8 @@ export class AccountsController {
         const { code, state, error, error_description } = this.parseOAuthCallback(req)
         this.assertNoOAuthError(error, error_description)
 
-        const userId = this.getUserId(req)
-        this.validateState(userId, state)
+        const statePayload = this.requireState(state)
+        const userId = statePayload.userId
 
         const authCode = this.requireCode(code)
         const result = await this.connectorService.connectLinkedinAccount(userId, authCode)
@@ -237,12 +237,14 @@ export class AccountsController {
         }
     }
 
-    private validateState(userId: string, state?: string) {
-        if (!state) return null
+    private requireState(state?: string) {
+        if (!state) {
+            throw new BaseAppError('Missing OAuth state', ErrorCode.UNAUTHORIZED, 401)
+        }
 
         const payload = this.oauthStateService.consume(state)
 
-        if (!payload || payload.userId !== userId) {
+        if (!payload || typeof payload.userId !== 'string') {
             throw new BaseAppError('Invalid OAuth state', ErrorCode.UNAUTHORIZED, 401)
         }
 

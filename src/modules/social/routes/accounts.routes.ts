@@ -21,6 +21,7 @@ import { asyncHandler } from '@/shared/http/async-handler'
 import { AxiosHttpClient } from '@/shared/http-client/axios-http-client'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import { S3Uploader } from '@/shared/media-uploader/media-uploader'
+import { getEnvVar } from '@/shared/utils/get-env-var'
 
 export const createAccountsRouter = (logger: ILogger, db: NodePgDatabase<typeof dbSchema>): Router => {
     const router = createRouter()
@@ -57,7 +58,8 @@ export const createAccountsRouter = (logger: ILogger, db: NodePgDatabase<typeof 
         accountsService
     )
 
-    const oauthStateService = new OAuthStateService()
+    const oauthStateSecret = getEnvVar('OAUTH_STATE_SECRET')
+    const oauthStateService = new OAuthStateService(oauthStateSecret)
     const accountsController = new AccountsController(accountsService, connectorService, logger, oauthStateService)
 
     router.get(
