@@ -9,7 +9,6 @@ import type { ILogger } from '@/shared/logger/logger.interface'
 export class BullMqAccessTokenWorker implements IAccessTokenWorker {
     private worker: Worker
     private queue: Queue
-    private heartbeatTimer?: ReturnType<typeof setInterval>
     private socialMediaTokenRefresher: ISocialMediaTokenRefresherService
     private logger: ILogger
 
@@ -51,9 +50,13 @@ export class BullMqAccessTokenWorker implements IAccessTokenWorker {
         this.logger = logger
         this.socialMediaTokenRefresher = socialMediaTokenRefresher
         this.queue = new Queue('check-expiring-tokens', { connection: redisConnection })
-        this.worker = new Worker('check-expiring-tokens', async (job) => this.checkForExpiringTokensAndUpdate(job), {
-            connection: redisConnection,
-        })
+        this.worker = new Worker(
+            'check-expiring-tokens',
+            async (job) => this.checkForExpiringTokensAndUpdate(job),
+            {
+                connection: redisConnection,
+            }
+        )
     }
 
     start(): void {
@@ -89,40 +92,13 @@ export class BullMqAccessTokenWorker implements IAccessTokenWorker {
         })
 
         void this.cleanFailedJobs()
-        this.heartbeatTimer = setInterval(() => {
-            void this.logQueueHeartbeat()
-        }, 60_000)
-        void this.logQueueHeartbeat()
 
         this.logger.info('Access Token Worker started')
     }
 
     async stop(): Promise<void> {
-        if (this.heartbeatTimer) {
-            clearInterval(this.heartbeatTimer)
-            this.heartbeatTimer = undefined
-        }
         await this.queue.close()
         await this.worker.close()
-    }
-
-    private async logQueueHeartbeat(): Promise<void> {
-        try {
-            const counts = await this.queue.getJobCounts('waiting', 'active', 'delayed', 'completed', 'failed')
-            this.logger.info('[Access Token Worker] Queue heartbeat', {
-                queueName: 'check-expiring-tokens',
-                counts,
-            })
-        } catch (error: unknown) {
-            this.logger.error('[Access Token Worker] Queue heartbeat failed', {
-                reason: error instanceof Error ? error.message : 'Unknown error',
-                error: {
-                    name: error instanceof Error ? error.name : 'Unknown Error',
-                    code: error instanceof Error && 'code' in error ? (error as any).code : undefined,
-                    stack: error instanceof Error ? error.stack : undefined,
-                },
-            })
-        }
     }
 
     private async cleanFailedJobs(): Promise<void> {
