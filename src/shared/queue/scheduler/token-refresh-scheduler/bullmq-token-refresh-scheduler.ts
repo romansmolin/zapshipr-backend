@@ -14,14 +14,19 @@ export class BullMqTokenRefreshScheduler implements ITokenRefreshScheduler {
     async scheduleDailyAccessTokenRefresh(): Promise<void> {
         await this.accessTokenRefreshQueue.waitUntilReady()
 
-        await this.accessTokenRefreshQueue.add(
+        await this.accessTokenRefreshQueue.upsertJobScheduler(
             'refresh-access-tokens',
-            {},
             {
-                jobId: 'refresh-access-tokens',
-                removeOnComplete: true,
-                removeOnFail: false,
-                repeat: { every: 60_000 },
+                every: 60_000,
+                immediately: true,
+            },
+            {
+                name: 'refresh-access-tokens',
+                data: {},
+                opts: {
+                    removeOnComplete: true,
+                    removeOnFail: false,
+                },
             }
         )
 
