@@ -20,6 +20,7 @@ async function startWorkers() {
     const apiClient = new AxiosHttpClient()
     const socialMediaErrorHandler = new SocialMediaErrorHandler(logger)
     const videoProcessor = new VideoProcessor(logger)
+
     const socialMediaPublisherFactory = new SocialMediaPublisherFactory(
         logger,
         accountRepository,
@@ -36,6 +37,7 @@ async function startWorkers() {
         socialMediaPublisherFactory
     )
     const socialMediaTokenRefresher = new SocialMediaTokenRefresherService(logger, accountRepository)
+
     const postsService = new PostsService(
         postsRepository,
         mediaUploader,

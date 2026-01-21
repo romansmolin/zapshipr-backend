@@ -39,8 +39,9 @@ export interface CreatePostsRequest {
     postStatus: PostStatus
     posts: CreatePostTargetRequest[]
     postNow?: boolean
-    scheduledTime?: Date | null
+    scheduledAtLocal?: string | null
+    timezone?: string | null
     mainCaption?: string | null
     coverTimestamp?: number | null
-    copyDataUrls?: string[]
+    copyDataUrls?: string[] | null
 }

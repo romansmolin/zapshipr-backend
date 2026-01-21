@@ -49,7 +49,9 @@ export class BullMqAccessTokenWorker implements IAccessTokenWorker {
     constructor(logger: ILogger, socialMediaTokenRefresher: ISocialMediaTokenRefresherService) {
         this.logger = logger
         this.socialMediaTokenRefresher = socialMediaTokenRefresher
+
         this.queue = new Queue('check-expiring-tokens', { connection: redisConnection })
+
         this.worker = new Worker(
             'check-expiring-tokens',
             async (job) => this.checkForExpiringTokensAndUpdate(job),
@@ -91,34 +93,11 @@ export class BullMqAccessTokenWorker implements IAccessTokenWorker {
             })
         })
 
-        void this.cleanFailedJobs()
-
         this.logger.info('Access Token Worker started')
     }
 
     async stop(): Promise<void> {
         await this.queue.close()
         await this.worker.close()
-    }
-
-    private async cleanFailedJobs(): Promise<void> {
-        try {
-            const cleaned = await this.queue.clean(0, 1000, 'failed')
-            if (cleaned.length > 0) {
-                this.logger.info('[Access Token Worker] Cleaned failed jobs', {
-                    queueName: 'check-expiring-tokens',
-                    cleaned: cleaned.length,
-                })
-            }
-        } catch (error: unknown) {
-            this.logger.error('[Access Token Worker] Failed to clean failed jobs', {
-                reason: error instanceof Error ? error.message : 'Unknown error',
-                error: {
-                    name: error instanceof Error ? error.name : 'Unknown Error',
-                    code: error instanceof Error && 'code' in error ? (error as any).code : undefined,
-                    stack: error instanceof Error ? error.stack : undefined,
-                },
-            })
-        }
     }
 }

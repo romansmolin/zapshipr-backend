@@ -1,9 +1,11 @@
 import axios, { AxiosError } from 'axios'
 import qs from 'qs'
-import type { PostPlatform } from '@/modules/post/schemas/posts.schemas'
+
 import { ErrorCode } from '@/shared/consts/error-codes.const'
 import { BaseAppError } from '@/shared/errors/base-error'
 import { handleAxiosErrors } from '@/shared/errors/handle-axios-error'
+
+import type { PostPlatform } from '@/modules/post/schemas/posts.schemas'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import type { IAccountRepository } from '@/modules/social/repositories/account-repository.interface'
 import type { ISocialMediaTokenRefresherService } from './social-media-token-refresher.interface'
@@ -56,18 +58,15 @@ export class SocialMediaTokenRefresherService implements ISocialMediaTokenRefres
             throw new BaseAppError('Missing Bluesky refresh token', ErrorCode.BAD_REQUEST, 400)
         }
 
-        const apiBaseUrl = process.env.BLUESKY_API_BASE_URL || process.env.BLUESKY_OAUTH_BASE_URL || 'https://bsky.social'
+        const apiBaseUrl =
+            process.env.BLUESKY_API_BASE_URL || process.env.BLUESKY_OAUTH_BASE_URL || 'https://bsky.social'
 
         try {
-            const response = await axios.post(
-                `${apiBaseUrl}/xrpc/com.atproto.server.refreshSession`,
-                undefined,
-                {
-                    headers: {
-                        Authorization: `Bearer ${refreshToken}`,
-                    },
-                }
-            )
+            const response = await axios.post(`${apiBaseUrl}/xrpc/com.atproto.server.refreshSession`, undefined, {
+                headers: {
+                    Authorization: `Bearer ${refreshToken}`,
+                },
+            })
 
             const { accessJwt, refreshJwt } = response.data || {}
 
@@ -228,14 +227,19 @@ export class SocialMediaTokenRefresherService implements ISocialMediaTokenRefres
             // Create Basic Auth header with client credentials
             const credentials = Buffer.from(`${PINTEREST_APP_ID}:${PINTEREST_APP_SECRET}`).toString('base64')
 
-            const { data } = await axios.post(`${PINTEREST_API_URL}/${PINTEREST_API_VERSION}/oauth/token`, formData, {
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    Authorization: `Basic ${credentials}`,
-                },
-            })
+            const { data } = await axios.post(
+                `${PINTEREST_API_URL}/${PINTEREST_API_VERSION}/oauth/token`,
+                formData,
+                {
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        Authorization: `Basic ${credentials}`,
+                    },
+                }
+            )
 
-            const { access_token, refresh_token, refresh_token_expires_in, refresh_token_expires_at, expires_in } = data
+            const { access_token, refresh_token, refresh_token_expires_in, refresh_token_expires_at, expires_in } =
+                data
 
             const tokenExpiresIn = new Date(Date.now() + expires_in * 1000)
             const refreshTokenExpiresIn = new Date(Date.now() + refresh_token_expires_in * 1000)
@@ -504,7 +508,9 @@ export class SocialMediaTokenRefresherService implements ISocialMediaTokenRefres
                 )
             )
 
-            const failures = results.filter((result): result is PromiseRejectedResult => result.status === 'rejected')
+            const failures = results.filter(
+                (result): result is PromiseRejectedResult => result.status === 'rejected'
+            )
 
             if (failures.length > 0) {
                 const errorDetails = failures.map((failure, index) => ({

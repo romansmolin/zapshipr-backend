@@ -30,7 +30,7 @@ export const mediaAssets = pgTable('media_assets', {
         .references(() => users.id, { onDelete: 'cascade' }),
     url: text('url').notNull(),
     type: text('type').notNull(),
-    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    uploadedAt: timestamp('uploaded_at', { withTimezone: true }).defaultNow().notNull(),
 })
 
 export const postMediaAssets = pgTable(

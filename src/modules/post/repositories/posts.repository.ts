@@ -73,6 +73,7 @@ export class PostsRepository implements IPostsRepository {
     async savePostMediaAssets(data: { userId: string; url: string; type: string }): Promise<{ mediaId: string }> {
         try {
             const mediaId = uuidv4()
+
             await this.db.insert(mediaAssets).values({
                 id: mediaId,
                 userId: data.userId,
@@ -154,10 +155,7 @@ export class PostsRepository implements IPostsRepository {
             }
 
             const mediaAssetsRows = await this.getPostMediaAssets(postId)
-            const targetRows = await this.db
-                .select()
-                .from(postTargets)
-                .where(eq(postTargets.postId, postId))
+            const targetRows = await this.db.select().from(postTargets).where(eq(postTargets.postId, postId))
 
             const targets = targetRows.map(toPostTargetResponse)
             const type = (post.type ?? (mediaAssetsRows.length > 0 ? 'media' : 'text')) as PostType
@@ -265,10 +263,7 @@ export class PostsRepository implements IPostsRepository {
 
             const postIds = postRows.map((row) => row.id)
 
-            const targetRows = await this.db
-                .select()
-                .from(postTargets)
-                .where(inArray(postTargets.postId, postIds))
+            const targetRows = await this.db.select().from(postTargets).where(inArray(postTargets.postId, postIds))
 
             const targetsByPost = new Map<string, PostTargetResponse[]>()
             targetRows.forEach((row) => {
@@ -360,7 +355,10 @@ export class PostsRepository implements IPostsRepository {
                 updateData.mainCaption = mainCaption
             }
 
-            await this.db.update(posts).set(updateData).where(and(eq(posts.id, postId), eq(posts.userId, userId)))
+            await this.db
+                .update(posts)
+                .set(updateData)
+                .where(and(eq(posts.id, postId), eq(posts.userId, userId)))
         } catch (error) {
             this.logger.error('Failed to update base post', {
                 operation: 'PostsRepository.updateBasePost',
@@ -592,13 +590,18 @@ export class PostsRepository implements IPostsRepository {
         }
     }
 
-    async getPostsByDate(userId: string, fromDate: Date, toDate: Date, workspaceId?: string): Promise<PostsByDateResponse> {
+    async getPostsByDate(
+        userId: string,
+        fromDate: Date,
+        toDate: Date,
+        workspaceId?: string
+    ): Promise<PostsByDateResponse> {
         try {
             const conditions = [
                 eq(posts.userId, userId),
                 gte(posts.createdAt, fromDate),
                 lte(posts.createdAt, toDate),
-                ne(posts.status, PostStatus.DRAFT)
+                ne(posts.status, PostStatus.DRAFT),
             ]
 
             if (workspaceId) {
@@ -617,10 +620,7 @@ export class PostsRepository implements IPostsRepository {
 
             const postIds = postRows.map((row) => row.id)
 
-            const targetRows = await this.db
-                .select()
-                .from(postTargets)
-                .where(inArray(postTargets.postId, postIds))
+            const targetRows = await this.db.select().from(postTargets).where(inArray(postTargets.postId, postIds))
 
             const targetsByPost = new Map<string, PostTargetResponse[]>()
             targetRows.forEach((row) => {
@@ -765,9 +765,10 @@ export class PostsRepository implements IPostsRepository {
                 )
             }
 
-            await this.db.update(postTargets).set({ status: PostStatus.PENDING, errorMessage: null }).where(
-                and(eq(postTargets.postId, postId), eq(postTargets.socialAccountId, socialAccountId))
-            )
+            await this.db
+                .update(postTargets)
+                .set({ status: PostStatus.PENDING, errorMessage: null })
+                .where(and(eq(postTargets.postId, postId), eq(postTargets.socialAccountId, socialAccountId)))
 
             const postDetails = await this.getPostDetails(postId, userId)
             const retriedTarget = postDetails.targets.find((target) => target.socialAccountId === socialAccountId)

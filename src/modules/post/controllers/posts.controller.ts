@@ -7,6 +7,9 @@ import type { ILogger } from '@/shared/logger/logger.interface'
 import type { PostFilters } from '@/modules/post/types/posts.types'
 import type { NextFunction, Request, Response } from 'express'
 
+import { createPostsSchema } from '../validation/posts.schemas'
+import { hasTimeZoneInfo, parseDateWithTimeZone } from '@/shared/utils/timezone'
+
 const getFirstValue = (value: unknown): string | number | undefined => {
     if (Array.isArray(value)) {
         const [first] = value
@@ -38,7 +41,7 @@ const parseJson = <T>(value: unknown): T | undefined => {
     return undefined
 }
 
-const parseDate = (value: unknown): Date | null => {
+const parseDate = (value: unknown, timeZone?: string | null): Date | null => {
     if (value instanceof Date) return value
     if (typeof value === 'number' && !Number.isNaN(value)) {
         const parsed = new Date(value)
@@ -55,10 +58,19 @@ const parseDate = (value: unknown): Date | null => {
                 return parsed
             }
         }
-        // Fallback to standard date string parsing
-        const parsed = new Date(value)
-        if (!Number.isNaN(parsed.getTime())) {
-            return parsed
+
+        const trimmed = value.trim()
+        if (timeZone && !hasTimeZoneInfo(trimmed)) {
+            const parsed = parseDateWithTimeZone(trimmed, timeZone)
+            if (parsed && !Number.isNaN(parsed.getTime())) {
+                return parsed
+            }
+        } else {
+            // Fallback to standard date string parsing
+            const parsed = new Date(trimmed)
+            if (!Number.isNaN(parsed.getTime())) {
+                return parsed
+            }
         }
     }
     return null
@@ -67,6 +79,11 @@ const parseDate = (value: unknown): Date | null => {
 const parseCreatePostsRequest = (body: Request['body']): CreatePostsRequest => {
     const posts = parseJson<CreatePostsRequest['posts']>(body.posts) ?? []
     const copyDataUrls = parseJson<string[]>(body.copyDataUrls) ?? undefined
+    const timezone = typeof body.timezone === 'string' && body.timezone.trim() !== '' ? body.timezone.trim() : null
+    const scheduledAtLocal =
+        typeof body.scheduledAtLocal === 'string' && body.scheduledAtLocal.trim() !== ''
+            ? body.scheduledAtLocal.trim()
+            : null
     const coverTimestamp =
         typeof body.coverTimestamp === 'number'
             ? body.coverTimestamp
@@ -79,7 +96,8 @@ const parseCreatePostsRequest = (body: Request['body']): CreatePostsRequest => {
         postStatus: body.postStatus,
         posts,
         postNow: parseBoolean(body.postNow),
-        scheduledTime: parseDate(body.scheduledTime),
+        scheduledAtLocal,
+        timezone,
         mainCaption: body.mainCaption ?? null,
         coverTimestamp: Number.isNaN(coverTimestamp as number)
             ? undefined
@@ -107,7 +125,7 @@ export class PostsController {
             throw new BaseAppError('Unauthorized', ErrorCode.UNAUTHORIZED, 401)
         }
 
-        const payload = parseCreatePostsRequest(req.body)
+        const payload = createPostsSchema.parse(parseCreatePostsRequest(req.body))
         const medias = req.files as { [fieldname: string]: Express.Multer.File[] } | Express.Multer.File[]
 
         const result = await this.postsService.createPost(payload, medias, userId)
@@ -138,7 +156,7 @@ export class PostsController {
             throw new BaseAppError('Post ID is required', ErrorCode.BAD_REQUEST, 400)
         }
 
-        const payload = parseCreatePostsRequest(req.body)
+        const payload = createPostsSchema.parse(parseCreatePostsRequest(req.body))
         const file = req.file
 
         await this.postsService.editPost(postId, payload, file, userId)
