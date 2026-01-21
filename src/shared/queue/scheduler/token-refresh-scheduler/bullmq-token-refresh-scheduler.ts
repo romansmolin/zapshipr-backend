@@ -25,7 +25,7 @@ export class BullMqTokenRefreshScheduler implements ITokenRefreshScheduler {
                 data: {},
                 opts: {
                     removeOnComplete: true,
-                    removeOnFail: false,
+                    removeOnFail: true,
                 },
             }
         )
