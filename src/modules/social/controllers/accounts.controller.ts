@@ -3,6 +3,7 @@ import type { NextFunction, Request, Response } from 'express'
 import { BaseAppError } from '@/shared/errors/base-error'
 import { ErrorCode } from '@/shared/consts/error-codes.const'
 import type { ILogger } from '@/shared/logger/logger.interface'
+import { getEnvVar } from '@/shared/utils/get-env-var'
 
 import type { IAccountsService } from '@/modules/social/services/accounts.service.interface'
 import type { ISocilaMediaConnectorService } from '@/modules/social/services/social-media-connector.interface'
@@ -62,8 +63,8 @@ export class AccountsController {
         const userId = statePayload.userId
 
         const authCode = this.requireCode(code)
-        const result = await this.connectorService.connectFacebookAccount(userId, authCode)
-        res.json(result)
+        await this.connectorService.connectFacebookAccount(userId, authCode)
+        this.redirectToAccounts(res)
     }
 
     async connectThreadsAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -74,8 +75,8 @@ export class AccountsController {
         const userId = statePayload.userId
 
         const authCode = this.requireCode(code)
-        const result = await this.connectorService.connectThreadsAccount(userId, authCode)
-        res.json(result)
+        await this.connectorService.connectThreadsAccount(userId, authCode)
+        this.redirectToAccounts(res)
     }
 
     async connectTikTokAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -86,8 +87,8 @@ export class AccountsController {
         const userId = statePayload.userId
 
         const authCode = this.requireCode(code)
-        const result = await this.connectorService.connectTikTokAccount(userId, authCode)
-        res.json(result)
+        await this.connectorService.connectTikTokAccount(userId, authCode)
+        this.redirectToAccounts(res)
     }
 
     async connectYouTubeAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -98,8 +99,8 @@ export class AccountsController {
         const userId = statePayload.userId
 
         const authCode = this.requireCode(code)
-        const result = await this.connectorService.connectYouTubeAccount(userId, authCode)
-        res.json(result)
+        await this.connectorService.connectYouTubeAccount(userId, authCode)
+        this.redirectToAccounts(res)
     }
 
     async connectXAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -115,8 +116,8 @@ export class AccountsController {
             throw new BaseAppError('Missing X code verifier', ErrorCode.BAD_REQUEST, 400)
         }
 
-        const result = await this.connectorService.connectXAccount(userId, authCode, resolvedCodeVerifier)
-        res.json(result)
+        await this.connectorService.connectXAccount(userId, authCode, resolvedCodeVerifier)
+        this.redirectToAccounts(res)
     }
 
     async connectPinterestAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -127,8 +128,8 @@ export class AccountsController {
         const userId = statePayload.userId
 
         const authCode = this.requireCode(code)
-        const result = await this.connectorService.connectPinterestAccount(userId, authCode)
-        res.json(result)
+        await this.connectorService.connectPinterestAccount(userId, authCode)
+        this.redirectToAccounts(res)
     }
 
     async connectInstagramAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -139,8 +140,8 @@ export class AccountsController {
         const userId = statePayload.userId
 
         const authCode = this.requireCode(code)
-        const result = await this.connectorService.connectInstagramAccount(userId, authCode)
-        res.json(result)
+        await this.connectorService.connectInstagramAccount(userId, authCode)
+        this.redirectToAccounts(res)
     }
 
     async connectLinkedinAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -151,8 +152,8 @@ export class AccountsController {
         const userId = statePayload.userId
 
         const authCode = this.requireCode(code)
-        const result = await this.connectorService.connectLinkedinAccount(userId, authCode)
-        res.json(result)
+        await this.connectorService.connectLinkedinAccount(userId, authCode)
+        this.redirectToAccounts(res)
     }
 
     async connectBlueskyAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -257,5 +258,11 @@ export class AccountsController {
         }
 
         return code
+    }
+
+    private redirectToAccounts(res: Response) {
+        const frontendUrl = getEnvVar('FRONTEND_URL')
+        const redirectUrl = `${frontendUrl}/accounts`
+        res.redirect(redirectUrl)
     }
 }
