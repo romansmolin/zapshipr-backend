@@ -471,7 +471,7 @@ export class TikTokContentPublisherService implements ITikTokContentPublisherSer
                             brand_content_toggle: false,
                             brand_organic_toggle: false,
                             ...(post?.coverImageUrl && {
-                                video_cover_timestamp_ms: 1,
+                                video_cover_timestamp_ms: 0,
                             }),
                             ...(post?.coverTimestamp &&
                                 !post?.coverImageUrl && {
