@@ -12,3 +12,16 @@ export interface IPinterestBoardResponse {
         }
     }>
 }
+
+export interface TikTokCreatorInfoDto {
+    creatorId: string
+    nickname: string | null
+    canPostNow: boolean
+    privacyLevelOptions: string[]
+    maxVideoPostDurationSec: number
+    interactions: {
+        allowComment: boolean
+        allowDuet: boolean
+        allowStitch: boolean
+    }
+}

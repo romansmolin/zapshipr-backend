@@ -191,6 +191,14 @@ export class AccountsController {
         res.json(boards)
     }
 
+    async getTikTokCreatorInfo(req: Request, res: Response, next: NextFunction): Promise<void> {
+        const userId = this.getUserId(req)
+        const params = socialAccountIdParamSchema.parse(req.params)
+
+        const creatorInfo = await this.connectorService.getTikTokCreatorInfo(userId, params.socialAccountId)
+        res.json(creatorInfo)
+    }
+
     private getUserId(req: Request): string {
         const userId = req.user?.id
 

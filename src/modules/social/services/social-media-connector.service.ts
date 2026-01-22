@@ -1,4 +1,3 @@
-import { Account } from "@/modules/social/entity/account"
 import { SocilaMediaPlatform } from "@/modules/post/schemas/posts.schemas"
 import { IAccountRepository } from "@/modules/social/repositories/account-repository.interface"
 import { IAccountsService } from "@/modules/social/services/accounts.service.interface"
@@ -12,6 +11,7 @@ import { ITikTokConnectorService } from "@/modules/social/connectors/tiktok-conn
 import { IYouTubeConnectorService } from "@/modules/social/connectors/youtube-connector-service/youtube-connector-service.interface"
 import { IXConnectorService } from "@/modules/social/connectors/x-connector-service/x-connector-service.interface"
 import { SocialMediaConnectorFactory } from "@/modules/social/factories/social-media-connector.factory"
+import { TikTokCreatorInfoDto } from "@/modules/social/types/account.types"
 import { IApiClient } from "@/shared/http-client"
 import { ILogger } from "@/shared/logger/logger.interface"
 import { IMediaUploader } from "@/shared/media-uploader/media-uploader.interface"
@@ -79,5 +79,10 @@ export class SocilaMediaConnectorService implements ISocilaMediaConnectorService
     async connectLinkedinAccount(userId: string, code: string): Promise<{ success: boolean }> {
         const connector = this.connectorFactory.create(SocilaMediaPlatform.LINKEDIN) as ILinkedinConnectorService
         return connector.connectLinkedinAccount(userId, code)
+    }
+
+    async getTikTokCreatorInfo(userId: string, socialAccountId: string): Promise<TikTokCreatorInfoDto> {
+        const connector = this.connectorFactory.create(SocilaMediaPlatform.TIKTOK) as ITikTokConnectorService
+        return connector.getTikTokCreatorInfo(userId, socialAccountId)
     }
 }

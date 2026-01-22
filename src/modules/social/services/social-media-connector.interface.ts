@@ -1,3 +1,5 @@
+import { TikTokCreatorInfoDto } from '@/modules/social/types/account.types'
+
 export interface ISocilaMediaConnectorService {
     connectFacebookAccount(userId: string, code: string): Promise<{ success: boolean }>
     connectInstagramAccount(userId: string, code: string): Promise<{ success: boolean }>
@@ -8,4 +10,5 @@ export interface ISocilaMediaConnectorService {
     connectXAccount(userId: string, code: string, codeVerifier: string): Promise<{ success: boolean }>
     connectPinterestAccount(userId: string, code: string): Promise<{ success: boolean }>
     connectLinkedinAccount(userId: string, code: string): Promise<{ success: boolean }>
+    getTikTokCreatorInfo(userId: string, socialAccountId: string): Promise<TikTokCreatorInfoDto>
 }

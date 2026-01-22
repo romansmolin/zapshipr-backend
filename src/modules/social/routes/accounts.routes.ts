@@ -107,6 +107,10 @@ export const createAccountsRouter = (logger: ILogger, db: NodePgDatabase<typeof 
         '/accounts/:socialAccountId/pinterest-boards',
         asyncHandler(accountsController.getPinterestBoards.bind(accountsController))
     )
+    router.get(
+        '/accounts/:socialAccountId/tiktok/creator-info',
+        asyncHandler(accountsController.getTikTokCreatorInfo.bind(accountsController))
+    )
 
     return router
 }
