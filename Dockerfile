@@ -45,6 +45,8 @@ FROM node:20-alpine AS api
 
 WORKDIR /app
 
+RUN apk add --no-cache ffmpeg
+
 # Копируем production зависимости из base
 COPY --from=base /app/node_modules ./node_modules
 
