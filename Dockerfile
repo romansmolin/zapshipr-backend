@@ -75,6 +75,9 @@ FROM node:20-alpine AS worker
 
 WORKDIR /app
 
+# Install FFmpeg for video processing (cover images, duration detection)
+RUN apk add --no-cache ffmpeg
+
 # Копируем production зависимости из base
 COPY --from=base /app/node_modules ./node_modules
 

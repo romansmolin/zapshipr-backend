@@ -439,16 +439,23 @@ export class TikTokContentPublisherService implements ITikTokContentPublisherSer
                     mediaBuffer = Buffer.isBuffer(mediaResponse) ? mediaResponse : Buffer.from(mediaResponse)
                 }
 
-                if (maxAllowedVideoDurationSec) {
-                    const videoDurationSeconds = await this.getVideoDurationSeconds(mediaBuffer, userId, postId)
+                const MIN_TIKTOK_VIDEO_DURATION_SEC = 3
+                const videoDurationSeconds = await this.getVideoDurationSeconds(mediaBuffer, userId, postId)
 
-                    if (videoDurationSeconds > maxAllowedVideoDurationSec) {
-                        throw new BaseAppError(
-                            `TikTok video duration exceeds the allowed limit of ${maxAllowedVideoDurationSec} seconds. Please shorten your video and try again.`,
-                            ErrorCode.BAD_REQUEST,
-                            400
-                        )
-                    }
+                if (videoDurationSeconds < MIN_TIKTOK_VIDEO_DURATION_SEC) {
+                    throw new BaseAppError(
+                        `TikTok video must be at least ${MIN_TIKTOK_VIDEO_DURATION_SEC} seconds. Your video is ${videoDurationSeconds.toFixed(1)} seconds.`,
+                        ErrorCode.BAD_REQUEST,
+                        400
+                    )
+                }
+
+                if (maxAllowedVideoDurationSec && videoDurationSeconds > maxAllowedVideoDurationSec) {
+                    throw new BaseAppError(
+                        `TikTok video duration exceeds the allowed limit of ${maxAllowedVideoDurationSec} seconds. Please shorten your video and try again.`,
+                        ErrorCode.BAD_REQUEST,
+                        400
+                    )
                 }
 
                 const mediaSize = mediaBuffer.length
