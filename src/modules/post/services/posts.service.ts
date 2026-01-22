@@ -541,8 +541,8 @@ export class PostsService implements IPostsService {
             )
             const isDraft = createPostsRequest.postStatus === PostStatus.DRAFT
             const isScheduled = !isDraft && scheduledUtc && !createPostsRequest.postNow
-            const scheduledAtLocal = isScheduled ? createPostsRequest.scheduledAtLocal ?? null : null
-            const scheduledTimezone = isScheduled ? createPostsRequest.timezone ?? null : null
+            const scheduledAtLocal = isScheduled ? (createPostsRequest.scheduledAtLocal ?? null) : null
+            const scheduledTimezone = isScheduled ? (createPostsRequest.timezone ?? null) : null
 
             if (isScheduled && scheduledUtc) {
                 if (scheduledUtc.getTime() <= Date.now()) {
@@ -839,14 +839,18 @@ export class PostsService implements IPostsService {
                 updatePostRequest.scheduledAtLocal,
                 updatePostRequest.timezone
             )
-            const scheduledAtLocal = scheduledUtc ? updatePostRequest.scheduledAtLocal ?? null : null
-            const scheduledTimezone = scheduledUtc ? updatePostRequest.timezone ?? null : null
+            const scheduledAtLocal = scheduledUtc ? (updatePostRequest.scheduledAtLocal ?? null) : null
+            const scheduledTimezone = scheduledUtc ? (updatePostRequest.timezone ?? null) : null
             const shouldValidateScheduledTime =
                 updatePostRequest.postStatus !== PostStatus.DRAFT && !updatePostRequest.postNow
 
             if (shouldValidateScheduledTime && scheduledUtc) {
                 if (scheduledUtc.getTime() <= Date.now()) {
-                    throw new BaseAppError('Scheduled time must be in the future', ErrorCode.BAD_REQUEST, 400)
+                    throw new BaseAppError(
+                        'Scheduled time must be in the future',
+                        ErrorCode.PAST_TIME_IS_NOT_ALLOWED,
+                        400
+                    )
                 }
             }
 
@@ -902,9 +906,7 @@ export class PostsService implements IPostsService {
             await this.postRepository.updatePostTargets(postId, postTargets)
 
             const shouldSchedule =
-                updatePostRequest.postStatus !== PostStatus.DRAFT &&
-                !updatePostRequest.postNow &&
-                !!scheduledUtc
+                updatePostRequest.postStatus !== PostStatus.DRAFT && !updatePostRequest.postNow && !!scheduledUtc
 
             const oldPlatforms = oldPost.targets.map((target) => target.platform)
 
@@ -1249,12 +1251,7 @@ export class PostsService implements IPostsService {
                     targetCount: postDetails.targets.length,
                 })
             } else if (someTargetsDone && someTargetsFailed && postDetails.status !== PostStatus.PARTIALLY_DONE) {
-                await this.postRepository.updateBasePost(
-                    postId,
-                    userId,
-                    PostStatus.PARTIALLY_DONE,
-                    undefined
-                )
+                await this.postRepository.updateBasePost(postId, userId, PostStatus.PARTIALLY_DONE, undefined)
 
                 this.logger.info('Base post status updated to PARTIALLY_DONE', {
                     operation: 'checkAndUpdateBasePostStatus',
@@ -1265,12 +1262,7 @@ export class PostsService implements IPostsService {
                     failedCount: postDetails.targets.filter((t) => t.status === PostStatus.FAILED).length,
                 })
             } else if (postDetails.status === PostStatus.POSTING && someTargetsDone && someTargetsFailed) {
-                await this.postRepository.updateBasePost(
-                    postId,
-                    userId,
-                    PostStatus.PARTIALLY_DONE,
-                    undefined
-                )
+                await this.postRepository.updateBasePost(postId, userId, PostStatus.PARTIALLY_DONE, undefined)
 
                 this.logger.info('Base post status updated from POSTING to PARTIALLY_DONE', {
                     operation: 'checkAndUpdateBasePostStatus',
