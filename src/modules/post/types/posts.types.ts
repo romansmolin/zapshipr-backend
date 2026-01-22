@@ -40,7 +40,7 @@ export enum InstagramPostStatus {
 }
 
 export enum TikTokPrivacyLevel {
-    PUBLIC = 'PUBLIC',
+    PUBLIC_TO_EVERYONE = 'PUBLIC_TO_EVERYONE',
     FRIENDS = 'FRIENDS',
     PRIVATE = 'PRIVATE',
     SELF_ONLY = 'SELF_ONLY',
