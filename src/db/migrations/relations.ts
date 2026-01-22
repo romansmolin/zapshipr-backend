@@ -7,21 +7,10 @@ export const socialAccountsRelations = relations(socialAccounts, ({one, many}) =
 		references: [users.id],
 		relationName: "socialAccounts_userId_users_id"
 	}),
-	user_userId: one(users, {
-		fields: [socialAccounts.userId],
-		references: [users.id],
-		relationName: "socialAccounts_userId_users_id"
-	}),
-	pinterestBoards_socialAccountId: many(pinterestBoards, {
-		relationName: "pinterestBoards_socialAccountId_socialAccounts_id"
-	}),
 	pinterestBoards_socialAccountId: many(pinterestBoards, {
 		relationName: "pinterestBoards_socialAccountId_socialAccounts_id"
 	}),
 	tiktokPublishJobs: many(tiktokPublishJobs),
-	postTargets_socialAccountId: many(postTargets, {
-		relationName: "postTargets_socialAccountId_socialAccounts_id"
-	}),
 	postTargets_socialAccountId: many(postTargets, {
 		relationName: "postTargets_socialAccountId_socialAccounts_id"
 	}),
@@ -31,26 +20,14 @@ export const usersRelations = relations(users, ({many}) => ({
 	socialAccounts_userId: many(socialAccounts, {
 		relationName: "socialAccounts_userId_users_id"
 	}),
-	socialAccounts_userId: many(socialAccounts, {
-		relationName: "socialAccounts_userId_users_id"
-	}),
 	userPlans: many(userPlans),
 	passwordResetTokens: many(passwordResetTokens),
-	mediaAssets_userId: many(mediaAssets, {
-		relationName: "mediaAssets_userId_users_id"
-	}),
 	mediaAssets_userId: many(mediaAssets, {
 		relationName: "mediaAssets_userId_users_id"
 	}),
 	magicLinks: many(magicLinks),
 	posts_userId: many(posts, {
 		relationName: "posts_userId_users_id"
-	}),
-	posts_userId: many(posts, {
-		relationName: "posts_userId_users_id"
-	}),
-	pinterestBoards_userId: many(pinterestBoards, {
-		relationName: "pinterestBoards_userId_users_id"
 	}),
 	pinterestBoards_userId: many(pinterestBoards, {
 		relationName: "pinterestBoards_userId_users_id"
@@ -83,14 +60,6 @@ export const mediaAssetsRelations = relations(mediaAssets, ({one, many}) => ({
 		references: [users.id],
 		relationName: "mediaAssets_userId_users_id"
 	}),
-	user_userId: one(users, {
-		fields: [mediaAssets.userId],
-		references: [users.id],
-		relationName: "mediaAssets_userId_users_id"
-	}),
-	postMediaAssets_mediaAssetId: many(postMediaAssets, {
-		relationName: "postMediaAssets_mediaAssetId_mediaAssets_id"
-	}),
 	postMediaAssets_mediaAssetId: many(postMediaAssets, {
 		relationName: "postMediaAssets_mediaAssetId_mediaAssets_id"
 	}),
@@ -112,14 +81,6 @@ export const waitlistEntriesRelations = relations(waitlistEntries, ({one, many})
 	waitlistEntries_referredById: many(waitlistEntries, {
 		relationName: "waitlistEntries_referredById_waitlistEntries_id"
 	}),
-	waitlistEntry_referredById: one(waitlistEntries, {
-		fields: [waitlistEntries.referredById],
-		references: [waitlistEntries.id],
-		relationName: "waitlistEntries_referredById_waitlistEntries_id"
-	}),
-	waitlistEntries_referredById: many(waitlistEntries, {
-		relationName: "waitlistEntries_referredById_waitlistEntries_id"
-	}),
 }));
 
 export const postsRelations = relations(posts, ({one, many}) => ({
@@ -127,14 +88,6 @@ export const postsRelations = relations(posts, ({one, many}) => ({
 		fields: [posts.userId],
 		references: [users.id],
 		relationName: "posts_userId_users_id"
-	}),
-	user_userId: one(users, {
-		fields: [posts.userId],
-		references: [users.id],
-		relationName: "posts_userId_users_id"
-	}),
-	postMediaAssets_postId: many(postMediaAssets, {
-		relationName: "postMediaAssets_postId_posts_id"
 	}),
 	postMediaAssets_postId: many(postMediaAssets, {
 		relationName: "postMediaAssets_postId_posts_id"
@@ -152,16 +105,6 @@ export const pinterestBoardsRelations = relations(pinterestBoards, ({one}) => ({
 		fields: [pinterestBoards.userId],
 		references: [users.id],
 		relationName: "pinterestBoards_userId_users_id"
-	}),
-	user_userId: one(users, {
-		fields: [pinterestBoards.userId],
-		references: [users.id],
-		relationName: "pinterestBoards_userId_users_id"
-	}),
-	socialAccount_socialAccountId: one(socialAccounts, {
-		fields: [pinterestBoards.socialAccountId],
-		references: [socialAccounts.id],
-		relationName: "pinterestBoards_socialAccountId_socialAccounts_id"
 	}),
 }));
 
@@ -253,16 +196,6 @@ export const postMediaAssetsRelations = relations(postMediaAssets, ({one}) => ({
 		references: [mediaAssets.id],
 		relationName: "postMediaAssets_mediaAssetId_mediaAssets_id"
 	}),
-	post_postId: one(posts, {
-		fields: [postMediaAssets.postId],
-		references: [posts.id],
-		relationName: "postMediaAssets_postId_posts_id"
-	}),
-	mediaAsset_mediaAssetId: one(mediaAssets, {
-		fields: [postMediaAssets.mediaAssetId],
-		references: [mediaAssets.id],
-		relationName: "postMediaAssets_mediaAssetId_mediaAssets_id"
-	}),
 }));
 
 export const postTargetsRelations = relations(postTargets, ({one}) => ({
@@ -274,10 +207,5 @@ export const postTargetsRelations = relations(postTargets, ({one}) => ({
 	post: one(posts, {
 		fields: [postTargets.postId],
 		references: [posts.id]
-	}),
-	socialAccount_socialAccountId: one(socialAccounts, {
-		fields: [postTargets.socialAccountId],
-		references: [socialAccounts.id],
-		relationName: "postTargets_socialAccountId_socialAccounts_id"
 	}),
 }));
