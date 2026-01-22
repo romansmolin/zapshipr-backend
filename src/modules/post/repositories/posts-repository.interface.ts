@@ -17,7 +17,8 @@ export interface IPostsRepository {
         workspaceId: string,
         status: PostStatus,
         postType: PostType,
-        scheduledTime: Date | null,
+        scheduledAtLocal?: string | null,
+        scheduledTimezone?: string | null,
         mainCaption?: string | null,
         coverTimestamp?: number | null,
         coverImageUrl?: string | null
@@ -27,8 +28,9 @@ export interface IPostsRepository {
         postId: string,
         userId: string,
         status: PostStatus,
-        scheduledTime: Date | null,
-        mainCaption?: string | null
+        mainCaption?: string | null,
+        scheduledAtLocal?: string | null,
+        scheduledTimezone?: string | null
     ): Promise<void>
 
     savePostMediaAssets(data: { userId: string; url: string; type: string }): Promise<{ mediaId: string }>

@@ -88,6 +88,7 @@ export async function initializeWorkers(
         llmExtraction,
         youtubeProcessor
     )
+
     inspirationWorker.start()
 
     return {

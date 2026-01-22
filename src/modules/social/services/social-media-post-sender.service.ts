@@ -73,7 +73,7 @@ export class SocialMediaPostSenderService implements ISocialMediaPostSenderServi
             }
 
             if (post.status !== PostStatus.POSTING) {
-                await this.postRepository.updateBasePost(postId, userId, PostStatus.POSTING, new Date(), undefined)
+                await this.postRepository.updateBasePost(postId, userId, PostStatus.POSTING, undefined)
             }
 
             await this.socialMediaPublisherFactory.publish(platform, targetForPlatform, userId, postId, {
@@ -120,7 +120,7 @@ export class SocialMediaPostSenderService implements ISocialMediaPostSenderServi
                 targetCount: post.targets.length,
             })
 
-            await this.postRepository.updateBasePost(postId, userId, PostStatus.POSTING, new Date(), undefined)
+            await this.postRepository.updateBasePost(postId, userId, PostStatus.POSTING, undefined)
 
             const results = await Promise.allSettled(
                 post.targets.map((target) =>
@@ -136,7 +136,7 @@ export class SocialMediaPostSenderService implements ISocialMediaPostSenderServi
             )
 
             if (failures.length === results.length) {
-                await this.postRepository.updateBasePost(postId, userId, PostStatus.FAILED, new Date(), undefined)
+                await this.postRepository.updateBasePost(postId, userId, PostStatus.FAILED, undefined)
 
                 this.logger.error('All platforms failed for post', {
                     operation: 'sendPostToAllPlatforms',
@@ -152,13 +152,12 @@ export class SocialMediaPostSenderService implements ISocialMediaPostSenderServi
                     500
                 )
             } else if (successes.length === results.length) {
-                await this.postRepository.updateBasePost(postId, userId, PostStatus.DONE, new Date(), undefined)
+                await this.postRepository.updateBasePost(postId, userId, PostStatus.DONE, undefined)
             } else if (successes.length !== results.length && failures.length !== results.length) {
                 await this.postRepository.updateBasePost(
                     postId,
                     userId,
                     PostStatus.PARTIALLY_DONE,
-                    new Date(),
                     undefined
                 )
             }

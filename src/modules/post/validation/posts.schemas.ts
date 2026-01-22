@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 import { SocilaMediaPlatform } from '@/modules/post/schemas/posts.schemas'
 import { PostStatus, TikTokPrivacyLevel } from '@/modules/post/types/posts.types'
-import { isValidTimeZone, parseDateWithTimeZone } from '@/shared/utils/timezone'
+import { hasTimeZoneInfo, isValidTimeZone, parseDateWithTimeZone } from '@/shared/utils/timezone'
 
 const timezoneSchema = z
     .string()
@@ -41,6 +41,15 @@ export const createPostsSchema = z.object({
                 code: z.ZodIssueCode.custom,
                 message: 'Timezone is required when scheduledAtLocal is provided',
                 path: ['timezone'],
+            })
+            return
+        }
+
+        if (hasTimeZoneInfo(value.scheduledAtLocal)) {
+            ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: 'scheduledAtLocal must not include timezone information',
+                path: ['scheduledAtLocal'],
             })
             return
         }

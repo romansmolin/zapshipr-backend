@@ -55,6 +55,7 @@
     },
     "dependencies": {
         "@aws-sdk/client-s3": "^3.952.0",
+        "@bull-board/express": "^6.16.2",
         "@types/bcryptjs": "^2.4.6",
         "@types/jsonwebtoken": "^9.0.10",
         "axios": "^1.13.2",
@@ -75,7 +76,7 @@
         "jsonwebtoken": "^9.0.3",
         "mammoth": "^1.11.0",
         "multer": "^1.4.5-lts.1",
-        "nodemailer": "^6.9.13",
+        "nodemailer": "^7.0.12",
         "openai": "^6.15.0",
         "pdf-parse": "^2.4.5",
         "pg": "^8.16.3",

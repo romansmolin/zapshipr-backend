@@ -535,15 +535,17 @@ export class PostsService implements IPostsService {
                 return mediaCompatibilityError
             }
 
-            const scheduledTime = this.resolveScheduledTime(
+            const scheduledUtc = this.resolveScheduledTime(
                 createPostsRequest.scheduledAtLocal,
                 createPostsRequest.timezone
             )
             const isDraft = createPostsRequest.postStatus === PostStatus.DRAFT
-            const isScheduled = !isDraft && scheduledTime && !createPostsRequest.postNow
+            const isScheduled = !isDraft && scheduledUtc && !createPostsRequest.postNow
+            const scheduledAtLocal = isScheduled ? createPostsRequest.scheduledAtLocal ?? null : null
+            const scheduledTimezone = isScheduled ? createPostsRequest.timezone ?? null : null
 
-            if (isScheduled && scheduledTime) {
-                if (scheduledTime.getTime() <= Date.now()) {
+            if (isScheduled && scheduledUtc) {
+                if (scheduledUtc.getTime() <= Date.now()) {
                     throw new BaseAppError('Scheduled time must be in the future', ErrorCode.BAD_REQUEST, 400)
                 }
             }
@@ -568,7 +570,8 @@ export class PostsService implements IPostsService {
                 userId, // workspaceId - temporarily use userId
                 initialStatus,
                 createPostsRequest.postType,
-                scheduledTime ?? null,
+                scheduledAtLocal,
+                scheduledTimezone,
                 createPostsRequest.mainCaption ?? null,
                 createPostsRequest.coverTimestamp ?? null,
                 coverImageUrl
@@ -592,9 +595,9 @@ export class PostsService implements IPostsService {
 
             await this.postRepository.createPostTargets(postTargets)
 
-            if (isScheduled && scheduledTime) {
+            if (isScheduled && scheduledUtc) {
                 try {
-                    await this.schedulePostTargets(postId, userId, scheduledTime, postTargets)
+                    await this.schedulePostTargets(postId, userId, scheduledUtc, postTargets)
                 } catch (error) {
                     await this.cleanupScheduledJobs(
                         postId,
@@ -606,7 +609,6 @@ export class PostsService implements IPostsService {
                         postId,
                         userId,
                         PostStatus.FAILED,
-                        scheduledTime,
                         createPostsRequest.mainCaption ?? null
                     )
 
@@ -727,7 +729,6 @@ export class PostsService implements IPostsService {
                         postId,
                         userId,
                         PostStatus.FAILED,
-                        scheduledTime || new Date(),
                         createPostsRequest.mainCaption ?? null
                     )
 
@@ -746,7 +747,6 @@ export class PostsService implements IPostsService {
                         postId,
                         userId,
                         PostStatus.DONE,
-                        scheduledTime || new Date(),
                         createPostsRequest.mainCaption ?? null
                     )
 
@@ -762,7 +762,6 @@ export class PostsService implements IPostsService {
                         postId,
                         userId,
                         PostStatus.PARTIALLY_DONE,
-                        scheduledTime || new Date(),
                         createPostsRequest.mainCaption ?? null
                     )
 
@@ -836,15 +835,17 @@ export class PostsService implements IPostsService {
                 )
             }
 
-            const scheduledTime = this.resolveScheduledTime(
+            const scheduledUtc = this.resolveScheduledTime(
                 updatePostRequest.scheduledAtLocal,
                 updatePostRequest.timezone
             )
+            const scheduledAtLocal = scheduledUtc ? updatePostRequest.scheduledAtLocal ?? null : null
+            const scheduledTimezone = scheduledUtc ? updatePostRequest.timezone ?? null : null
             const shouldValidateScheduledTime =
                 updatePostRequest.postStatus !== PostStatus.DRAFT && !updatePostRequest.postNow
 
-            if (shouldValidateScheduledTime && scheduledTime) {
-                if (scheduledTime.getTime() <= Date.now()) {
+            if (shouldValidateScheduledTime && scheduledUtc) {
+                if (scheduledUtc.getTime() <= Date.now()) {
                     throw new BaseAppError('Scheduled time must be in the future', ErrorCode.BAD_REQUEST, 400)
                 }
             }
@@ -853,8 +854,9 @@ export class PostsService implements IPostsService {
                 postId,
                 userId,
                 updatePostRequest.postStatus as PostStatus,
-                scheduledTime ?? null,
-                updatePostRequest.mainCaption ?? null
+                updatePostRequest.mainCaption ?? null,
+                scheduledAtLocal,
+                scheduledTimezone
             )
 
             if (updatePostRequest.postType === 'media') {
@@ -902,13 +904,13 @@ export class PostsService implements IPostsService {
             const shouldSchedule =
                 updatePostRequest.postStatus !== PostStatus.DRAFT &&
                 !updatePostRequest.postNow &&
-                !!scheduledTime
+                !!scheduledUtc
 
             const oldPlatforms = oldPost.targets.map((target) => target.platform)
 
-            if (shouldSchedule && scheduledTime) {
+            if (shouldSchedule && scheduledUtc) {
                 await this.cleanupScheduledJobs(postId, oldPlatforms, true)
-                await this.schedulePostTargets(postId, userId, scheduledTime, postTargets)
+                await this.schedulePostTargets(postId, userId, scheduledUtc, postTargets)
             } else {
                 await this.cleanupScheduledJobs(postId, oldPlatforms, false)
             }
@@ -1238,7 +1240,7 @@ export class PostsService implements IPostsService {
             const allTargetsFailed = postDetails.targets.every((target) => target.status === PostStatus.FAILED)
 
             if (allTargetsDone && postDetails.status !== PostStatus.DONE) {
-                await this.postRepository.updateBasePost(postId, userId, PostStatus.DONE, new Date(), undefined)
+                await this.postRepository.updateBasePost(postId, userId, PostStatus.DONE, undefined)
 
                 this.logger.info('Base post status updated to DONE', {
                     operation: 'checkAndUpdateBasePostStatus',
@@ -1251,7 +1253,6 @@ export class PostsService implements IPostsService {
                     postId,
                     userId,
                     PostStatus.PARTIALLY_DONE,
-                    new Date(),
                     undefined
                 )
 
@@ -1268,7 +1269,6 @@ export class PostsService implements IPostsService {
                     postId,
                     userId,
                     PostStatus.PARTIALLY_DONE,
-                    new Date(),
                     undefined
                 )
 
@@ -1281,7 +1281,7 @@ export class PostsService implements IPostsService {
                     failedCount: postDetails.targets.filter((t) => t.status === PostStatus.FAILED).length,
                 })
             } else if (allTargetsFailed && postDetails.status !== PostStatus.FAILED) {
-                await this.postRepository.updateBasePost(postId, userId, PostStatus.FAILED, new Date(), undefined)
+                await this.postRepository.updateBasePost(postId, userId, PostStatus.FAILED, undefined)
 
                 this.logger.info('Base post status updated to FAILED', {
                     operation: 'checkAndUpdateBasePostStatus',

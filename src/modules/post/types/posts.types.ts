@@ -99,7 +99,8 @@ export interface CreatePostResponse {
     postId: string
     type: PostType
     status: PostStatus
-    scheduledTime: Date | null
+    scheduledAtLocal?: string | null
+    timezone?: string | null
     createdAt: Date
     mainCaption?: string | null
     coverTimestamp?: number | null
@@ -124,7 +125,8 @@ export interface PostListItem {
     postId: string
     type: PostType
     status: PostStatus
-    scheduledTime: Date | null
+    scheduledAtLocal?: string | null
+    timezone?: string | null
     createdAt: Date
     mainCaption?: string | null
     coverTimestamp?: number | null

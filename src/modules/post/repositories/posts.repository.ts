@@ -39,7 +39,8 @@ export class PostsRepository implements IPostsRepository {
         workspaceId: string,
         status: PostStatus,
         postType: PostType,
-        scheduledTime: Date | null,
+        scheduledAtLocal?: string | null,
+        scheduledTimezone?: string | null,
         mainCaption?: string | null,
         coverTimestamp?: number | null,
         coverImageUrl?: string | null
@@ -52,7 +53,8 @@ export class PostsRepository implements IPostsRepository {
                 workspaceId,
                 status,
                 type: postType,
-                scheduledTime,
+                scheduledAtLocal: scheduledAtLocal ?? null,
+                scheduledTimezone: scheduledTimezone ?? null,
                 mainCaption: mainCaption ?? null,
                 coverTimestamp: coverTimestamp ?? null,
                 coverImageUrl: coverImageUrl ?? null,
@@ -165,7 +167,8 @@ export class PostsRepository implements IPostsRepository {
                 postId: post.id,
                 type,
                 status: post.status as PostStatus,
-                scheduledTime: post.scheduledTime,
+                scheduledAtLocal: post.scheduledAtLocal ?? null,
+                timezone: post.scheduledTimezone ?? null,
                 createdAt: post.createdAt,
                 mainCaption: post.mainCaption ?? null,
                 coverTimestamp: post.coverTimestamp ?? null,
@@ -253,7 +256,7 @@ export class PostsRepository implements IPostsRepository {
                 .select()
                 .from(posts)
                 .where(whereClause)
-                .orderBy(desc(posts.scheduledTime), desc(posts.createdAt))
+                .orderBy(desc(posts.scheduledAtLocal), desc(posts.createdAt))
                 .limit(limit)
                 .offset(offset)
 
@@ -299,7 +302,8 @@ export class PostsRepository implements IPostsRepository {
                     postId: row.id,
                     type,
                     status: row.status as PostStatus,
-                    scheduledTime: row.scheduledTime,
+                    scheduledAtLocal: row.scheduledAtLocal ?? null,
+                    timezone: row.scheduledTimezone ?? null,
                     createdAt: row.createdAt,
                     mainCaption: row.mainCaption ?? null,
                     coverTimestamp: row.coverTimestamp ?? null,
@@ -336,23 +340,32 @@ export class PostsRepository implements IPostsRepository {
         postId: string,
         userId: string,
         status: PostStatus,
-        scheduledTime: Date | null,
-        mainCaption?: string | null
+        mainCaption?: string | null,
+        scheduledAtLocal?: string | null,
+        scheduledTimezone?: string | null
     ): Promise<void> {
         try {
             const updateData: {
                 status: PostStatus
-                scheduledTime: Date | null
                 updatedAt: Date
                 mainCaption?: string | null
+                scheduledAtLocal?: string | null
+                scheduledTimezone?: string | null
             } = {
                 status,
-                scheduledTime,
                 updatedAt: new Date(),
             }
 
             if (typeof mainCaption !== 'undefined') {
                 updateData.mainCaption = mainCaption
+            }
+
+            if (typeof scheduledAtLocal !== 'undefined') {
+                updateData.scheduledAtLocal = scheduledAtLocal
+            }
+
+            if (typeof scheduledTimezone !== 'undefined') {
+                updateData.scheduledTimezone = scheduledTimezone
             }
 
             await this.db
@@ -656,7 +669,8 @@ export class PostsRepository implements IPostsRepository {
                     postId: row.id,
                     type,
                     status: row.status as PostStatus,
-                    scheduledTime: row.scheduledTime,
+                    scheduledAtLocal: row.scheduledAtLocal ?? null,
+                    timezone: row.scheduledTimezone ?? null,
                     createdAt: row.createdAt,
                     mainCaption: row.mainCaption ?? null,
                     coverTimestamp: row.coverTimestamp ?? null,

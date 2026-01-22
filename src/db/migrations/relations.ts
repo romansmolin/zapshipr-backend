@@ -1,134 +1,283 @@
 import { relations } from "drizzle-orm/relations";
-import { tenants, socialAccounts, userPlans, passwordResetTokens, mediaAssets, posts, magicLinks, waitlistEntries, pinterestBoards, tiktokPublishJobs, userPlanUsage, tenantSettings, postMediaAssets, postTargets } from "./schema";
+import { users, socialAccounts, userPlans, passwordResetTokens, mediaAssets, magicLinks, waitlistEntries, posts, pinterestBoards, tiktokPublishJobs, userPlanUsage, tenantSettings, rawInspirations, transcripts, workspaces, workspaceTags, inspirationsExtractions, postMediaAssets, postTargets } from "./schema";
 
 export const socialAccountsRelations = relations(socialAccounts, ({one, many}) => ({
-	tenant: one(tenants, {
-		fields: [socialAccounts.tenantId],
-		references: [tenants.id]
+	user_userId: one(users, {
+		fields: [socialAccounts.userId],
+		references: [users.id],
+		relationName: "socialAccounts_userId_users_id"
 	}),
-	pinterestBoards: many(pinterestBoards),
+	user_userId: one(users, {
+		fields: [socialAccounts.userId],
+		references: [users.id],
+		relationName: "socialAccounts_userId_users_id"
+	}),
+	pinterestBoards_socialAccountId: many(pinterestBoards, {
+		relationName: "pinterestBoards_socialAccountId_socialAccounts_id"
+	}),
+	pinterestBoards_socialAccountId: many(pinterestBoards, {
+		relationName: "pinterestBoards_socialAccountId_socialAccounts_id"
+	}),
 	tiktokPublishJobs: many(tiktokPublishJobs),
-	postTargets: many(postTargets),
+	postTargets_socialAccountId: many(postTargets, {
+		relationName: "postTargets_socialAccountId_socialAccounts_id"
+	}),
+	postTargets_socialAccountId: many(postTargets, {
+		relationName: "postTargets_socialAccountId_socialAccounts_id"
+	}),
 }));
 
-export const tenantsRelations = relations(tenants, ({many}) => ({
-	socialAccounts: many(socialAccounts),
+export const usersRelations = relations(users, ({many}) => ({
+	socialAccounts_userId: many(socialAccounts, {
+		relationName: "socialAccounts_userId_users_id"
+	}),
+	socialAccounts_userId: many(socialAccounts, {
+		relationName: "socialAccounts_userId_users_id"
+	}),
 	userPlans: many(userPlans),
 	passwordResetTokens: many(passwordResetTokens),
-	mediaAssets: many(mediaAssets),
-	posts: many(posts),
+	mediaAssets_userId: many(mediaAssets, {
+		relationName: "mediaAssets_userId_users_id"
+	}),
+	mediaAssets_userId: many(mediaAssets, {
+		relationName: "mediaAssets_userId_users_id"
+	}),
 	magicLinks: many(magicLinks),
-	pinterestBoards: many(pinterestBoards),
+	posts_userId: many(posts, {
+		relationName: "posts_userId_users_id"
+	}),
+	posts_userId: many(posts, {
+		relationName: "posts_userId_users_id"
+	}),
+	pinterestBoards_userId: many(pinterestBoards, {
+		relationName: "pinterestBoards_userId_users_id"
+	}),
+	pinterestBoards_userId: many(pinterestBoards, {
+		relationName: "pinterestBoards_userId_users_id"
+	}),
 	tiktokPublishJobs: many(tiktokPublishJobs),
 	userPlanUsages: many(userPlanUsage),
 	tenantSettings: many(tenantSettings),
+	workspaces: many(workspaces),
+	rawInspirations: many(rawInspirations),
 }));
 
 export const userPlansRelations = relations(userPlans, ({one, many}) => ({
-	tenant: one(tenants, {
-		fields: [userPlans.tenantId],
-		references: [tenants.id]
+	user: one(users, {
+		fields: [userPlans.userId],
+		references: [users.id]
 	}),
 	userPlanUsages: many(userPlanUsage),
 }));
 
 export const passwordResetTokensRelations = relations(passwordResetTokens, ({one}) => ({
-	tenant: one(tenants, {
-		fields: [passwordResetTokens.tenantId],
-		references: [tenants.id]
+	user: one(users, {
+		fields: [passwordResetTokens.userId],
+		references: [users.id]
 	}),
 }));
 
 export const mediaAssetsRelations = relations(mediaAssets, ({one, many}) => ({
-	tenant: one(tenants, {
-		fields: [mediaAssets.tenantId],
-		references: [tenants.id]
+	user_userId: one(users, {
+		fields: [mediaAssets.userId],
+		references: [users.id],
+		relationName: "mediaAssets_userId_users_id"
 	}),
-	postMediaAssets: many(postMediaAssets),
-}));
-
-export const postsRelations = relations(posts, ({one, many}) => ({
-	tenant: one(tenants, {
-		fields: [posts.tenantId],
-		references: [tenants.id]
+	user_userId: one(users, {
+		fields: [mediaAssets.userId],
+		references: [users.id],
+		relationName: "mediaAssets_userId_users_id"
 	}),
-	postMediaAssets: many(postMediaAssets),
+	postMediaAssets_mediaAssetId: many(postMediaAssets, {
+		relationName: "postMediaAssets_mediaAssetId_mediaAssets_id"
+	}),
+	postMediaAssets_mediaAssetId: many(postMediaAssets, {
+		relationName: "postMediaAssets_mediaAssetId_mediaAssets_id"
+	}),
 }));
 
 export const magicLinksRelations = relations(magicLinks, ({one}) => ({
-	tenant: one(tenants, {
+	user: one(users, {
 		fields: [magicLinks.redeemedByUserId],
-		references: [tenants.id]
+		references: [users.id]
 	}),
 }));
 
 export const waitlistEntriesRelations = relations(waitlistEntries, ({one, many}) => ({
-	waitlistEntry: one(waitlistEntries, {
+	waitlistEntry_referredById: one(waitlistEntries, {
 		fields: [waitlistEntries.referredById],
 		references: [waitlistEntries.id],
 		relationName: "waitlistEntries_referredById_waitlistEntries_id"
 	}),
-	waitlistEntries: many(waitlistEntries, {
+	waitlistEntries_referredById: many(waitlistEntries, {
+		relationName: "waitlistEntries_referredById_waitlistEntries_id"
+	}),
+	waitlistEntry_referredById: one(waitlistEntries, {
+		fields: [waitlistEntries.referredById],
+		references: [waitlistEntries.id],
+		relationName: "waitlistEntries_referredById_waitlistEntries_id"
+	}),
+	waitlistEntries_referredById: many(waitlistEntries, {
 		relationName: "waitlistEntries_referredById_waitlistEntries_id"
 	}),
 }));
 
+export const postsRelations = relations(posts, ({one, many}) => ({
+	user_userId: one(users, {
+		fields: [posts.userId],
+		references: [users.id],
+		relationName: "posts_userId_users_id"
+	}),
+	user_userId: one(users, {
+		fields: [posts.userId],
+		references: [users.id],
+		relationName: "posts_userId_users_id"
+	}),
+	postMediaAssets_postId: many(postMediaAssets, {
+		relationName: "postMediaAssets_postId_posts_id"
+	}),
+	postMediaAssets_postId: many(postMediaAssets, {
+		relationName: "postMediaAssets_postId_posts_id"
+	}),
+	postTargets: many(postTargets),
+}));
 
 export const pinterestBoardsRelations = relations(pinterestBoards, ({one}) => ({
-	tenant: one(tenants, {
-		fields: [pinterestBoards.tenantId],
-		references: [tenants.id]
-	}),
-	socialAccount: one(socialAccounts, {
+	socialAccount_socialAccountId: one(socialAccounts, {
 		fields: [pinterestBoards.socialAccountId],
-		references: [socialAccounts.id]
+		references: [socialAccounts.id],
+		relationName: "pinterestBoards_socialAccountId_socialAccounts_id"
+	}),
+	user_userId: one(users, {
+		fields: [pinterestBoards.userId],
+		references: [users.id],
+		relationName: "pinterestBoards_userId_users_id"
+	}),
+	user_userId: one(users, {
+		fields: [pinterestBoards.userId],
+		references: [users.id],
+		relationName: "pinterestBoards_userId_users_id"
+	}),
+	socialAccount_socialAccountId: one(socialAccounts, {
+		fields: [pinterestBoards.socialAccountId],
+		references: [socialAccounts.id],
+		relationName: "pinterestBoards_socialAccountId_socialAccounts_id"
 	}),
 }));
 
-
 export const tiktokPublishJobsRelations = relations(tiktokPublishJobs, ({one}) => ({
-	tenant: one(tenants, {
-		fields: [tiktokPublishJobs.tenantId],
-		references: [tenants.id]
-	}),
 	socialAccount: one(socialAccounts, {
 		fields: [tiktokPublishJobs.socialAccountId],
 		references: [socialAccounts.id]
 	}),
+	user: one(users, {
+		fields: [tiktokPublishJobs.userId],
+		references: [users.id]
+	}),
 }));
 
 export const userPlanUsageRelations = relations(userPlanUsage, ({one}) => ({
-	tenant: one(tenants, {
-		fields: [userPlanUsage.tenantId],
-		references: [tenants.id]
-	}),
 	userPlan: one(userPlans, {
 		fields: [userPlanUsage.planId],
 		references: [userPlans.id]
 	}),
+	user: one(users, {
+		fields: [userPlanUsage.userId],
+		references: [users.id]
+	}),
 }));
 
 export const tenantSettingsRelations = relations(tenantSettings, ({one}) => ({
-	tenant: one(tenants, {
-		fields: [tenantSettings.tenantId],
-		references: [tenants.id]
+	user: one(users, {
+		fields: [tenantSettings.userId],
+		references: [users.id]
+	}),
+}));
+
+export const transcriptsRelations = relations(transcripts, ({one}) => ({
+	rawInspiration: one(rawInspirations, {
+		fields: [transcripts.inspirationId],
+		references: [rawInspirations.id]
+	}),
+}));
+
+export const rawInspirationsRelations = relations(rawInspirations, ({one, many}) => ({
+	transcripts: many(transcripts),
+	user: one(users, {
+		fields: [rawInspirations.userId],
+		references: [users.id]
+	}),
+	workspace: one(workspaces, {
+		fields: [rawInspirations.workspaceId],
+		references: [workspaces.id]
+	}),
+	inspirationsExtractions: many(inspirationsExtractions),
+}));
+
+export const workspaceTagsRelations = relations(workspaceTags, ({one}) => ({
+	workspace: one(workspaces, {
+		fields: [workspaceTags.workspaceId],
+		references: [workspaces.id]
+	}),
+}));
+
+export const workspacesRelations = relations(workspaces, ({one, many}) => ({
+	workspaceTags: many(workspaceTags),
+	user: one(users, {
+		fields: [workspaces.userId],
+		references: [users.id]
+	}),
+	rawInspirations: many(rawInspirations),
+	inspirationsExtractions: many(inspirationsExtractions),
+}));
+
+export const inspirationsExtractionsRelations = relations(inspirationsExtractions, ({one}) => ({
+	rawInspiration: one(rawInspirations, {
+		fields: [inspirationsExtractions.rawInspirationId],
+		references: [rawInspirations.id]
+	}),
+	workspace: one(workspaces, {
+		fields: [inspirationsExtractions.workspaceId],
+		references: [workspaces.id]
 	}),
 }));
 
 export const postMediaAssetsRelations = relations(postMediaAssets, ({one}) => ({
-	post: one(posts, {
+	post_postId: one(posts, {
 		fields: [postMediaAssets.postId],
-		references: [posts.id]
+		references: [posts.id],
+		relationName: "postMediaAssets_postId_posts_id"
 	}),
-	mediaAsset: one(mediaAssets, {
+	mediaAsset_mediaAssetId: one(mediaAssets, {
 		fields: [postMediaAssets.mediaAssetId],
-		references: [mediaAssets.id]
+		references: [mediaAssets.id],
+		relationName: "postMediaAssets_mediaAssetId_mediaAssets_id"
+	}),
+	post_postId: one(posts, {
+		fields: [postMediaAssets.postId],
+		references: [posts.id],
+		relationName: "postMediaAssets_postId_posts_id"
+	}),
+	mediaAsset_mediaAssetId: one(mediaAssets, {
+		fields: [postMediaAssets.mediaAssetId],
+		references: [mediaAssets.id],
+		relationName: "postMediaAssets_mediaAssetId_mediaAssets_id"
 	}),
 }));
 
 export const postTargetsRelations = relations(postTargets, ({one}) => ({
-	socialAccount: one(socialAccounts, {
+	socialAccount_socialAccountId: one(socialAccounts, {
 		fields: [postTargets.socialAccountId],
-		references: [socialAccounts.id]
+		references: [socialAccounts.id],
+		relationName: "postTargets_socialAccountId_socialAccounts_id"
+	}),
+	post: one(posts, {
+		fields: [postTargets.postId],
+		references: [posts.id]
+	}),
+	socialAccount_socialAccountId: one(socialAccounts, {
+		fields: [postTargets.socialAccountId],
+		references: [socialAccounts.id],
+		relationName: "postTargets_socialAccountId_socialAccounts_id"
 	}),
 }));

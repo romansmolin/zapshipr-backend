@@ -29,6 +29,14 @@ const parseDateParts = (value: string): DateParts | null => {
 }
 
 const getTimeZoneOffsetMs = (timeZone: string, date: Date): number => {
+    const values = formatDateParts(timeZone, date)
+
+    const asUtc = Date.UTC(values.year, values.month - 1, values.day, values.hour, values.minute, values.second)
+
+    return asUtc - date.getTime()
+}
+
+const formatDateParts = (timeZone: string, date: Date): DateParts => {
     const formatter = new Intl.DateTimeFormat('en-US', {
         timeZone,
         hour12: false,
@@ -48,16 +56,27 @@ const getTimeZoneOffsetMs = (timeZone: string, date: Date): number => {
         }
     }
 
-    const asUtc = Date.UTC(
-        Number(values.year),
-        Number(values.month) - 1,
-        Number(values.day),
-        Number(values.hour),
-        Number(values.minute),
-        Number(values.second)
-    )
+    return {
+        year: Number(values.year),
+        month: Number(values.month),
+        day: Number(values.day),
+        hour: Number(values.hour),
+        minute: Number(values.minute),
+        second: Number(values.second),
+        millisecond: date.getUTCMilliseconds(),
+    }
+}
 
-    return asUtc - date.getTime()
+const partsMatch = (expected: DateParts, actual: DateParts): boolean => {
+    return (
+        expected.year === actual.year &&
+        expected.month === actual.month &&
+        expected.day === actual.day &&
+        expected.hour === actual.hour &&
+        expected.minute === actual.minute &&
+        expected.second === actual.second &&
+        expected.millisecond === actual.millisecond
+    )
 }
 
 export const isValidTimeZone = (timeZone: string): boolean => {
@@ -88,6 +107,18 @@ export const parseDateWithTimeZone = (value: string, timeZone: string): Date | n
     )
 
     const guessDate = new Date(utcGuess)
-    const offsetMs = getTimeZoneOffsetMs(timeZone, guessDate)
-    return new Date(utcGuess - offsetMs)
+    const initialOffset = getTimeZoneOffsetMs(timeZone, guessDate)
+    let candidate = new Date(utcGuess - initialOffset)
+
+    const adjustedOffset = getTimeZoneOffsetMs(timeZone, candidate)
+    if (adjustedOffset !== initialOffset) {
+        candidate = new Date(utcGuess - adjustedOffset)
+    }
+
+    const candidateParts = formatDateParts(timeZone, candidate)
+    if (!partsMatch(parts, candidateParts)) {
+        return null
+    }
+
+    return candidate
 }
