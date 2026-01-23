@@ -30,9 +30,14 @@ export const updateMainPromptSchema = z.object({
     additionalContext: z.string().optional(),
 })
 
+export const workspaceIdParamSchema = z.object({
+    workspaceId: z.string().uuid('Invalid workspace ID format'),
+})
+
 export type CreateWorkspaceInput = z.infer<typeof createWorkspaceSchema>
 export type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceSchema>
 export type MainPrompt = z.infer<typeof mainPromptSchema>
 export type UpdateMainPrompt = z.infer<typeof updateMainPromptSchema>
+export type WorkspaceIdParam = z.infer<typeof workspaceIdParamSchema>
 
 

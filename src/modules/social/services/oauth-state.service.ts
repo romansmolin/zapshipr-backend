@@ -5,6 +5,7 @@ export interface OAuthStatePayload {
     userId: string
     platform?: string
     codeVerifier?: string
+    workspaceId?: string
 }
 
 export interface IOAuthStateService {
@@ -42,6 +43,7 @@ export class OAuthStateService implements IOAuthStateService {
                     userId: payload.userId,
                     platform: typeof payload.platform === 'string' ? payload.platform : undefined,
                     codeVerifier: typeof payload.codeVerifier === 'string' ? payload.codeVerifier : undefined,
+                    workspaceId: typeof payload.workspaceId === 'string' ? payload.workspaceId : undefined,
                 }
             } catch {
                 return null

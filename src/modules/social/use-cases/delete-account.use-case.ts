@@ -11,6 +11,7 @@ import type { IPostsService } from '@/modules/post/services/posts-service.interf
 
 export interface DeleteAccountInput {
     userId: string
+    workspaceId: string
     accountId: string
 }
 
@@ -39,7 +40,7 @@ export class DeleteAccountUseCase {
         this.postsService = postsService
     }
 
-    async execute({ userId, accountId }: DeleteAccountInput): Promise<DeleteAccountResult> {
+    async execute({ userId, workspaceId, accountId }: DeleteAccountInput): Promise<DeleteAccountResult> {
         try {
             const account = await this.repo.getAccountById(userId, accountId)
 
@@ -47,6 +48,7 @@ export class DeleteAccountUseCase {
                 this.logger.warn('Account not found for deletion', {
                     operation: 'DeleteAccountUseCase.execute',
                     userId,
+                    workspaceId,
                     accountId,
                 })
                 return { success: false }

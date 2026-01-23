@@ -42,7 +42,7 @@ export class FacebookConnectorService implements IFacebookConnectorService {
         this.backendUrl = getEnvVar("BACKEND_URL")
     }
 
-    async connectFacebookAccount(userId: string, code: string): Promise<{ success: boolean }> {
+    async connectFacebookAccount(userId: string, code: string, workspaceId: string): Promise<{ success: boolean }> {
         try {
             const accessTokenResponse = await this.httpClient.get<{ access_token: string }>(
                 "https://graph.facebook.com/v18.0/oauth/access_token",
@@ -114,7 +114,7 @@ export class FacebookConnectorService implements IFacebookConnectorService {
                     const account = new Account(
                         uuidv4(),
                         userId.toString(),
-                        userId.toString(), // workspaceId - temporarily use userId
+                        workspaceId,
                         "facebook",
                         page.name,
                         longLiveAccessToken.access_token,

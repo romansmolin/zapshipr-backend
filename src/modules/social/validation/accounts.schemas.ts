@@ -12,12 +12,18 @@ export const oauthCallbackSchema = z.object({
 
 export const oauthStateRequestSchema = z.object({
     platform: socialPlatformSchema,
-    codeVerifier: z.string().min(1).optional(),
+    metadata: z
+        .object({
+            workspaceId: z.string().uuid('Workspace ID must be a valid UUID'),
+            codeVerifier: z.string().min(1).optional(),
+        })
+        .strict(),
 })
 
 export const blueskyConnectSchema = z.object({
     identifier: z.string().min(1, { message: 'Identifier is required' }),
     appPassword: z.string().min(1, { message: 'App password is required' }),
+    workspaceId: z.string().uuid('Workspace ID must be a valid UUID'),
 })
 
 export const accountIdParamSchema = z.object({

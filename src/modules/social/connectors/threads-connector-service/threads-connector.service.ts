@@ -42,7 +42,7 @@ export class ThreadsConnectorService implements IThreadsConnectorService {
         this.backendUrl = getEnvVar("BACKEND_URL")
     }
 
-    async connectThreadsAccount(userId: string, code: string): Promise<{ success: boolean }> {
+    async connectThreadsAccount(userId: string, code: string, workspaceId: string): Promise<{ success: boolean }> {
         try {
             const redirectUri = `${this.backendUrl}${this.redirectUri}`
 
@@ -109,7 +109,7 @@ export class ThreadsConnectorService implements IThreadsConnectorService {
             const account = new Account(
                 uuidv4(),
                 userId.toString(),
-                userId.toString(), // workspaceId - temporarily use userId
+                workspaceId,
                 "threads",
                 profile.username,
                 longLiveAccessToken,

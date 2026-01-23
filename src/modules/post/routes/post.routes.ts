@@ -2,6 +2,7 @@ import { Router as createRouter } from 'express'
 
 import { schema as dbSchema } from '@/db/schema'
 import { authMiddleware } from '@/middleware/auth.middleware'
+import { createWorkspaceMiddleware } from '@/middleware/workspace.middleware'
 import { upload } from '@/middleware/upload.middleware'
 import { SocialMediaPublisherFactory } from '@/modules/social/factories/socia-media-publisher.factory'
 import { AccountRepository } from '@/modules/social/repositories/account.repository'
@@ -57,29 +58,65 @@ export const createPostsRouter = (logger: ILogger, db: NodePgDatabase<typeof dbS
         postScheduler
     )
     const postsController = new PostsController(postsService, logger)
+    const workspaceMiddleware = createWorkspaceMiddleware(logger, db)
 
     router.use(authMiddleware)
 
+    // Workspace-scoped routes
     router.post(
-        '/post',
+        '/workspaces/:workspaceId/post',
+        asyncHandler(workspaceMiddleware),
         upload.fields(mediaFields),
         asyncHandler(postsController.createPost.bind(postsController))
     )
-    router.post('/post/retry', asyncHandler(postsController.retryPostTarget.bind(postsController)))
-    router.post('/post/target/delete', asyncHandler(postsController.deletePostTarget.bind(postsController)))
+    router.post(
+        '/workspaces/:workspaceId/post/retry',
+        asyncHandler(workspaceMiddleware),
+        asyncHandler(postsController.retryPostTarget.bind(postsController))
+    )
+    router.post(
+        '/workspaces/:workspaceId/post/target/delete',
+        asyncHandler(workspaceMiddleware),
+        asyncHandler(postsController.deletePostTarget.bind(postsController))
+    )
 
     router.put(
-        '/post/:postId',
+        '/workspaces/:workspaceId/post/:postId',
+        asyncHandler(workspaceMiddleware),
         upload.single('media'),
         asyncHandler(postsController.editPost.bind(postsController))
     )
-    router.delete('/post/:postId', asyncHandler(postsController.deletePost.bind(postsController)))
+    router.delete(
+        '/workspaces/:workspaceId/post/:postId',
+        asyncHandler(workspaceMiddleware),
+        asyncHandler(postsController.deletePost.bind(postsController))
+    )
 
-    router.get('/posts', asyncHandler(postsController.getPostsByFilters.bind(postsController)))
-    router.get('/posts/by-date', asyncHandler(postsController.getPostsByDate.bind(postsController)))
-    router.get('/posts/failed/count', asyncHandler(postsController.getPostsFailedCount.bind(postsController)))
-    router.get('/posts/failed', asyncHandler(postsController.getFailedPostTargets.bind(postsController)))
-    router.get('/posts/rate-limits', asyncHandler(postsController.getRateLimits.bind(postsController)))
+    router.get(
+        '/workspaces/:workspaceId/posts',
+        asyncHandler(workspaceMiddleware),
+        asyncHandler(postsController.getPostsByFilters.bind(postsController))
+    )
+    router.get(
+        '/workspaces/:workspaceId/posts/by-date',
+        asyncHandler(workspaceMiddleware),
+        asyncHandler(postsController.getPostsByDate.bind(postsController))
+    )
+    router.get(
+        '/workspaces/:workspaceId/posts/failed/count',
+        asyncHandler(workspaceMiddleware),
+        asyncHandler(postsController.getPostsFailedCount.bind(postsController))
+    )
+    router.get(
+        '/workspaces/:workspaceId/posts/failed',
+        asyncHandler(workspaceMiddleware),
+        asyncHandler(postsController.getFailedPostTargets.bind(postsController))
+    )
+    router.get(
+        '/workspaces/:workspaceId/posts/rate-limits',
+        asyncHandler(workspaceMiddleware),
+        asyncHandler(postsController.getRateLimits.bind(postsController))
+    )
 
     return router
 }

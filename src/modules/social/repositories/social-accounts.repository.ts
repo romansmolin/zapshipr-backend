@@ -417,20 +417,22 @@ export class SocialAccountsRepository implements ISocialAccountsRepository {
         }
     }
 
-    async getPinterestBoards(userId: string, socialAccountId: string): Promise<PinterestBoard[]> {
+    async getPinterestBoards(userId: string, workspaceId: string, socialAccountId: string): Promise<PinterestBoard[]> {
         try {
             const rows = await this.db
                 .select()
                 .from(pinterestBoards)
+                .innerJoin(socialAccounts, eq(pinterestBoards.socialAccountId, socialAccounts.id))
                 .where(
                     and(
                         eq(pinterestBoards.userId, userId),
+                        eq(socialAccounts.workspaceId, workspaceId),
                         eq(pinterestBoards.socialAccountId, socialAccountId),
                         ne(pinterestBoards.privacy, 'SECRET')
                     )
                 )
 
-            return rows.map((row) => this.normalizePinterestBoard(row))
+            return rows.map((row) => this.normalizePinterestBoard(row.pinterest_boards))
         } catch (error) {
             this.logger.error('Failed to fetch Pinterest boards', {
                 operation: 'SocialAccountsRepository.getPinterestBoards',

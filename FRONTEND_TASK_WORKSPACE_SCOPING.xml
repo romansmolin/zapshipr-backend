@@ -1,0 +1,303 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task>
+  <title>Update Frontend API Calls for Workspace-Scoped Endpoints</title>
+
+  <summary>
+    The backend has been updated to enforce workspace scoping on all resource endpoints.
+    All API calls for posts, accounts, and inspirations now require a workspaceId path parameter.
+    The frontend must update all API client calls to include the active workspace ID in the URL path.
+  </summary>
+
+  <priority>High</priority>
+  <estimated_effort>Medium</estimated_effort>
+
+  <context>
+    <description>
+      Previously, resources were scoped only by userId. Now, workspaceId is required as a path
+      parameter to ensure proper data isolation between workspaces. The backend validates that
+      the authenticated user owns the workspace before returning any data.
+    </description>
+    <breaking_changes>
+      All existing API endpoints for posts and accounts have been moved under /workspaces/:workspaceId/.
+      Calls to the old endpoints will return 404 Not Found.
+    </breaking_changes>
+  </context>
+
+  <api_changes>
+    <section name="posts">
+      <description>All post-related endpoints now require workspaceId in the path</description>
+
+      <endpoint_change>
+        <old_path>POST /post</old_path>
+        <new_path>POST /workspaces/:workspaceId/post</new_path>
+        <description>Create a new post</description>
+      </endpoint_change>
+
+      <endpoint_change>
+        <old_path>PUT /post/:postId</old_path>
+        <new_path>PUT /workspaces/:workspaceId/post/:postId</new_path>
+        <description>Edit an existing post</description>
+      </endpoint_change>
+
+      <endpoint_change>
+        <old_path>DELETE /post/:postId</old_path>
+        <new_path>DELETE /workspaces/:workspaceId/post/:postId</new_path>
+        <description>Delete a post</description>
+      </endpoint_change>
+
+      <endpoint_change>
+        <old_path>GET /posts</old_path>
+        <new_path>GET /workspaces/:workspaceId/posts</new_path>
+        <description>Get posts with filters (pagination, status, platform, date range)</description>
+        <note>The workspaceId query parameter is no longer needed - it's now in the path</note>
+      </endpoint_change>
+
+      <endpoint_change>
+        <old_path>GET /posts/by-date</old_path>
+        <new_path>GET /workspaces/:workspaceId/posts/by-date</new_path>
+        <description>Get posts within a date range (for calendar view)</description>
+      </endpoint_change>
+
+      <endpoint_change>
+        <old_path>GET /posts/failed/count</old_path>
+        <new_path>GET /workspaces/:workspaceId/posts/failed/count</new_path>
+        <description>Get count of failed post targets</description>
+      </endpoint_change>
+
+      <endpoint_change>
+        <old_path>GET /posts/failed</old_path>
+        <new_path>GET /workspaces/:workspaceId/posts/failed</new_path>
+        <description>Get list of failed post targets</description>
+      </endpoint_change>
+
+      <endpoint_change>
+        <old_path>POST /post/retry</old_path>
+        <new_path>POST /workspaces/:workspaceId/post/retry</new_path>
+        <description>Retry a failed post target</description>
+      </endpoint_change>
+
+      <endpoint_change>
+        <old_path>POST /post/target/delete</old_path>
+        <new_path>POST /workspaces/:workspaceId/post/target/delete</new_path>
+        <description>Delete a specific post target</description>
+      </endpoint_change>
+
+      <endpoint_change>
+        <old_path>GET /posts/rate-limits</old_path>
+        <new_path>GET /workspaces/:workspaceId/posts/rate-limits</new_path>
+        <description>Get rate limit information</description>
+      </endpoint_change>
+    </section>
+
+    <section name="accounts">
+      <description>Account listing and management endpoints now require workspaceId</description>
+
+      <endpoint_change>
+        <old_path>GET /accounts</old_path>
+        <new_path>GET /workspaces/:workspaceId/accounts</new_path>
+        <description>Get all connected social accounts for a workspace</description>
+      </endpoint_change>
+
+      <endpoint_change>
+        <old_path>DELETE /accounts/:accountId</old_path>
+        <new_path>DELETE /workspaces/:workspaceId/accounts/:accountId</new_path>
+        <description>Disconnect/delete a social account</description>
+      </endpoint_change>
+
+      <endpoint_change>
+        <old_path>GET /accounts/:socialAccountId/pinterest-boards</old_path>
+        <new_path>GET /workspaces/:workspaceId/accounts/:socialAccountId/pinterest-boards</new_path>
+        <description>Get Pinterest boards for an account</description>
+      </endpoint_change>
+
+      <endpoint_change>
+        <old_path>GET /accounts/:socialAccountId/tiktok/creator-info</old_path>
+        <new_path>GET /workspaces/:workspaceId/accounts/:socialAccountId/tiktok/creator-info</new_path>
+        <description>Get TikTok creator info (privacy options, max duration, etc.)</description>
+      </endpoint_change>
+
+      <unchanged_endpoints>
+        <endpoint>POST /oauth/state - OAuth state creation (no workspace needed)</endpoint>
+        <endpoint>POST /bluesky/connect - Bluesky connection (no workspace needed)</endpoint>
+        <endpoint>GET /facebook/authorize - Facebook OAuth initiation</endpoint>
+        <endpoint>GET /*/callback - All OAuth callbacks (external providers call these)</endpoint>
+      </unchanged_endpoints>
+    </section>
+
+    <section name="inspirations">
+      <description>Inspiration endpoints already use workspaceId in path - no changes needed</description>
+      <note>
+        Routes remain: /workspaces/:workspaceId/inspirations/*
+        Backend now enforces workspace ownership validation.
+      </note>
+    </section>
+
+    <section name="workspaces">
+      <description>Workspace management endpoints remain unchanged</description>
+      <unchanged_endpoints>
+        <endpoint>GET /workspaces - List all workspaces for user</endpoint>
+        <endpoint>GET /workspaces/:id - Get workspace by ID</endpoint>
+        <endpoint>GET /workspaces/default - Get default workspace</endpoint>
+        <endpoint>POST /workspaces - Create workspace</endpoint>
+        <endpoint>PUT /workspaces/:id - Update workspace</endpoint>
+        <endpoint>DELETE /workspaces/:id - Delete workspace</endpoint>
+        <endpoint>GET /workspaces/:id/prompt - Get main prompt</endpoint>
+        <endpoint>PUT /workspaces/:id/prompt - Update main prompt</endpoint>
+      </unchanged_endpoints>
+    </section>
+  </api_changes>
+
+  <implementation_requirements>
+    <requirement priority="critical">
+      <title>Update API Client/Service Layer</title>
+      <description>
+        Update all API client functions to accept workspaceId as a parameter and include it in the URL path.
+      </description>
+      <example>
+        <before>
+          // Old API call
+          const posts = await api.get('/posts', { params: { workspaceId, page, limit } });
+        </before>
+        <after>
+          // New API call
+          const posts = await api.get(`/workspaces/${workspaceId}/posts`, { params: { page, limit } });
+        </after>
+      </example>
+    </requirement>
+
+    <requirement priority="critical">
+      <title>Ensure Active Workspace Context</title>
+      <description>
+        All components that make API calls must have access to the current workspace ID.
+        Consider using a React context, Zustand store, or similar state management.
+      </description>
+      <suggestions>
+        <suggestion>Create a useActiveWorkspace() hook that returns the current workspace ID</suggestion>
+        <suggestion>Ensure workspace is selected before allowing navigation to posts/accounts pages</suggestion>
+        <suggestion>Handle the case where no workspace is selected (redirect to workspace selection)</suggestion>
+      </suggestions>
+    </requirement>
+
+    <requirement priority="high">
+      <title>Update React Query/SWR Keys</title>
+      <description>
+        If using React Query or SWR, update cache keys to include workspaceId to ensure
+        proper cache invalidation when switching workspaces.
+      </description>
+      <example>
+        <before>queryKey: ['posts', filters]</before>
+        <after>queryKey: ['posts', workspaceId, filters]</after>
+      </example>
+    </requirement>
+
+    <requirement priority="high">
+      <title>Handle Workspace Switching</title>
+      <description>
+        When user switches workspaces, all cached data should be invalidated or refetched.
+        The UI should reflect data from the newly selected workspace.
+      </description>
+    </requirement>
+
+    <requirement priority="medium">
+      <title>Error Handling</title>
+      <description>
+        Handle new error responses from workspace middleware:
+        - 400 Bad Request: Invalid workspace ID format (not a valid UUID)
+        - 404 Not Found: Workspace not found or access denied
+      </description>
+      <error_codes>
+        <error code="400" message="Invalid workspace ID" action="Show validation error" />
+        <error code="404" message="Workspace not found or access denied" action="Redirect to workspace selection" />
+      </error_codes>
+    </requirement>
+  </implementation_requirements>
+
+  <files_likely_to_change>
+    <file_group name="API Client Layer">
+      <file>src/api/posts.ts or src/services/posts.service.ts</file>
+      <file>src/api/accounts.ts or src/services/accounts.service.ts</file>
+      <file>src/api/client.ts or src/lib/api.ts (if centralized)</file>
+    </file_group>
+
+    <file_group name="State Management">
+      <file>src/store/workspace.ts or src/context/WorkspaceContext.tsx</file>
+      <file>src/hooks/useWorkspace.ts</file>
+    </file_group>
+
+    <file_group name="Pages/Components">
+      <file>Posts list page</file>
+      <file>Post creation/edit forms</file>
+      <file>Calendar view</file>
+      <file>Accounts list page</file>
+      <file>Failed posts dashboard</file>
+      <file>Any component fetching posts or accounts</file>
+    </file_group>
+  </files_likely_to_change>
+
+  <testing_checklist>
+    <test_case>
+      <name>Posts CRUD with workspace</name>
+      <steps>
+        <step>Select a workspace</step>
+        <step>Create a new post - verify it's created in the selected workspace</step>
+        <step>Edit the post - verify changes are saved</step>
+        <step>Delete the post - verify it's removed</step>
+        <step>Switch workspace - verify posts list shows different data</step>
+      </steps>
+    </test_case>
+
+    <test_case>
+      <name>Accounts with workspace</name>
+      <steps>
+        <step>Select a workspace</step>
+        <step>View accounts list - should only show accounts for that workspace</step>
+        <step>Disconnect an account - verify it's removed</step>
+        <step>Switch workspace - verify accounts list changes</step>
+      </steps>
+    </test_case>
+
+    <test_case>
+      <name>Calendar view</name>
+      <steps>
+        <step>Select a workspace</step>
+        <step>Open calendar view</step>
+        <step>Verify only posts from selected workspace appear</step>
+        <step>Switch workspace - calendar should update</step>
+      </steps>
+    </test_case>
+
+    <test_case>
+      <name>Failed posts</name>
+      <steps>
+        <step>Select a workspace with failed posts</step>
+        <step>View failed posts count in header/sidebar</step>
+        <step>Open failed posts page</step>
+        <step>Retry a failed post - verify it processes</step>
+        <step>Switch workspace - failed count should update</step>
+      </steps>
+    </test_case>
+
+    <test_case>
+      <name>Error handling</name>
+      <steps>
+        <step>Manually call API with invalid workspaceId - verify error handling</step>
+        <step>Call API with workspaceId of another user - verify 404 response</step>
+        <step>Delete workspace while viewing its posts - verify graceful handling</step>
+      </steps>
+    </test_case>
+  </testing_checklist>
+
+  <migration_notes>
+    <note type="important">
+      This is a breaking change. The old endpoints no longer exist.
+      Frontend must be updated and deployed alongside or after the backend update.
+    </note>
+    <note type="recommendation">
+      Consider implementing the changes behind a feature flag if gradual rollout is needed.
+    </note>
+    <note type="tip">
+      Create a central API utility that automatically injects workspaceId into paths
+      to reduce repetitive code changes.
+    </note>
+  </migration_notes>
+</task>

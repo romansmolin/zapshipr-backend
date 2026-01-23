@@ -30,10 +30,11 @@ export class BlueskyConnectorService implements IBlueskyConnectorService {
 		this.accountService = accountService
 	}
 
-	async connectBlueskyAccount(        
+	async connectBlueskyAccount(
 		userId: string,
         identifier: string,
-        appPassword: string): Promise<{success: boolean}> {
+        appPassword: string,
+        workspaceId: string): Promise<{success: boolean}> {
 		try {
             const session = await this.httpClient.post<{
                 did: string
@@ -97,7 +98,7 @@ export class BlueskyConnectorService implements IBlueskyConnectorService {
             const account = new Account(
                 uuidv4(),
                 userId,
-                userId, // workspaceId - temporarily use userId
+                workspaceId,
                 'bluesky',
                 accountName,
                 accessJwt,

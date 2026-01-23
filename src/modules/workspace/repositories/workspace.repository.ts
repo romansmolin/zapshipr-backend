@@ -38,6 +38,17 @@ export class WorkspaceRepository implements IWorkspaceRepository {
         return workspace
     }
 
+    async findByIdAndUserId(id: string, userId: string): Promise<Workspace | undefined> {
+        this.logger.info('Finding workspace by id and user id', { workspaceId: id, userId })
+
+        const [workspace] = await this.db
+            .select()
+            .from(workspaces)
+            .where(and(eq(workspaces.id, id), eq(workspaces.userId, userId)))
+
+        return workspace
+    }
+
     async findByUserId(userId: string): Promise<Workspace[]> {
         this.logger.info('Finding workspaces by user id', { userId })
 

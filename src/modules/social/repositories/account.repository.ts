@@ -75,7 +75,7 @@ export class AccountRepository implements IAccountRepository {
         return accounts.map((account) => this.toAccount(account))
     }
 
-    async getAllAccounts(userId: string, workspaceId?: string): Promise<Account[]> {
+    async getAllAccounts(userId: string, workspaceId: string): Promise<Account[]> {
         const accounts = await this.repository.getAllAccounts(userId, workspaceId)
         return accounts.map((account) => this.toAccount(account))
     }
@@ -167,8 +167,8 @@ export class AccountRepository implements IAccountRepository {
         await this.repository.deletePinterestBoardsByAccountId(userId, socialAccountId)
     }
 
-    async getPinterestBoards(userId: string, socialAccountId: string): Promise<PinterestBoard[]> {
-        const boards = await this.repository.getPinterestBoards(userId, socialAccountId)
+    async getPinterestBoards(userId: string, workspaceId: string, socialAccountId: string): Promise<PinterestBoard[]> {
+        const boards = await this.repository.getPinterestBoards(userId, workspaceId, socialAccountId)
 
         return boards.map(
             (board) =>

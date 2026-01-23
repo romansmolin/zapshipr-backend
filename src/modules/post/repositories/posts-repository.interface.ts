@@ -59,17 +59,17 @@ export interface IPostsRepository {
 
     getPostDetails(postId: string, userId: string): Promise<CreatePostResponse>
 
-    getPosts(userId: string, filters: PostFilters): Promise<PostsListResponse>
+    getPosts(userId: string, workspaceId: string, filters: PostFilters): Promise<PostsListResponse>
 
     hasExistingMedia(postId: string): Promise<boolean>
 
-    deletePost(postId: string, userId: string): Promise<{ mediaUrls: string[]; coverImageUrl?: string }>
+    deletePost(postId: string, userId: string, workspaceId?: string): Promise<{ mediaUrls: string[]; coverImageUrl?: string }>
 
-    getPostsByDate(userId: string, fromDate: Date, toDate: Date, workspaceId?: string): Promise<PostsByDateResponse>
+    getPostsByDate(userId: string, workspaceId: string, fromDate: Date, toDate: Date): Promise<PostsByDateResponse>
 
-    getPostsFailedCount(userId: string): Promise<number>
+    getPostsFailedCount(userId: string, workspaceId: string): Promise<number>
 
-    getFailedPostTargets(userId: string): Promise<PostTargetEntity[]>
+    getFailedPostTargets(userId: string, workspaceId: string): Promise<PostTargetEntity[]>
 
     retryPostTarget(
         userId: string,

@@ -58,7 +58,7 @@ export class PinterestConnectorService implements IPinterestConnectorService {
         this.apiVersion = getEnvVar("PINTEREST_API_VERSION")
     }
 
-    async connectPinterestAccount(userId: string, code: string): Promise<{ success: boolean }> {
+    async connectPinterestAccount(userId: string, code: string, workspaceId: string): Promise<{ success: boolean }> {
         try {
             const tokenBody = qs.stringify({
                 grant_type: "authorization_code",
@@ -124,7 +124,7 @@ export class PinterestConnectorService implements IPinterestConnectorService {
             const account = new Account(
                 uuidv4(),
                 userId,
-                userId, // workspaceId - temporarily use userId
+                workspaceId,
                 "pinterest",
                 profileResponse.username,
                 accessToken,

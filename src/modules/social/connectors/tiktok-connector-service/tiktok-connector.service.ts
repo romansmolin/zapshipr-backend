@@ -58,7 +58,7 @@ export class TikTokConnectorService implements ITikTokConnectorService {
         this.backendUrl = getEnvVar('BACKEND_URL')
     }
 
-    async connectTikTokAccount(userId: string, code: string): Promise<{ success: boolean }> {
+    async connectTikTokAccount(userId: string, code: string, workspaceId: string): Promise<{ success: boolean }> {
         try {
             const redirectUri = `${this.backendUrl}${this.redirectUri}`
 
@@ -123,7 +123,7 @@ export class TikTokConnectorService implements ITikTokConnectorService {
             const account = new Account(
                 uuidv4(),
                 userId,
-                userId, // workspaceId - temporarily use userId
+                workspaceId,
                 'tiktok',
                 user.display_name,
                 accessToken,
@@ -241,7 +241,7 @@ export class TikTokConnectorService implements ITikTokConnectorService {
         }
     }
 
-    async getTikTokCreatorInfo(userId: string, socialAccountId: string): Promise<TikTokCreatorInfoDto> {
+    async getTikTokCreatorInfo(userId: string, workspaceId: string, socialAccountId: string): Promise<TikTokCreatorInfoDto> {
         const apiBaseUrl = getEnvVar('TIKTOK_API_URL')
         const apiVersion = getEnvVar('TIKTOK_API_VERSION')
 

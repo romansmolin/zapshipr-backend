@@ -7,6 +7,7 @@ import { schema as dbSchema } from '@/db/schema'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import { asyncHandler } from '@/shared/http/async-handler'
 import { authMiddleware } from '@/middleware/auth.middleware'
+import { createWorkspaceMiddleware } from '@/middleware/workspace.middleware'
 import { S3Uploader } from '@/shared/media-uploader/media-uploader'
 import { BullMqInspirationScheduler } from '@/shared/queue'
 
@@ -31,41 +32,49 @@ export const createInspirationsRouter = (logger: ILogger, db: NodePgDatabase<typ
     const contentParser = new ContentParserService(logger)
     const service = new InspirationsService(repository, mediaUploader, scheduler, contentParser, logger)
     const controller = new InspirationsController(service, logger)
+    const workspaceMiddleware = createWorkspaceMiddleware(logger, db)
 
     router.post(
         '/workspaces/:workspaceId/inspirations',
         authMiddleware,
+        asyncHandler(workspaceMiddleware),
         upload.single('file'),
         asyncHandler(controller.create.bind(controller))
     )
     router.get(
         '/workspaces/:workspaceId/inspirations',
         authMiddleware,
+        asyncHandler(workspaceMiddleware),
         asyncHandler(controller.getAll.bind(controller))
     )
     router.get(
         '/workspaces/:workspaceId/inspirations/:id',
         authMiddleware,
+        asyncHandler(workspaceMiddleware),
         asyncHandler(controller.getById.bind(controller))
     )
     router.put(
         '/workspaces/:workspaceId/inspirations/:id',
         authMiddleware,
+        asyncHandler(workspaceMiddleware),
         asyncHandler(controller.update.bind(controller))
     )
     router.delete(
         '/workspaces/:workspaceId/inspirations/:id',
         authMiddleware,
+        asyncHandler(workspaceMiddleware),
         asyncHandler(controller.delete.bind(controller))
     )
     router.post(
         '/workspaces/:workspaceId/inspirations/:id/retry',
         authMiddleware,
+        asyncHandler(workspaceMiddleware),
         asyncHandler(controller.retry.bind(controller))
     )
     router.post(
         '/workspaces/:workspaceId/inspirations/:id/extract',
         authMiddleware,
+        asyncHandler(workspaceMiddleware),
         asyncHandler(controller.triggerExtraction.bind(controller))
     )
 

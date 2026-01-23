@@ -29,7 +29,7 @@ export interface IAccountRepository {
     updateAccountByTenantPlatformAndPage(input: AccountUpdateInput): Promise<Account>
     findByUserId(userId: string, workspaceId?: string): Promise<Account[]>
     findByUserIdAndPlatform(userId: string, platform: SocialPlatform, workspaceId?: string): Promise<Account[]>
-    getAllAccounts(userId: string, workspaceId?: string): Promise<Account[]>
+    getAllAccounts(userId: string, workspaceId: string): Promise<Account[]>
     updateAccessToken(userId: string, pageId: string, newAccessToken: string): Promise<void>
     updateAccessTokenByAccountId(
         accountId: string,
@@ -44,5 +44,5 @@ export interface IAccountRepository {
     findAccountsWithExpiringAccessTokens(): Promise<{ accountsSnapshots: SocialTokenSnapshot[] }>
     savePinterestBoard(board: PinterestBoard): Promise<PinterestBoard>
     deletePinterestBoardsByAccountId(userId: string, socialAccountId: string): Promise<void>
-    getPinterestBoards(userId: string, socialAccountId: string): Promise<PinterestBoard[]>
+    getPinterestBoards(userId: string, workspaceId: string, socialAccountId: string): Promise<PinterestBoard[]>
 }

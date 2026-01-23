@@ -49,7 +49,8 @@ export class AccountsController {
         const state = this.oauthStateService.create({
             userId,
             platform: payload.platform,
-            codeVerifier: payload.codeVerifier,
+            codeVerifier: payload.metadata?.codeVerifier,
+            workspaceId: payload.metadata?.workspaceId,
         })
 
         res.status(201).json({ state })
@@ -61,10 +62,20 @@ export class AccountsController {
 
         const statePayload = this.requireState(state)
         const userId = statePayload.userId
+        const workspaceId = this.requireWorkspaceId(statePayload)
 
         const authCode = this.requireCode(code)
-        await this.connectorService.connectFacebookAccount(userId, authCode)
-        this.redirectToAccounts(res)
+
+        try {
+            await this.connectorService.connectFacebookAccount(userId, authCode, workspaceId)
+            this.redirectToAccounts(res)
+        } catch (error) {
+            if (error instanceof BaseAppError && error.code === ErrorCode.WORKSPACE_MISMATCH) {
+                this.redirectWithError(res, 'workspace_mismatch', 'This account is already connected to a different workspace')
+                return
+            }
+            throw error
+        }
     }
 
     async connectThreadsAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -73,10 +84,20 @@ export class AccountsController {
 
         const statePayload = this.requireState(state)
         const userId = statePayload.userId
+        const workspaceId = this.requireWorkspaceId(statePayload)
 
         const authCode = this.requireCode(code)
-        await this.connectorService.connectThreadsAccount(userId, authCode)
-        this.redirectToAccounts(res)
+
+        try {
+            await this.connectorService.connectThreadsAccount(userId, authCode, workspaceId)
+            this.redirectToAccounts(res)
+        } catch (error) {
+            if (error instanceof BaseAppError && error.code === ErrorCode.WORKSPACE_MISMATCH) {
+                this.redirectWithError(res, 'workspace_mismatch', 'This account is already connected to a different workspace')
+                return
+            }
+            throw error
+        }
     }
 
     async connectTikTokAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -85,10 +106,20 @@ export class AccountsController {
 
         const statePayload = this.requireState(state)
         const userId = statePayload.userId
+        const workspaceId = this.requireWorkspaceId(statePayload)
 
         const authCode = this.requireCode(code)
-        await this.connectorService.connectTikTokAccount(userId, authCode)
-        this.redirectToAccounts(res)
+
+        try {
+            await this.connectorService.connectTikTokAccount(userId, authCode, workspaceId)
+            this.redirectToAccounts(res)
+        } catch (error) {
+            if (error instanceof BaseAppError && error.code === ErrorCode.WORKSPACE_MISMATCH) {
+                this.redirectWithError(res, 'workspace_mismatch', 'This account is already connected to a different workspace')
+                return
+            }
+            throw error
+        }
     }
 
     async connectYouTubeAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -97,10 +128,20 @@ export class AccountsController {
 
         const statePayload = this.requireState(state)
         const userId = statePayload.userId
+        const workspaceId = this.requireWorkspaceId(statePayload)
 
         const authCode = this.requireCode(code)
-        await this.connectorService.connectYouTubeAccount(userId, authCode)
-        this.redirectToAccounts(res)
+
+        try {
+            await this.connectorService.connectYouTubeAccount(userId, authCode, workspaceId)
+            this.redirectToAccounts(res)
+        } catch (error) {
+            if (error instanceof BaseAppError && error.code === ErrorCode.WORKSPACE_MISMATCH) {
+                this.redirectWithError(res, 'workspace_mismatch', 'This account is already connected to a different workspace')
+                return
+            }
+            throw error
+        }
     }
 
     async connectXAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -109,6 +150,7 @@ export class AccountsController {
 
         const statePayload = this.requireState(state)
         const userId = statePayload.userId
+        const workspaceId = this.requireWorkspaceId(statePayload)
         const authCode = this.requireCode(code)
 
         const resolvedCodeVerifier = code_verifier ?? statePayload?.codeVerifier
@@ -116,8 +158,16 @@ export class AccountsController {
             throw new BaseAppError('Missing X code verifier', ErrorCode.BAD_REQUEST, 400)
         }
 
-        await this.connectorService.connectXAccount(userId, authCode, resolvedCodeVerifier)
-        this.redirectToAccounts(res)
+        try {
+            await this.connectorService.connectXAccount(userId, authCode, resolvedCodeVerifier, workspaceId)
+            this.redirectToAccounts(res)
+        } catch (error) {
+            if (error instanceof BaseAppError && error.code === ErrorCode.WORKSPACE_MISMATCH) {
+                this.redirectWithError(res, 'workspace_mismatch', 'This account is already connected to a different workspace')
+                return
+            }
+            throw error
+        }
     }
 
     async connectPinterestAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -126,10 +176,20 @@ export class AccountsController {
 
         const statePayload = this.requireState(state)
         const userId = statePayload.userId
+        const workspaceId = this.requireWorkspaceId(statePayload)
 
         const authCode = this.requireCode(code)
-        await this.connectorService.connectPinterestAccount(userId, authCode)
-        this.redirectToAccounts(res)
+
+        try {
+            await this.connectorService.connectPinterestAccount(userId, authCode, workspaceId)
+            this.redirectToAccounts(res)
+        } catch (error) {
+            if (error instanceof BaseAppError && error.code === ErrorCode.WORKSPACE_MISMATCH) {
+                this.redirectWithError(res, 'workspace_mismatch', 'This account is already connected to a different workspace')
+                return
+            }
+            throw error
+        }
     }
 
     async connectInstagramAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -138,10 +198,20 @@ export class AccountsController {
 
         const statePayload = this.requireState(state)
         const userId = statePayload.userId
+        const workspaceId = this.requireWorkspaceId(statePayload)
 
         const authCode = this.requireCode(code)
-        await this.connectorService.connectInstagramAccount(userId, authCode)
-        this.redirectToAccounts(res)
+
+        try {
+            await this.connectorService.connectInstagramAccount(userId, authCode, workspaceId)
+            this.redirectToAccounts(res)
+        } catch (error) {
+            if (error instanceof BaseAppError && error.code === ErrorCode.WORKSPACE_MISMATCH) {
+                this.redirectWithError(res, 'workspace_mismatch', 'This account is already connected to a different workspace')
+                return
+            }
+            throw error
+        }
     }
 
     async connectLinkedinAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -150,63 +220,99 @@ export class AccountsController {
 
         const statePayload = this.requireState(state)
         const userId = statePayload.userId
+        const workspaceId = this.requireWorkspaceId(statePayload)
 
         const authCode = this.requireCode(code)
-        await this.connectorService.connectLinkedinAccount(userId, authCode)
-        this.redirectToAccounts(res)
+
+        try {
+            await this.connectorService.connectLinkedinAccount(userId, authCode, workspaceId)
+            this.redirectToAccounts(res)
+        } catch (error) {
+            if (error instanceof BaseAppError && error.code === ErrorCode.WORKSPACE_MISMATCH) {
+                this.redirectWithError(res, 'workspace_mismatch', 'This account is already connected to a different workspace')
+                return
+            }
+            throw error
+        }
     }
 
     async connectBlueskyAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
         const userId = this.getUserId(req)
         const payload = blueskyConnectSchema.parse(req.body)
 
-        const result = await this.connectorService.connectBlueskyAccount(
-            userId,
-            payload.identifier,
-            payload.appPassword
-        )
+        try {
+            const result = await this.connectorService.connectBlueskyAccount(
+                userId,
+                payload.identifier,
+                payload.appPassword,
+                payload.workspaceId
+            )
 
-        res.json(result)
+            res.json(result)
+        } catch (error) {
+            if (error instanceof BaseAppError && error.code === ErrorCode.WORKSPACE_MISMATCH) {
+                throw new BaseAppError(
+                    'This account is already connected to a different workspace',
+                    ErrorCode.WORKSPACE_MISMATCH,
+                    409
+                )
+            }
+            throw error
+        }
     }
 
     async getAllAccounts(req: Request, res: Response, next: NextFunction): Promise<void> {
         const userId = this.getUserId(req)
-        const accounts = await this.accountsService.getAllAccounts(userId)
+        const workspaceId = this.getWorkspaceId(req)
+        const accounts = await this.accountsService.getAllAccounts(userId, workspaceId)
         res.json(accounts)
     }
 
     async deleteAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
         const userId = this.getUserId(req)
+        const workspaceId = this.getWorkspaceId(req)
         const params = accountIdParamSchema.parse(req.params)
 
-        const result = await this.accountsService.deleteAccount(userId, params.accountId)
+        const result = await this.accountsService.deleteAccount(userId, workspaceId, params.accountId)
         res.json(result)
     }
 
     async getPinterestBoards(req: Request, res: Response, next: NextFunction): Promise<void> {
         const userId = this.getUserId(req)
+        const workspaceId = this.getWorkspaceId(req)
         const params = socialAccountIdParamSchema.parse(req.params)
 
-        const boards = await this.accountsService.getPinterestBoards(userId, params.socialAccountId)
+        const boards = await this.accountsService.getPinterestBoards(userId, workspaceId, params.socialAccountId)
         res.json(boards)
     }
 
     async getTikTokCreatorInfo(req: Request, res: Response, next: NextFunction): Promise<void> {
         const userId = this.getUserId(req)
+        const workspaceId = this.getWorkspaceId(req)
         const params = socialAccountIdParamSchema.parse(req.params)
 
-        const creatorInfo = await this.connectorService.getTikTokCreatorInfo(userId, params.socialAccountId)
+        const creatorInfo = await this.connectorService.getTikTokCreatorInfo(
+            userId,
+            workspaceId,
+            params.socialAccountId
+        )
         res.json(creatorInfo)
     }
 
     private getUserId(req: Request): string {
         const userId = req.user?.id
 
-        if (!userId) {
-            throw new BaseAppError('Unauthorized', ErrorCode.UNAUTHORIZED, 401)
-        }
+        if (!userId) throw new BaseAppError('Unauthorized', ErrorCode.UNAUTHORIZED, 401)
 
         return userId
+    }
+
+    private getWorkspaceId(req: Request): string {
+        const workspaceId = req.workspaceId
+        if (!workspaceId) {
+            throw new BaseAppError('Workspace ID is required', ErrorCode.BAD_REQUEST, 400)
+        }
+        return workspaceId
     }
 
     private parseOAuthCallback(req: Request) {
@@ -271,6 +377,22 @@ export class AccountsController {
     private redirectToAccounts(res: Response) {
         const frontendUrl = getEnvVar('FRONTEND_URL')
         const redirectUrl = `${frontendUrl}/accounts`
+        res.redirect(redirectUrl)
+    }
+
+    private requireWorkspaceId(statePayload: { workspaceId?: string }): string {
+        const workspaceId = statePayload.workspaceId
+
+        if (!workspaceId) {
+            throw new BaseAppError('Missing workspace ID in OAuth state', ErrorCode.BAD_REQUEST, 400)
+        }
+
+        return workspaceId
+    }
+
+    private redirectWithError(res: Response, errorCode: string, errorMessage: string) {
+        const frontendUrl = getEnvVar('FRONTEND_URL')
+        const redirectUrl = `${frontendUrl}/accounts?error=${encodeURIComponent(errorCode)}&error_description=${encodeURIComponent(errorMessage)}`
         res.redirect(redirectUrl)
     }
 }

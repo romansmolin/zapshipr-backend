@@ -42,7 +42,7 @@ export class YouTubeConnectorService implements IYouTubeConnectorService {
         this.backendUrl = getEnvVar("BACKEND_URL")
     }
 
-    async connectYouTubeAccount(userId: string, code: string): Promise<{ success: boolean }> {
+    async connectYouTubeAccount(userId: string, code: string, workspaceId: string): Promise<{ success: boolean }> {
         try {
             const formData = new URLSearchParams({
                 code,
@@ -103,7 +103,7 @@ export class YouTubeConnectorService implements IYouTubeConnectorService {
             const account = new Account(
                 uuidv4(),
                 userId,
-                userId, // workspaceId - temporarily use userId
+                workspaceId,
                 "youtube",
                 channel.snippet.title,
                 accessToken,

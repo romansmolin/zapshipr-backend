@@ -42,7 +42,7 @@ export class InstagramConnectorService implements IInstagramConnectorService {
         this.backendUrl = getEnvVar("BACKEND_URL")
     }
 
-    async connectInstagramAccount(userId: string, code: string): Promise<{ success: boolean }> {
+    async connectInstagramAccount(userId: string, code: string, workspaceId: string): Promise<{ success: boolean }> {
         try {
             const formData = new URLSearchParams({
                 client_id: this.appId,
@@ -113,7 +113,7 @@ export class InstagramConnectorService implements IInstagramConnectorService {
             const account = new Account(
                 uuidv4(),
                 userId,
-                userId, // workspaceId - temporarily use userId
+                workspaceId,
                 "instagram",
                 accountInfoResponse.username,
                 longLivedToken,

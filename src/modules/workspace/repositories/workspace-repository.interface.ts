@@ -4,6 +4,7 @@ import type { MainPrompt } from '../validation/workspace.schemas'
 export interface IWorkspaceRepository {
     create(data: InsertWorkspace): Promise<Workspace>
     findById(id: string): Promise<Workspace | undefined>
+    findByIdAndUserId(id: string, userId: string): Promise<Workspace | undefined>
     findByUserId(userId: string): Promise<Workspace[]>
     findDefaultByUserId(userId: string): Promise<Workspace | undefined>
     countByUserId(userId: string): Promise<number>

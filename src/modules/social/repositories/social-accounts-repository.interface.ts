@@ -52,5 +52,5 @@ export interface ISocialAccountsRepository {
     findAccountsWithExpiringAccessTokens(): Promise<SocialTokenSnapshot[]>
     savePinterestBoard(board: NewPinterestBoard): Promise<PinterestBoard>
     deletePinterestBoardsByAccountId(userId: string, socialAccountId: string): Promise<void>
-    getPinterestBoards(userId: string, socialAccountId: string): Promise<PinterestBoard[]>
+    getPinterestBoards(userId: string, workspaceId: string, socialAccountId: string): Promise<PinterestBoard[]>
 }

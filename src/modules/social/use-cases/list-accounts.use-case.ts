@@ -5,6 +5,7 @@ import type { IAccountRepository } from '@/modules/social/repositories/account-r
 
 export interface ListAccountsInput {
     userId: string
+    workspaceId?: string
 }
 
 export class ListAccountsUseCase {
@@ -16,12 +17,15 @@ export class ListAccountsUseCase {
         this.logger = logger
     }
 
-    async execute({ userId }: ListAccountsInput): Promise<SocialAccountResponse[]> {
-        const accounts = await this.repo.getAllAccounts(userId)
+    async execute({ userId, workspaceId }: ListAccountsInput): Promise<SocialAccountResponse[]> {
+        const accounts = workspaceId
+            ? await this.repo.getAllAccounts(userId, workspaceId)
+            : await this.repo.findByUserId(userId)
 
         this.logger.info('Fetched social accounts', {
             operation: 'ListAccountsUseCase.execute',
             userId,
+            workspaceId: workspaceId ?? 'all',
             count: accounts.length,
         })
 

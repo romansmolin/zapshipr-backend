@@ -18,10 +18,10 @@ export interface ConnectAccountResult {
 export interface IAccountsService {
     connectAccount(account: Account): Promise<ConnectAccountResult>
     listAccounts(userId: string): Promise<SocialAccountResponse[]>
-    getAllAccounts(userId: string): Promise<SocialAccountResponse[]>
+    getAllAccounts(userId: string, workspaceId: string): Promise<SocialAccountResponse[]>
     getAccountById(userId: string, accountId: string): Promise<SocialAccountResponse>
-    deleteAccount(userId: string, accountId: string): Promise<{ success: boolean }>
-    getPinterestBoards(userId: string, socialAccountId: string): Promise<PinterestBoard[]>
+    deleteAccount(userId: string, workspaceId: string, accountId: string): Promise<{ success: boolean }>
+    getPinterestBoards(userId: string, workspaceId: string, socialAccountId: string): Promise<PinterestBoard[]>
     updateAccessToken(userId: string, pageId: string, accessToken: string): Promise<void>
     updateAccessTokenByAccountId(accountId: string, payload: AccountTokenPayload): Promise<void>
     findAccountsWithExpiringAccessTokens(): Promise<SocialTokenSnapshot[]>

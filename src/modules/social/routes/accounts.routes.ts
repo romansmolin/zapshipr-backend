@@ -4,6 +4,7 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 
 import { schema as dbSchema } from '@/db/schema'
 import { authMiddleware } from '@/middleware/auth.middleware'
+import { createWorkspaceMiddleware } from '@/middleware/workspace.middleware'
 import { AccountRepository } from '@/modules/social/repositories/account.repository'
 import { AccountsController } from '@/modules/social/controllers/accounts.controller'
 import { AccountsService } from '@/modules/social/services/accounts.service'
@@ -61,7 +62,9 @@ export const createAccountsRouter = (logger: ILogger, db: NodePgDatabase<typeof 
     const oauthStateSecret = getEnvVar('OAUTH_STATE_SECRET')
     const oauthStateService = new OAuthStateService(oauthStateSecret)
     const accountsController = new AccountsController(accountsService, connectorService, logger, oauthStateService)
+    const workspaceMiddleware = createWorkspaceMiddleware(logger, db)
 
+    // OAuth callbacks (no workspace scope - external providers call these)
     router.get(
         '/facebook/authorize',
         authMiddleware,
@@ -94,21 +97,41 @@ export const createAccountsRouter = (logger: ILogger, db: NodePgDatabase<typeof 
         asyncHandler(accountsController.connectLinkedinAccount.bind(accountsController))
     )
 
-    router.use(authMiddleware)
-
-    router.post('/oauth/state', asyncHandler(accountsController.createOAuthState.bind(accountsController)))
+    // Authenticated but not workspace-scoped (OAuth state creation, Bluesky connect)
+    router.post(
+        '/oauth/state',
+        authMiddleware,
+        asyncHandler(accountsController.createOAuthState.bind(accountsController))
+    )
     router.post(
         '/bluesky/connect',
+        authMiddleware,
         asyncHandler(accountsController.connectBlueskyAccount.bind(accountsController))
     )
-    router.get('/accounts', asyncHandler(accountsController.getAllAccounts.bind(accountsController)))
-    router.delete('/accounts/:accountId', asyncHandler(accountsController.deleteAccount.bind(accountsController)))
+
+    // Workspace-scoped account routes
     router.get(
-        '/accounts/:socialAccountId/pinterest-boards',
+        '/workspaces/:workspaceId/accounts',
+        authMiddleware,
+        asyncHandler(workspaceMiddleware),
+        asyncHandler(accountsController.getAllAccounts.bind(accountsController))
+    )
+    router.delete(
+        '/workspaces/:workspaceId/accounts/:accountId',
+        authMiddleware,
+        asyncHandler(workspaceMiddleware),
+        asyncHandler(accountsController.deleteAccount.bind(accountsController))
+    )
+    router.get(
+        '/workspaces/:workspaceId/accounts/:socialAccountId/pinterest-boards',
+        authMiddleware,
+        asyncHandler(workspaceMiddleware),
         asyncHandler(accountsController.getPinterestBoards.bind(accountsController))
     )
     router.get(
-        '/accounts/:socialAccountId/tiktok/creator-info',
+        '/workspaces/:workspaceId/accounts/:socialAccountId/tiktok/creator-info',
+        authMiddleware,
+        asyncHandler(workspaceMiddleware),
         asyncHandler(accountsController.getTikTokCreatorInfo.bind(accountsController))
     )
 

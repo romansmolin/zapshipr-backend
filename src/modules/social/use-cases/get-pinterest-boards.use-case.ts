@@ -5,6 +5,7 @@ import type { IAccountRepository } from '@/modules/social/repositories/account-r
 
 export interface GetPinterestBoardsInput {
     userId: string
+    workspaceId: string
     socialAccountId: string
 }
 
@@ -17,12 +18,13 @@ export class GetPinterestBoardsUseCase {
         this.logger = logger
     }
 
-    async execute({ userId, socialAccountId }: GetPinterestBoardsInput): Promise<PinterestBoard[]> {
-        const boards = await this.repo.getPinterestBoards(userId, socialAccountId)
+    async execute({ userId, workspaceId, socialAccountId }: GetPinterestBoardsInput): Promise<PinterestBoard[]> {
+        const boards = await this.repo.getPinterestBoards(userId, workspaceId, socialAccountId)
 
         this.logger.info('Fetched Pinterest boards', {
             operation: 'GetPinterestBoardsUseCase.execute',
             userId,
+            workspaceId,
             socialAccountId,
             count: boards.length,
         })

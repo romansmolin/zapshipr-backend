@@ -35,6 +35,24 @@ export class ConnectAccountUseCase {
         )
 
         if (existing) {
+            // Check workspace mismatch: if the account already exists in a different workspace, reject
+            if (existing.workspaceId && account.workspaceId && existing.workspaceId !== account.workspaceId) {
+                this.logger.warn('Account already connected to a different workspace', {
+                    operation: 'ConnectAccountUseCase.execute',
+                    userId: account.userId,
+                    platform: account.platform,
+                    pageId: account.pageId,
+                    existingWorkspaceId: existing.workspaceId,
+                    requestedWorkspaceId: account.workspaceId,
+                })
+
+                throw new BaseAppError(
+                    'This social account is already connected to a different workspace',
+                    ErrorCode.WORKSPACE_MISMATCH,
+                    409
+                )
+            }
+
             const updated = await this.repo.updateAccountByTenantPlatformAndPage({
                 userId: account.userId,
                 workspaceId: account.workspaceId,

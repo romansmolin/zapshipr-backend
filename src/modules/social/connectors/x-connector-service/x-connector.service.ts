@@ -42,7 +42,7 @@ export class XConnectorService implements IXConnectorService {
         this.backendUrl = getEnvVar("BACKEND_URL")
     }
 
-    async connectXAccount(userId: string, code: string, codeVerifier: string): Promise<{ success: boolean }> {
+    async connectXAccount(userId: string, code: string, codeVerifier: string, workspaceId: string): Promise<{ success: boolean }> {
         try {
             const formData = new URLSearchParams({
                 code,
@@ -102,7 +102,7 @@ export class XConnectorService implements IXConnectorService {
             const account = new Account(
                 uuidv4(),
                 userId,
-                userId, // workspaceId - temporarily use userId
+                workspaceId,
                 "x",
                 user.name || user.username,
                 accessToken,

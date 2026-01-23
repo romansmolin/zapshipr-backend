@@ -199,17 +199,13 @@ export class PostsRepository implements IPostsRepository {
         }
     }
 
-    async getPosts(userId: string, filters: PostFilters): Promise<PostsListResponse> {
+    async getPosts(userId: string, workspaceId: string, filters: PostFilters): Promise<PostsListResponse> {
         const page = filters.page || 1
         const limit = filters.limit || 9
         const offset = (page - 1) * limit
 
         try {
-            const conditions = [eq(posts.userId, userId)]
-
-            if (filters.workspaceId) {
-                conditions.push(eq(posts.workspaceId, filters.workspaceId))
-            }
+            const conditions = [eq(posts.userId, userId), eq(posts.workspaceId, workspaceId)]
 
             if (filters.status) {
                 conditions.push(eq(posts.status, filters.status))
@@ -224,10 +220,11 @@ export class PostsRepository implements IPostsRepository {
             }
 
             if (filters.platform) {
-                const platformConditions = [eq(posts.userId, userId), eq(postTargets.platform, filters.platform)]
-                if (filters.workspaceId) {
-                    platformConditions.push(eq(posts.workspaceId, filters.workspaceId))
-                }
+                const platformConditions = [
+                    eq(posts.userId, userId),
+                    eq(posts.workspaceId, workspaceId),
+                    eq(postTargets.platform, filters.platform),
+                ]
 
                 const matchingPosts = await this.db
                     .select({ postId: postTargets.postId })
@@ -553,13 +550,22 @@ export class PostsRepository implements IPostsRepository {
         }
     }
 
-    async deletePost(postId: string, userId: string): Promise<{ mediaUrls: string[]; coverImageUrl?: string }> {
+    async deletePost(
+        postId: string,
+        userId: string,
+        workspaceId?: string
+    ): Promise<{ mediaUrls: string[]; coverImageUrl?: string }> {
         try {
             return await this.db.transaction(async (tx) => {
+                const conditions = [eq(posts.id, postId), eq(posts.userId, userId)]
+                if (workspaceId) {
+                    conditions.push(eq(posts.workspaceId, workspaceId))
+                }
+
                 const [postRow] = await tx
                     .select({ coverImageUrl: posts.coverImageUrl })
                     .from(posts)
-                    .where(and(eq(posts.id, postId), eq(posts.userId, userId)))
+                    .where(and(...conditions))
                     .limit(1)
 
                 if (!postRow) {
@@ -605,21 +611,18 @@ export class PostsRepository implements IPostsRepository {
 
     async getPostsByDate(
         userId: string,
+        workspaceId: string,
         fromDate: Date,
-        toDate: Date,
-        workspaceId?: string
+        toDate: Date
     ): Promise<PostsByDateResponse> {
         try {
             const conditions = [
                 eq(posts.userId, userId),
+                eq(posts.workspaceId, workspaceId),
                 gte(posts.createdAt, fromDate),
                 lte(posts.createdAt, toDate),
                 ne(posts.status, PostStatus.DRAFT),
             ]
-
-            if (workspaceId) {
-                conditions.push(eq(posts.workspaceId, workspaceId))
-            }
 
             const postRows = await this.db
                 .select()
@@ -730,19 +733,26 @@ export class PostsRepository implements IPostsRepository {
         }
     }
 
-    async getPostsFailedCount(userId: string): Promise<number> {
+    async getPostsFailedCount(userId: string, workspaceId: string): Promise<number> {
         try {
             const [row] = await this.db
                 .select({ total: sql<number>`count(*)` })
                 .from(postTargets)
                 .innerJoin(posts, eq(postTargets.postId, posts.id))
-                .where(and(eq(posts.userId, userId), eq(postTargets.status, PostStatus.FAILED)))
+                .where(
+                    and(
+                        eq(posts.userId, userId),
+                        eq(posts.workspaceId, workspaceId),
+                        eq(postTargets.status, PostStatus.FAILED)
+                    )
+                )
 
             return Number(row?.total ?? 0)
         } catch (error) {
             this.logger.error('Failed to get failed posts count', {
                 operation: 'PostsRepository.getPostsFailedCount',
                 userId,
+                workspaceId,
                 error: formatError(error),
             })
             throw new BaseAppError('Failed to get failed posts count', ErrorCode.UNKNOWN_ERROR, 500)
@@ -851,7 +861,7 @@ export class PostsRepository implements IPostsRepository {
         }
     }
 
-    async getFailedPostTargets(userId: string): Promise<PostTargetEntity[]> {
+    async getFailedPostTargets(userId: string, workspaceId: string): Promise<PostTargetEntity[]> {
         try {
             const rows = await this.db
                 .select({
@@ -867,7 +877,13 @@ export class PostsRepository implements IPostsRepository {
                 })
                 .from(postTargets)
                 .innerJoin(posts, eq(postTargets.postId, posts.id))
-                .where(and(eq(posts.userId, userId), eq(postTargets.status, PostStatus.FAILED)))
+                .where(
+                    and(
+                        eq(posts.userId, userId),
+                        eq(posts.workspaceId, workspaceId),
+                        eq(postTargets.status, PostStatus.FAILED)
+                    )
+                )
 
             return rows.map(
                 (row) =>

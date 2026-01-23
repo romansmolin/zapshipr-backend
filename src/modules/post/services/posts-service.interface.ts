@@ -33,35 +33,38 @@ export interface IPostsService {
     createPost(
         createPostsRequest: CreatePostsRequest,
         medias: { [fieldname: string]: Express.Multer.File[] } | undefined | Express.Multer.File[],
-        userId: string
+        userId: string,
+        workspaceId: string
     ): Promise<CreatePostResponse | MediaCompatibilityError>
 
     editPost(
         postId: string,
         updatePostRequest: CreatePostsRequest,
         file: Express.Multer.File | undefined,
-        userId: string
+        userId: string,
+        workspaceId: string
     ): Promise<void>
 
     hasExistingMedia(postId: string): Promise<boolean>
 
-    getPostsByFilters(userId: string, filters: PostFilters): Promise<PostsListResponse>
+    getPostsByFilters(userId: string, workspaceId: string, filters: PostFilters): Promise<PostsListResponse>
 
-    deletePost(postId: string, userId: string): Promise<void>
+    deletePost(postId: string, userId: string, workspaceId: string): Promise<void>
     deletePostsOrphanedByAccount(userId: string, accountId: string): Promise<void>
 
-    getPostsByDate(userId: string, fromDate: Date, toDate: Date): Promise<PostsByDateResponse>
+    getPostsByDate(userId: string, workspaceId: string, fromDate: Date, toDate: Date): Promise<PostsByDateResponse>
 
-    getPostsFailedCount(userId: string): Promise<number>
+    getPostsFailedCount(userId: string, workspaceId: string): Promise<number>
 
     retryPostTarget(
         userId: string,
+        workspaceId: string,
         postId: string,
         socialAccountId: string
     ): Promise<{ postTarget: PostTargetResponse; post: CreatePostResponse }>
 
     checkAndUpdateBasePostStatus(userId: string, postId: string): Promise<void>
-    getFailedPostTargets(userId: string): Promise<PostTargetEntity[]>
+    getFailedPostTargets(userId: string, workspaceId: string): Promise<PostTargetEntity[]>
     cancelPostTarget(userId: string, postId: string, socialAccountId: string): Promise<void>
-    deletePostTarget(userId: string, postId: string, socialAccountId: string): Promise<void>
+    deletePostTarget(userId: string, workspaceId: string, postId: string, socialAccountId: string): Promise<void>
 }

@@ -1,6 +1,7 @@
 export interface IBlueskyConnectorService {
-	connectBlueskyAccount(        
+	connectBlueskyAccount(
 		userId: string,
         identifier: string,
-        appPassword: string): Promise<{success: boolean}> 
+        appPassword: string,
+        workspaceId: string): Promise<{success: boolean}>
 }

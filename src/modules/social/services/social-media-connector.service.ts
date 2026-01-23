@@ -36,53 +36,53 @@ export class SocilaMediaConnectorService implements ISocilaMediaConnectorService
         )
     }
 
-    async connectFacebookAccount(userId: string, code: string): Promise<{ success: boolean }> {
+    async connectFacebookAccount(userId: string, code: string, workspaceId: string): Promise<{ success: boolean }> {
         const connector = this.connectorFactory.create(SocilaMediaPlatform.FACEBOOK) as IFacebookConnectorService
-        return connector.connectFacebookAccount(userId, code)
+        return connector.connectFacebookAccount(userId, code, workspaceId)
     }
 
-    async connectInstagramAccount(userId: string, code: string): Promise<{ success: boolean }> {
+    async connectInstagramAccount(userId: string, code: string, workspaceId: string): Promise<{ success: boolean }> {
         const connector = this.connectorFactory.create(SocilaMediaPlatform.INSTAGRAM) as IInstagramConnectorService
-        return connector.connectInstagramAccount(userId, code)
+        return connector.connectInstagramAccount(userId, code, workspaceId)
     }
 
-    async connectThreadsAccount(userId: string, code: string): Promise<{ success: boolean }> {
+    async connectThreadsAccount(userId: string, code: string, workspaceId: string): Promise<{ success: boolean }> {
         const connector = this.connectorFactory.create(SocilaMediaPlatform.THREADS) as IThreadsConnectorService
-        return connector.connectThreadsAccount(userId, code)
+        return connector.connectThreadsAccount(userId, code, workspaceId)
     }
 
-    async connectTikTokAccount(userId: string, code: string): Promise<{ success: boolean }> {
+    async connectTikTokAccount(userId: string, code: string, workspaceId: string): Promise<{ success: boolean }> {
         const connector = this.connectorFactory.create(SocilaMediaPlatform.TIKTOK) as ITikTokConnectorService
-        return connector.connectTikTokAccount(userId, code)
+        return connector.connectTikTokAccount(userId, code, workspaceId)
     }
 
-    async connectYouTubeAccount(userId: string, code: string): Promise<{ success: boolean }> {
+    async connectYouTubeAccount(userId: string, code: string, workspaceId: string): Promise<{ success: boolean }> {
         const connector = this.connectorFactory.create(SocilaMediaPlatform.YOUTUBE) as IYouTubeConnectorService
-        return connector.connectYouTubeAccount(userId, code)
+        return connector.connectYouTubeAccount(userId, code, workspaceId)
     }
 
-    async connectBlueskyAccount(userId: string, identifier: string, appPassword: string): Promise<{ success: boolean }> {
+    async connectBlueskyAccount(userId: string, identifier: string, appPassword: string, workspaceId: string): Promise<{ success: boolean }> {
         const connector = this.connectorFactory.create(SocilaMediaPlatform.BLUESKY) as IBlueskyConnectorService
-        return connector.connectBlueskyAccount(userId, identifier, appPassword)
+        return connector.connectBlueskyAccount(userId, identifier, appPassword, workspaceId)
     }
 
-    async connectXAccount(userId: string, code: string, codeVerifier: string): Promise<{ success: boolean }> {
+    async connectXAccount(userId: string, code: string, codeVerifier: string, workspaceId: string): Promise<{ success: boolean }> {
         const connector = this.connectorFactory.create(SocilaMediaPlatform.X) as IXConnectorService
-        return connector.connectXAccount(userId, code, codeVerifier)
+        return connector.connectXAccount(userId, code, codeVerifier, workspaceId)
     }
 
-    async connectPinterestAccount(userId: string, code: string): Promise<{ success: boolean }> {
+    async connectPinterestAccount(userId: string, code: string, workspaceId: string): Promise<{ success: boolean }> {
         const connector = this.connectorFactory.create(SocilaMediaPlatform.PINTEREST) as IPinterestConnectorService
-        return connector.connectPinterestAccount(userId, code)
+        return connector.connectPinterestAccount(userId, code, workspaceId)
     }
 
-    async connectLinkedinAccount(userId: string, code: string): Promise<{ success: boolean }> {
+    async connectLinkedinAccount(userId: string, code: string, workspaceId: string): Promise<{ success: boolean }> {
         const connector = this.connectorFactory.create(SocilaMediaPlatform.LINKEDIN) as ILinkedinConnectorService
-        return connector.connectLinkedinAccount(userId, code)
+        return connector.connectLinkedinAccount(userId, code, workspaceId)
     }
 
-    async getTikTokCreatorInfo(userId: string, socialAccountId: string): Promise<TikTokCreatorInfoDto> {
+    async getTikTokCreatorInfo(userId: string, workspaceId: string, socialAccountId: string): Promise<TikTokCreatorInfoDto> {
         const connector = this.connectorFactory.create(SocilaMediaPlatform.TIKTOK) as ITikTokConnectorService
-        return connector.getTikTokCreatorInfo(userId, socialAccountId)
+        return connector.getTikTokCreatorInfo(userId, workspaceId, socialAccountId)
     }
 }

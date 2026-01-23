@@ -52,20 +52,20 @@ export class AccountsService implements IAccountsService {
         return this.listAccountsUseCase.execute({ userId })
     }
 
-    async getAllAccounts(userId: string): Promise<SocialAccountResponse[]> {
-        return this.listAccounts(userId)
+    async getAllAccounts(userId: string, workspaceId: string): Promise<SocialAccountResponse[]> {
+        return this.listAccountsUseCase.execute({ userId, workspaceId })
     }
 
     async getAccountById(userId: string, accountId: string): Promise<SocialAccountResponse> {
         return this.getAccountByIdUseCase.execute({ userId, accountId })
     }
 
-    async deleteAccount(userId: string, accountId: string): Promise<{ success: boolean }> {
-        return this.deleteAccountUseCase.execute({ userId, accountId })
+    async deleteAccount(userId: string, workspaceId: string, accountId: string): Promise<{ success: boolean }> {
+        return this.deleteAccountUseCase.execute({ userId, workspaceId, accountId })
     }
 
-    async getPinterestBoards(userId: string, socialAccountId: string): Promise<PinterestBoard[]> {
-        return this.getPinterestBoardsUseCase.execute({ userId, socialAccountId })
+    async getPinterestBoards(userId: string, workspaceId: string, socialAccountId: string): Promise<PinterestBoard[]> {
+        return this.getPinterestBoardsUseCase.execute({ userId, workspaceId, socialAccountId })
     }
 
     async updateAccessToken(userId: string, pageId: string, accessToken: string): Promise<void> {

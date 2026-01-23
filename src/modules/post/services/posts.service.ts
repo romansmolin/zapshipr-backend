@@ -527,7 +527,8 @@ export class PostsService implements IPostsService {
     async createPost(
         createPostsRequest: CreatePostsRequest,
         medias: { [fieldname: string]: Express.Multer.File[] } | undefined | Express.Multer.File[],
-        userId: string
+        userId: string,
+        workspaceId: string
     ): Promise<CreatePostResponse | MediaCompatibilityError> {
         try {
             const mediaCompatibilityError = this.validateMediaCompatibility(createPostsRequest, medias)
@@ -567,7 +568,7 @@ export class PostsService implements IPostsService {
 
             const { postId } = await this.postRepository.createBasePost(
                 userId,
-                userId, // workspaceId - temporarily use userId
+                workspaceId,
                 initialStatus,
                 createPostsRequest.postType,
                 scheduledAtLocal,
@@ -790,7 +791,8 @@ export class PostsService implements IPostsService {
         postId: string,
         updatePostRequest: CreatePostsRequest,
         file: Express.Multer.File | undefined,
-        userId: string
+        userId: string,
+        workspaceId: string
     ): Promise<void> {
         try {
             const oldPost = await this.postRepository.getPostDetails(postId, userId)
@@ -943,9 +945,9 @@ export class PostsService implements IPostsService {
         }
     }
 
-    async getPostsByFilters(userId: string, filters: PostFilters): Promise<PostsListResponse> {
+    async getPostsByFilters(userId: string, workspaceId: string, filters: PostFilters): Promise<PostsListResponse> {
         try {
-            const response = await this.postRepository.getPosts(userId, filters)
+            const response = await this.postRepository.getPosts(userId, workspaceId, filters)
             return response
         } catch (error) {
             if (error instanceof BaseAppError) throw error
@@ -1001,7 +1003,7 @@ export class PostsService implements IPostsService {
         }
     }
 
-    async deletePost(postId: string, userId: string): Promise<void> {
+    async deletePost(postId: string, userId: string, workspaceId?: string): Promise<void> {
         try {
             const postDetails = await this.postRepository.getPostDetails(postId, userId)
             await this.cleanupScheduledJobs(
@@ -1010,7 +1012,7 @@ export class PostsService implements IPostsService {
                 false
             )
 
-            const { mediaUrls, coverImageUrl } = await this.postRepository.deletePost(postId, userId)
+            const { mediaUrls, coverImageUrl } = await this.postRepository.deletePost(postId, userId, workspaceId)
 
             if (mediaUrls.length > 0) {
                 await Promise.all(
@@ -1069,9 +1071,9 @@ export class PostsService implements IPostsService {
         }
     }
 
-    async getPostsByDate(userId: string, fromDate: Date, toDate: Date): Promise<PostsByDateResponse> {
+    async getPostsByDate(userId: string, workspaceId: string, fromDate: Date, toDate: Date): Promise<PostsByDateResponse> {
         try {
-            const { posts } = await this.postRepository.getPostsByDate(userId, fromDate, toDate)
+            const { posts } = await this.postRepository.getPostsByDate(userId, workspaceId, fromDate, toDate)
 
             return { posts }
         } catch (error: unknown) {
@@ -1080,9 +1082,9 @@ export class PostsService implements IPostsService {
         }
     }
 
-    async getPostsFailedCount(userId: string): Promise<number> {
+    async getPostsFailedCount(userId: string, workspaceId: string): Promise<number> {
         try {
-            const failedCount = await this.postRepository.getPostsFailedCount(userId)
+            const failedCount = await this.postRepository.getPostsFailedCount(userId, workspaceId)
 
             return failedCount
         } catch (error: unknown) {
@@ -1093,6 +1095,7 @@ export class PostsService implements IPostsService {
 
     async retryPostTarget(
         userId: string,
+        workspaceId: string,
         postId: string,
         socialAccountId: string
     ): Promise<{ postTarget: PostTargetResponse; post: CreatePostResponse }> {
@@ -1186,7 +1189,7 @@ export class PostsService implements IPostsService {
         }
     }
 
-    async deletePostTarget(userId: string, postId: string, socialAccountId: string): Promise<void> {
+    async deletePostTarget(userId: string, workspaceId: string, postId: string, socialAccountId: string): Promise<void> {
         try {
             await this.postRepository.deletePostTarget(userId, postId, socialAccountId)
 
@@ -1296,9 +1299,9 @@ export class PostsService implements IPostsService {
         }
     }
 
-    async getFailedPostTargets(userId: string): Promise<PostTargetEntity[]> {
+    async getFailedPostTargets(userId: string, workspaceId: string): Promise<PostTargetEntity[]> {
         try {
-            const failedPosts = await this.postRepository.getFailedPostTargets(userId)
+            const failedPosts = await this.postRepository.getFailedPostTargets(userId, workspaceId)
 
             return failedPosts
         } catch (err: unknown) {

@@ -1,5 +1,6 @@
 import { BaseAppError } from '@/shared/errors/base-error'
 import { ErrorCode } from '@/shared/consts/error-codes.const'
+import { workspaceIdParamSchema } from '@/modules/workspace/validation/workspace.schemas'
 
 import type { IPostsService, MediaCompatibilityError } from '@/modules/post/services/posts-service.interface'
 import type { CreatePostsRequest } from '@/modules/post/schemas/posts.schemas'
@@ -119,16 +120,25 @@ export class PostsController {
         this.logger = logger
     }
 
+    private getWorkspaceId(req: Request): string {
+        const workspaceId = req.workspaceId
+        if (!workspaceId) {
+            throw new BaseAppError('Workspace ID is required', ErrorCode.BAD_REQUEST, 400)
+        }
+        return workspaceId
+    }
+
     async createPost(req: Request, res: Response, _next: NextFunction): Promise<void> {
         const userId = req.user?.id
         if (!userId) {
             throw new BaseAppError('Unauthorized', ErrorCode.UNAUTHORIZED, 401)
         }
 
+        const workspaceId = this.getWorkspaceId(req)
         const payload = createPostsSchema.parse(parseCreatePostsRequest(req.body))
         const medias = req.files as { [fieldname: string]: Express.Multer.File[] } | Express.Multer.File[]
 
-        const result = await this.postsService.createPost(payload, medias, userId)
+        const result = await this.postsService.createPost(payload, medias, userId, workspaceId)
 
         if (isCompatibilityError(result)) {
             res.status(result.status).json(result)
@@ -151,6 +161,7 @@ export class PostsController {
             throw new BaseAppError('Unauthorized', ErrorCode.UNAUTHORIZED, 401)
         }
 
+        const workspaceId = this.getWorkspaceId(req)
         const { postId } = req.params
         if (!postId) {
             throw new BaseAppError('Post ID is required', ErrorCode.BAD_REQUEST, 400)
@@ -159,11 +170,12 @@ export class PostsController {
         const payload = createPostsSchema.parse(parseCreatePostsRequest(req.body))
         const file = req.file
 
-        await this.postsService.editPost(postId, payload, file, userId)
+        await this.postsService.editPost(postId, payload, file, userId, workspaceId)
 
         this.logger.info('Post updated', {
             operation: 'PostsController.editPost',
             userId,
+            workspaceId,
             postId,
         })
 
@@ -176,12 +188,13 @@ export class PostsController {
             throw new BaseAppError('Unauthorized', ErrorCode.UNAUTHORIZED, 401)
         }
 
+        const workspaceId = this.getWorkspaceId(req)
         const { postId } = req.params
         if (!postId) {
             throw new BaseAppError('Post ID is required', ErrorCode.BAD_REQUEST, 400)
         }
 
-        await this.postsService.deletePost(postId, userId)
+        await this.postsService.deletePost(postId, userId, workspaceId)
 
         res.status(204).end()
     }
@@ -192,6 +205,7 @@ export class PostsController {
             throw new BaseAppError('Unauthorized', ErrorCode.UNAUTHORIZED, 401)
         }
 
+        const workspaceId = this.getWorkspaceId(req)
         const filters: PostFilters = {
             page: Number(getFirstValue(req.query.page)) || undefined,
             limit: Number(getFirstValue(req.query.limit)) || undefined,
@@ -201,7 +215,7 @@ export class PostsController {
             toDate: parseDate(getFirstValue(req.query.toDate)) ?? undefined,
         }
 
-        const result = await this.postsService.getPostsByFilters(userId, filters)
+        const result = await this.postsService.getPostsByFilters(userId, workspaceId, filters)
 
         res.json(result)
     }
@@ -212,6 +226,7 @@ export class PostsController {
             throw new BaseAppError('Unauthorized', ErrorCode.UNAUTHORIZED, 401)
         }
 
+        const workspaceId = this.getWorkspaceId(req)
         const fromDateRaw = getFirstValue(req.query.fromDate)
         const toDateRaw = getFirstValue(req.query.toDate)
         const fromDate = parseDate(fromDateRaw)
@@ -221,7 +236,7 @@ export class PostsController {
             throw new BaseAppError('fromDate and toDate are required', ErrorCode.BAD_REQUEST, 400)
         }
 
-        const result = await this.postsService.getPostsByDate(userId, fromDate, toDate)
+        const result = await this.postsService.getPostsByDate(userId, workspaceId, fromDate, toDate)
 
         res.json(result)
     }
@@ -232,7 +247,8 @@ export class PostsController {
             throw new BaseAppError('Unauthorized', ErrorCode.UNAUTHORIZED, 401)
         }
 
-        const count = await this.postsService.getPostsFailedCount(userId)
+        const workspaceId = this.getWorkspaceId(req)
+        const count = await this.postsService.getPostsFailedCount(userId, workspaceId)
 
         res.json({ count })
     }
@@ -244,7 +260,8 @@ export class PostsController {
 
         if (!userId) throw new BaseAppError('Unauthorized', ErrorCode.UNAUTHORIZED, 401)
 
-        const result = await this.postsService.getFailedPostTargets(userId)
+        const workspaceId = this.getWorkspaceId(req)
+        const result = await this.postsService.getFailedPostTargets(userId, workspaceId)
 
         this.logger.debug('Failed Targets: ', { result })
 
@@ -257,6 +274,7 @@ export class PostsController {
             throw new BaseAppError('Unauthorized', ErrorCode.UNAUTHORIZED, 401)
         }
 
+        const workspaceId = this.getWorkspaceId(req)
         const postId = req.body?.postId
         const socialAccountId = req.body?.socialAccountId
 
@@ -264,7 +282,7 @@ export class PostsController {
             throw new BaseAppError('postId and socialAccountId are required', ErrorCode.BAD_REQUEST, 400)
         }
 
-        const result = await this.postsService.retryPostTarget(userId, postId, socialAccountId)
+        const result = await this.postsService.retryPostTarget(userId, workspaceId, postId, socialAccountId)
 
         res.json(result)
     }
@@ -275,6 +293,7 @@ export class PostsController {
             throw new BaseAppError('Unauthorized', ErrorCode.UNAUTHORIZED, 401)
         }
 
+        const workspaceId = this.getWorkspaceId(req)
         const postId = req.body?.postId
         const socialAccountId = req.body?.socialAccountId
 
@@ -282,7 +301,7 @@ export class PostsController {
             throw new BaseAppError('postId and socialAccountId are required', ErrorCode.BAD_REQUEST, 400)
         }
 
-        await this.postsService.deletePostTarget(userId, postId, socialAccountId)
+        await this.postsService.deletePostTarget(userId, workspaceId, postId, socialAccountId)
 
         res.status(204).end()
     }
