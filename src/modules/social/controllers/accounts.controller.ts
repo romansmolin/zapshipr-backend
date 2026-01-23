@@ -68,10 +68,15 @@ export class AccountsController {
 
         try {
             await this.connectorService.connectFacebookAccount(userId, authCode, workspaceId)
-            this.redirectToAccounts(res)
+            this.redirectToAccounts(res, workspaceId)
         } catch (error) {
             if (error instanceof BaseAppError && error.code === ErrorCode.WORKSPACE_MISMATCH) {
-                this.redirectWithError(res, 'workspace_mismatch', 'This account is already connected to a different workspace')
+                this.redirectWithError(
+                    res,
+                    workspaceId,
+                    'workspace_mismatch',
+                    'This account is already connected to a different workspace'
+                )
                 return
             }
             throw error
@@ -90,10 +95,15 @@ export class AccountsController {
 
         try {
             await this.connectorService.connectThreadsAccount(userId, authCode, workspaceId)
-            this.redirectToAccounts(res)
+            this.redirectToAccounts(res, workspaceId)
         } catch (error) {
             if (error instanceof BaseAppError && error.code === ErrorCode.WORKSPACE_MISMATCH) {
-                this.redirectWithError(res, 'workspace_mismatch', 'This account is already connected to a different workspace')
+                this.redirectWithError(
+                    res,
+                    workspaceId,
+                    'workspace_mismatch',
+                    'This account is already connected to a different workspace'
+                )
                 return
             }
             throw error
@@ -112,10 +122,15 @@ export class AccountsController {
 
         try {
             await this.connectorService.connectTikTokAccount(userId, authCode, workspaceId)
-            this.redirectToAccounts(res)
+            this.redirectToAccounts(res, workspaceId)
         } catch (error) {
             if (error instanceof BaseAppError && error.code === ErrorCode.WORKSPACE_MISMATCH) {
-                this.redirectWithError(res, 'workspace_mismatch', 'This account is already connected to a different workspace')
+                this.redirectWithError(
+                    res,
+                    workspaceId,
+                    'workspace_mismatch',
+                    'This account is already connected to a different workspace'
+                )
                 return
             }
             throw error
@@ -134,10 +149,15 @@ export class AccountsController {
 
         try {
             await this.connectorService.connectYouTubeAccount(userId, authCode, workspaceId)
-            this.redirectToAccounts(res)
+            this.redirectToAccounts(res, workspaceId)
         } catch (error) {
             if (error instanceof BaseAppError && error.code === ErrorCode.WORKSPACE_MISMATCH) {
-                this.redirectWithError(res, 'workspace_mismatch', 'This account is already connected to a different workspace')
+                this.redirectWithError(
+                    res,
+                    workspaceId,
+                    'workspace_mismatch',
+                    'This account is already connected to a different workspace'
+                )
                 return
             }
             throw error
@@ -160,10 +180,15 @@ export class AccountsController {
 
         try {
             await this.connectorService.connectXAccount(userId, authCode, resolvedCodeVerifier, workspaceId)
-            this.redirectToAccounts(res)
+            this.redirectToAccounts(res, workspaceId)
         } catch (error) {
             if (error instanceof BaseAppError && error.code === ErrorCode.WORKSPACE_MISMATCH) {
-                this.redirectWithError(res, 'workspace_mismatch', 'This account is already connected to a different workspace')
+                this.redirectWithError(
+                    res,
+                    workspaceId,
+                    'workspace_mismatch',
+                    'This account is already connected to a different workspace'
+                )
                 return
             }
             throw error
@@ -182,10 +207,15 @@ export class AccountsController {
 
         try {
             await this.connectorService.connectPinterestAccount(userId, authCode, workspaceId)
-            this.redirectToAccounts(res)
+            this.redirectToAccounts(res, workspaceId)
         } catch (error) {
             if (error instanceof BaseAppError && error.code === ErrorCode.WORKSPACE_MISMATCH) {
-                this.redirectWithError(res, 'workspace_mismatch', 'This account is already connected to a different workspace')
+                this.redirectWithError(
+                    res,
+                    workspaceId,
+                    'workspace_mismatch',
+                    'This account is already connected to a different workspace'
+                )
                 return
             }
             throw error
@@ -204,10 +234,15 @@ export class AccountsController {
 
         try {
             await this.connectorService.connectInstagramAccount(userId, authCode, workspaceId)
-            this.redirectToAccounts(res)
+            this.redirectToAccounts(res, workspaceId)
         } catch (error) {
             if (error instanceof BaseAppError && error.code === ErrorCode.WORKSPACE_MISMATCH) {
-                this.redirectWithError(res, 'workspace_mismatch', 'This account is already connected to a different workspace')
+                this.redirectWithError(
+                    res,
+                    workspaceId,
+                    'workspace_mismatch',
+                    'This account is already connected to a different workspace'
+                )
                 return
             }
             throw error
@@ -226,10 +261,15 @@ export class AccountsController {
 
         try {
             await this.connectorService.connectLinkedinAccount(userId, authCode, workspaceId)
-            this.redirectToAccounts(res)
+            this.redirectToAccounts(res, workspaceId)
         } catch (error) {
             if (error instanceof BaseAppError && error.code === ErrorCode.WORKSPACE_MISMATCH) {
-                this.redirectWithError(res, 'workspace_mismatch', 'This account is already connected to a different workspace')
+                this.redirectWithError(
+                    res,
+                    workspaceId,
+                    'workspace_mismatch',
+                    'This account is already connected to a different workspace'
+                )
                 return
             }
             throw error
@@ -374,9 +414,9 @@ export class AccountsController {
         return code
     }
 
-    private redirectToAccounts(res: Response) {
+    private redirectToAccounts(res: Response, workspaceId: string) {
         const frontendUrl = getEnvVar('FRONTEND_URL')
-        const redirectUrl = `${frontendUrl}/accounts`
+        const redirectUrl = `${frontendUrl}/accounts?workspaceId=${workspaceId}`
         res.redirect(redirectUrl)
     }
 
@@ -390,9 +430,9 @@ export class AccountsController {
         return workspaceId
     }
 
-    private redirectWithError(res: Response, errorCode: string, errorMessage: string) {
+    private redirectWithError(res: Response, workspaceId: string, errorCode: string, errorMessage: string) {
         const frontendUrl = getEnvVar('FRONTEND_URL')
-        const redirectUrl = `${frontendUrl}/accounts?error=${encodeURIComponent(errorCode)}&error_description=${encodeURIComponent(errorMessage)}`
+        const redirectUrl = `${frontendUrl}/accounts?workspaceId=${workspaceId}&error=${encodeURIComponent(errorCode)}&error_description=${encodeURIComponent(errorMessage)}`
         res.redirect(redirectUrl)
     }
 }
