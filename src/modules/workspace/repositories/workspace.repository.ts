@@ -7,6 +7,7 @@ import type { ILogger } from '@/shared/logger'
 import type { InsertWorkspace, Workspace } from '../entity/workspace.schema'
 import { workspaces } from '../entity/workspace.schema'
 import type { IWorkspaceRepository } from './workspace-repository.interface'
+import type { Onboarding } from '../validation/onboarding.schemas'
 
 export class WorkspaceRepository implements IWorkspaceRepository {
     constructor(
@@ -87,6 +88,21 @@ export class WorkspaceRepository implements IWorkspaceRepository {
             .update(workspaces)
             .set({
                 mainPrompt,
+                updatedAt: new Date(),
+            })
+            .where(eq(workspaces.id, id))
+            .returning()
+
+        return workspace
+    }
+
+    async updateOnboarding(id: string, onboarding: Onboarding): Promise<Workspace | undefined> {
+        this.logger.info('Updating workspace onboarding', { workspaceId: id })
+
+        const [workspace] = await this.db
+            .update(workspaces)
+            .set({
+                onboarding,
                 updatedAt: new Date(),
             })
             .where(eq(workspaces.id, id))

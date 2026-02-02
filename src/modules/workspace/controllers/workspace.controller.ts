@@ -4,6 +4,7 @@ import type { ILogger } from '@/shared/logger'
 
 import type { IWorkspaceService } from '../services/workspace-service.interface'
 import { createWorkspaceSchema, updateWorkspaceSchema } from '../validation/workspace.schemas'
+import { updateOnboardingInputSchema } from '../validation/onboarding.schemas'
 import type { IWorkspaceController } from './workspace-controller.interface'
 
 export class WorkspaceController implements IWorkspaceController {
@@ -113,5 +114,28 @@ export class WorkspaceController implements IWorkspaceController {
         const workspace = await this.service.setDefaultWorkspace(id, userId)
 
         res.json(workspace)
+    }
+
+    async getOnboarding(req: Request, res: Response): Promise<void> {
+        const userId = req.user!.id
+        const { id } = req.params
+
+        this.logger.info('Get onboarding request', { userId, workspaceId: id })
+
+        const onboarding = await this.service.getOnboarding(id, userId)
+
+        res.json(onboarding)
+    }
+
+    async updateOnboarding(req: Request, res: Response): Promise<void> {
+        const userId = req.user!.id
+        const { id } = req.params
+        const body = updateOnboardingInputSchema.parse(req.body)
+
+        this.logger.info('Update onboarding request', { userId, workspaceId: id })
+
+        const onboarding = await this.service.updateOnboarding(id, userId, body)
+
+        res.json(onboarding)
     }
 }

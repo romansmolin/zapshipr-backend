@@ -1,4 +1,4 @@
-import type { NextFunction, Request, Response } from 'express'
+import type { CookieOptions, NextFunction, Request, Response } from 'express'
 
 import type { ILogger } from '@/shared/logger/logger.interface'
 import { toUserResponse } from '@/modules/user/entity/user.dto'
@@ -23,7 +23,7 @@ export class AuthController implements IAuthController {
 
         const result = await this.authService.signIn(payload)
 
-        this.setAuthCookie(res, result.refreshToken)
+        this.setAuthCookie(req, res, result.refreshToken)
 
         this.logger.info('User signed in', { operation: 'AuthController.signIn', userId: result.user.id })
 
@@ -35,7 +35,7 @@ export class AuthController implements IAuthController {
 
         const result = await this.authService.signUp(payload)
 
-        this.setAuthCookie(res, result.refreshToken)
+        this.setAuthCookie(req, res, result.refreshToken)
 
         this.logger.info('User signed up', { operation: 'AuthController.signUp', userId: result.user.id })
 
@@ -67,7 +67,8 @@ export class AuthController implements IAuthController {
 
         const result = await this.authService.googleCallback(payload.code)
 
-        this.setAuthCookie(res, result.refreshToken)
+        this.logger.debug('TOKEN: ', { token: result.refreshToken })
+        this.setAuthCookie(req, res, result.refreshToken)
 
         this.logger.info('Google auth callback handled', {
             operation: 'AuthController.googleCallback',
@@ -90,7 +91,7 @@ export class AuthController implements IAuthController {
 
         const result = await this.authService.getSession(refreshToken)
 
-        this.setAuthCookie(res, result.refreshToken)
+        this.setAuthCookie(req, res, result.refreshToken)
 
         this.logger.info('Session validated via cookie', {
             operation: 'AuthController.authMe',
@@ -105,7 +106,7 @@ export class AuthController implements IAuthController {
 
         const result = await this.authService.refresh(refreshToken)
 
-        this.setAuthCookie(res, result.refreshToken)
+        this.setAuthCookie(req, res, result.refreshToken)
 
         this.logger.info('Access token refreshed', {
             operation: 'AuthController.authRefresh',
@@ -116,7 +117,7 @@ export class AuthController implements IAuthController {
 
     async logout(req: Request, res: Response, next: NextFunction): Promise<void> {
         await this.authService.logout()
-        this.clearAuthCookie(res)
+        this.clearAuthCookie(req, res)
         res.status(204).end()
     }
 
@@ -126,22 +127,52 @@ export class AuthController implements IAuthController {
 
     // AUTH COOKIES LOGIC
 
-    private getRefreshCookieOptions() {
-        return {
-            httpOnly: true,
-            sameSite: 'lax' as const,
-            secure: process.env.NODE_ENV === 'production',
-            domain: '.zapshipr.com',
-            maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+    private getRefreshCookieOptions(req?: Request): CookieOptions {
+        const sameSiteEnv = process.env.AUTH_COOKIE_SAMESITE?.toLowerCase()
+        const sameSite =
+            sameSiteEnv === 'none' || sameSiteEnv === 'lax' || sameSiteEnv === 'strict'
+                ? (sameSiteEnv as 'none' | 'lax' | 'strict')
+                : 'lax'
+
+        const forwardedProto = req?.headers['x-forwarded-proto']
+        const forwardedProtoValue = Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto
+        const isHttps =
+            req?.secure || (typeof forwardedProtoValue === 'string' && forwardedProtoValue.split(',')[0].trim() === 'https')
+
+        const secureEnv = process.env.AUTH_COOKIE_SECURE?.toLowerCase()
+        let secure =
+            secureEnv === 'true' ? true : secureEnv === 'false' ? false : isHttps || process.env.NODE_ENV === 'production'
+
+        if (sameSite === 'none') {
+            secure = true
         }
+
+        const domain = process.env.AUTH_COOKIE_DOMAIN?.trim()
+        const path = process.env.AUTH_COOKIE_PATH?.trim() || '/'
+        const maxAgeDays = Number.parseInt(process.env.AUTH_COOKIE_MAX_AGE_DAYS ?? '7', 10)
+        const maxAge = Number.isFinite(maxAgeDays) ? maxAgeDays * 24 * 60 * 60 * 1000 : 1000 * 60 * 60 * 24 * 7
+
+        const options: CookieOptions = {
+            httpOnly: true,
+            sameSite,
+            secure,
+            path,
+            maxAge,
+        }
+
+        if (domain) {
+            options.domain = domain
+        }
+
+        return options
     }
 
-    private setAuthCookie(res: Response, refreshToken: string) {
-        res.cookie('token', refreshToken, this.getRefreshCookieOptions())
+    private setAuthCookie(req: Request, res: Response, refreshToken: string) {
+        res.cookie('token', refreshToken, this.getRefreshCookieOptions(req))
     }
 
-    private clearAuthCookie(res: Response) {
-        const { maxAge, ...options } = this.getRefreshCookieOptions()
+    private clearAuthCookie(req: Request, res: Response) {
+        const { maxAge, ...options } = this.getRefreshCookieOptions(req)
         res.clearCookie('token', options)
     }
 }

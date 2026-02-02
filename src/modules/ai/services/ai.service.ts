@@ -251,7 +251,8 @@ export class AiService implements IAiService {
                           ? lastValidationError.message
                           : String(lastValidationError),
             },
-            details: lastValidationError instanceof Error ? lastValidationError.message : String(lastValidationError),
+            details:
+                lastValidationError instanceof Error ? lastValidationError.message : String(lastValidationError),
         })
 
         throw new BaseAppError('Failed to generate AI content', ErrorCode.UNKNOWN_ERROR, 502)
@@ -537,7 +538,9 @@ export class AiService implements IAiService {
                 .join(' ')
                 .toLowerCase()
 
-            const offendingWords = processedForbiddenWords.filter((word) => combinedContent.includes(word.normalized))
+            const offendingWords = processedForbiddenWords.filter((word) =>
+                combinedContent.includes(word.normalized)
+            )
 
             if (offendingWords.length > 0) {
                 this.logger.warn('Generated content contains forbidden terms', {

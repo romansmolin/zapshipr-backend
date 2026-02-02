@@ -1,0 +1,1110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<frontend-integration-task>
+  <metadata>
+    <task-id>FE-2024-001</task-id>
+    <title>Integrate User Images List Endpoint</title>
+    <priority>medium</priority>
+    <estimated-effort>5-8 hours</estimated-effort>
+    <created-date>2026-01-31</created-date>
+    <backend-pr>link-to-pr</backend-pr>
+  </metadata>
+
+  <overview>
+    <description>
+      A new authenticated API endpoint has been implemented to retrieve all images stored in S3 for the current user.
+      This endpoint supports pagination, filtering by folder prefix, and optional signed URL generation for secure access.
+    </description>
+    <purpose>
+      Enable the frontend to display user-uploaded images, browse media galleries, and integrate image selection
+      into existing workflows (post creation, profile management, inspiration boards, etc.).
+    </purpose>
+    <backend-status>
+      Implemented, tested, and deployed to staging environment.
+    </backend-status>
+  </overview>
+
+  <api-specification>
+    <endpoint>
+      <method>GET</method>
+      <path>/api/media/images</path>
+      <base-url>
+        <staging>https://staging-api.zapshipr.com</staging>
+        <production>https://api.zapshipr.com</production>
+      </base-url>
+      <authentication>
+        <required>true</required>
+        <method>Bearer token (Authorization header) OR Cookie (token)</method>
+      </authentication>
+    </endpoint>
+
+    <request>
+      <query-parameters>
+        <parameter>
+          <name>limit</name>
+          <type>number</type>
+          <required>false</required>
+          <default>50</default>
+          <constraints>
+            <min>1</min>
+            <max>100</max>
+          </constraints>
+          <description>Maximum number of items to return per request</description>
+        </parameter>
+
+        <parameter>
+          <name>cursor</name>
+          <type>string</type>
+          <required>false</required>
+          <description>
+            Pagination cursor token returned from previous response (nextCursor field).
+            Omit for first page.
+          </description>
+        </parameter>
+
+        <parameter>
+          <name>prefix</name>
+          <type>string</type>
+          <required>false</required>
+          <description>
+            Optional sub-folder filter under user's root folder.
+            Examples: "covers/", "accounts/", "inspirations/"
+            Leave empty to retrieve all user images.
+          </description>
+        </parameter>
+
+        <parameter>
+          <name>signed</name>
+          <type>boolean</type>
+          <required>false</required>
+          <default>false</default>
+          <description>
+            When true, generates presigned URLs for secure, temporary access to images.
+            Use this if S3 bucket is private or for enhanced security.
+          </description>
+        </parameter>
+
+        <parameter>
+          <name>expiresIn</name>
+          <type>number</type>
+          <required>false</required>
+          <default>3600</default>
+          <constraints>
+            <min>60</min>
+            <max>86400</max>
+          </constraints>
+          <description>
+            Signed URL expiration time in seconds (1 minute to 24 hours).
+            Only used when signed=true.
+          </description>
+        </parameter>
+      </query-parameters>
+
+      <headers>
+        <header>
+          <name>Authorization</name>
+          <value>Bearer {access_token}</value>
+          <required>true</required>
+        </header>
+      </headers>
+    </request>
+
+    <response>
+      <success>
+        <status-code>200</status-code>
+        <content-type>application/json</content-type>
+        <schema>
+          <field>
+            <name>items</name>
+            <type>array</type>
+            <description>Array of image objects</description>
+            <item-schema>
+              <field name="key" type="string" description="S3 object key (e.g., 'user-123/covers/1234567890-image.jpg')" />
+              <field name="url" type="string" description="Public S3 URL for the image" />
+              <field name="signedUrl" type="string" optional="true" description="Presigned URL (only present when signed=true)" />
+              <field name="size" type="number" description="File size in bytes" />
+              <field name="lastModified" type="string" description="ISO 8601 timestamp of last modification" />
+              <field name="contentType" type="string" optional="true" description="MIME type (currently not populated, reserved for future use)" />
+            </item-schema>
+          </field>
+
+          <field>
+            <name>nextCursor</name>
+            <type>string</type>
+            <optional>true</optional>
+            <description>
+              Continuation token for fetching the next page.
+              Only present when hasMore=true.
+            </description>
+          </field>
+
+          <field>
+            <name>hasMore</name>
+            <type>boolean</type>
+            <description>
+              Indicates whether more results are available.
+              When true, use nextCursor to fetch the next page.
+            </description>
+          </field>
+        </schema>
+
+        <example>
+          <![CDATA[
+{
+  "items": [
+    {
+      "key": "user-abc123/covers/1706745600000-header.jpg",
+      "url": "https://zapshipr-bucket.s3.amazonaws.com/user-abc123/covers/1706745600000-header.jpg",
+      "signedUrl": "https://zapshipr-bucket.s3.amazonaws.com/user-abc123/covers/1706745600000-header.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=...",
+      "size": 204800,
+      "lastModified": "2024-02-01T00:00:00.000Z"
+    },
+    {
+      "key": "user-abc123/accounts/1706832000000-avatar.png",
+      "url": "https://zapshipr-bucket.s3.amazonaws.com/user-abc123/accounts/1706832000000-avatar.png",
+      "size": 51200,
+      "lastModified": "2024-02-02T00:00:00.000Z"
+    }
+  ],
+  "nextCursor": "eyJDb250aW51YXRpb25Ub2tlbiI6Im5leHQtcGFnZS10b2tlbiJ9",
+  "hasMore": true
+}
+          ]]>
+        </example>
+      </success>
+
+      <errors>
+        <error>
+          <status-code>401</status-code>
+          <error-code>UNAUTHORIZED</error-code>
+          <description>Missing or invalid authentication token</description>
+          <example>
+            <![CDATA[
+{
+  "errorMessageCode": "UNAUTHORIZED",
+  "httpCode": 401
+}
+            ]]>
+          </example>
+        </error>
+
+        <error>
+          <status-code>400</status-code>
+          <error-code>BAD_REQUEST</error-code>
+          <description>Invalid query parameters (validation failure)</description>
+          <example>
+            <![CDATA[
+{
+  "errorMessageCode": "BAD_REQUEST",
+  "httpCode": 400,
+  "fields": [
+    {
+      "field": "limit",
+      "message": "Number must be less than or equal to 100"
+    }
+  ]
+}
+            ]]>
+          </example>
+        </error>
+
+        <error>
+          <status-code>500</status-code>
+          <error-code>UNKNOWN_ERROR</error-code>
+          <description>Server error or S3 connection failure</description>
+          <example>
+            <![CDATA[
+{
+  "errorMessageCode": "UNKNOWN_ERROR",
+  "httpCode": 500
+}
+            ]]>
+          </example>
+        </error>
+      </errors>
+    </response>
+  </api-specification>
+
+  <implementation-requirements>
+    <technical-requirements>
+      <requirement>
+        <id>TR-001</id>
+        <category>API Client</category>
+        <description>Create a new API service method for fetching user images</description>
+        <acceptance>
+          Method should handle authentication, query parameters, and response parsing.
+          Should follow existing API client patterns in the codebase.
+        </acceptance>
+      </requirement>
+
+      <requirement>
+        <id>TR-002</id>
+        <category>TypeScript Types</category>
+        <description>Define TypeScript interfaces for request params and response data</description>
+        <acceptance>
+          Types should match the API specification exactly.
+          Use proper optional fields for signedUrl, nextCursor, etc.
+        </acceptance>
+      </requirement>
+
+      <requirement>
+        <id>TR-003</id>
+        <category>Pagination</category>
+        <description>Implement infinite scroll or "Load More" functionality</description>
+        <acceptance>
+          Use nextCursor from previous response to fetch next page.
+          Handle hasMore flag to show/hide load more button.
+          Prevent duplicate items when loading more pages.
+        </acceptance>
+      </requirement>
+
+      <requirement>
+        <id>TR-004</id>
+        <category>Error Handling</category>
+        <description>Handle all error scenarios gracefully with user-friendly messages</description>
+        <acceptance>
+          Show appropriate error messages for 401, 400, 500 errors.
+          Provide retry mechanism for failed requests.
+          Log errors for debugging purposes.
+        </acceptance>
+      </requirement>
+
+      <requirement>
+        <id>TR-005</id>
+        <category>Image Loading</category>
+        <description>Implement progressive image loading with placeholders</description>
+        <acceptance>
+          Show skeleton/spinner while images are loading.
+          Handle broken images gracefully.
+          Optimize for performance with lazy loading if needed.
+        </acceptance>
+      </requirement>
+
+      <requirement>
+        <id>TR-006</id>
+        <category>Caching</category>
+        <description>Implement appropriate caching strategy for image lists</description>
+        <acceptance>
+          Consider using React Query, SWR, or similar for data caching.
+          Implement cache invalidation when new images are uploaded.
+          Balance between fresh data and performance.
+        </acceptance>
+      </requirement>
+    </technical-requirements>
+
+    <ui-ux-requirements>
+      <requirement>
+        <id>UX-001</id>
+        <category>Image Gallery</category>
+        <description>Create a responsive image gallery component</description>
+        <acceptance>
+          Display images in a grid layout (responsive: 1-4 columns based on screen size).
+          Show image metadata (size, date) on hover or in detail view.
+          Support image selection for downstream actions.
+        </acceptance>
+      </requirement>
+
+      <requirement>
+        <id>UX-002</id>
+        <category>Filtering</category>
+        <description>Add folder/category filter UI</description>
+        <acceptance>
+          Provide tabs or dropdown to filter by prefix (All, Covers, Accounts, Inspirations, etc.).
+          Update URL params when filter changes for shareable links.
+          Show empty state when no images match filter.
+        </acceptance>
+      </requirement>
+
+      <requirement>
+        <id>UX-003</id>
+        <category>Loading States</category>
+        <description>Implement clear loading and empty states</description>
+        <acceptance>
+          Show skeleton loaders during initial load.
+          Show spinner for pagination requests.
+          Display friendly empty state when user has no images.
+          Provide call-to-action to upload first image.
+        </acceptance>
+      </requirement>
+
+      <requirement>
+        <id>UX-004</id>
+        <category>Image Actions</category>
+        <description>Add contextual actions for each image</description>
+        <acceptance>
+          Support image selection (single or multi-select).
+          Provide preview/lightbox functionality.
+          Add "Copy URL" action for easy sharing.
+          Consider delete action (requires separate backend endpoint).
+        </acceptance>
+      </requirement>
+
+      <requirement>
+        <id>UX-005</id>
+        <category>Mobile Responsiveness</category>
+        <description>Ensure excellent mobile experience</description>
+        <acceptance>
+          Touch-friendly image selection.
+          Optimized grid layout for small screens.
+          Smooth infinite scroll on mobile devices.
+          Consider mobile-specific gestures (pinch to zoom, swipe).
+        </acceptance>
+      </requirement>
+    </ui-ux-requirements>
+  </implementation-requirements>
+
+  <implementation-steps>
+    <step>
+      <number>1</number>
+      <title>Define TypeScript Types</title>
+      <description>
+        Create TypeScript interfaces for the API request and response.
+        Place in appropriate types/models directory.
+      </description>
+      <code-example language="typescript">
+        <![CDATA[
+// types/media.types.ts
+
+export interface ListUserImagesParams {
+  limit?: number;
+  cursor?: string;
+  prefix?: string;
+  signed?: boolean;
+  expiresIn?: number;
+}
+
+export interface MediaItem {
+  key: string;
+  url: string;
+  signedUrl?: string;
+  size: number;
+  lastModified: string;
+  contentType?: string;
+}
+
+export interface ListUserImagesResponse {
+  items: MediaItem[];
+  nextCursor?: string;
+  hasMore: boolean;
+}
+
+export enum ImageFolder {
+  ALL = '',
+  COVERS = 'covers/',
+  ACCOUNTS = 'accounts/',
+  INSPIRATIONS = 'inspirations/',
+}
+        ]]>
+      </code-example>
+    </step>
+
+    <step>
+      <number>2</number>
+      <title>Create API Service Method</title>
+      <description>
+        Add a new method to the existing API client for fetching user images.
+        Use existing authentication and error handling patterns.
+      </description>
+      <code-example language="typescript">
+        <![CDATA[
+// services/api/media.service.ts
+
+import { apiClient } from './client';
+import { ListUserImagesParams, ListUserImagesResponse } from '@/types/media.types';
+
+export const mediaService = {
+  /**
+   * Fetch user images from S3
+   * @param params - Query parameters for filtering and pagination
+   * @returns Promise with image list and pagination info
+   */
+  async listUserImages(params: ListUserImagesParams = {}): Promise<ListUserImagesResponse> {
+    const queryParams = new URLSearchParams();
+
+    if (params.limit !== undefined) {
+      queryParams.append('limit', params.limit.toString());
+    }
+    if (params.cursor) {
+      queryParams.append('cursor', params.cursor);
+    }
+    if (params.prefix) {
+      queryParams.append('prefix', params.prefix);
+    }
+    if (params.signed !== undefined) {
+      queryParams.append('signed', params.signed.toString());
+    }
+    if (params.expiresIn !== undefined) {
+      queryParams.append('expiresIn', params.expiresIn.toString());
+    }
+
+    const response = await apiClient.get<ListUserImagesResponse>(
+      `/api/media/images?${queryParams.toString()}`
+    );
+
+    return response.data;
+  },
+};
+        ]]>
+      </code-example>
+    </step>
+
+    <step>
+      <number>3</number>
+      <title>Create React Hook (Optional but Recommended)</title>
+      <description>
+        Create a custom hook using React Query or SWR for data fetching and caching.
+        This provides automatic refetching, caching, and loading states.
+      </description>
+      <code-example language="typescript">
+        <![CDATA[
+// hooks/useUserImages.ts
+
+import { useInfiniteQuery } from '@tanstack/react-query';
+import { mediaService } from '@/services/api/media.service';
+import { ListUserImagesParams } from '@/types/media.types';
+
+export function useUserImages(params: Omit<ListUserImagesParams, 'cursor'> = {}) {
+  return useInfiniteQuery({
+    queryKey: ['user-images', params],
+    queryFn: ({ pageParam }) =>
+      mediaService.listUserImages({
+        ...params,
+        cursor: pageParam,
+      }),
+    getNextPageParam: (lastPage) =>
+      lastPage.hasMore ? lastPage.nextCursor : undefined,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+}
+
+// Alternative with SWR
+import useSWRInfinite from 'swr/infinite';
+
+export function useUserImagesSWR(params: Omit<ListUserImagesParams, 'cursor'> = {}) {
+  const getKey = (pageIndex: number, previousPageData: any) => {
+    if (previousPageData && !previousPageData.hasMore) return null;
+
+    const cursor = previousPageData?.nextCursor;
+    return ['user-images', { ...params, cursor }];
+  };
+
+  return useSWRInfinite(
+    getKey,
+    ([_, fetchParams]) => mediaService.listUserImages(fetchParams as ListUserImagesParams),
+    {
+      revalidateFirstPage: false,
+    }
+  );
+}
+        ]]>
+      </code-example>
+    </step>
+
+    <step>
+      <number>4</number>
+      <title>Create Image Gallery Component</title>
+      <description>
+        Build a reusable image gallery component with grid layout and responsive design.
+      </description>
+      <code-example language="typescript">
+        <![CDATA[
+// components/ImageGallery.tsx
+
+import React from 'react';
+import { useUserImages } from '@/hooks/useUserImages';
+import { ImageFolder } from '@/types/media.types';
+
+interface ImageGalleryProps {
+  folder?: ImageFolder;
+  onImageSelect?: (imageUrl: string) => void;
+  allowMultiSelect?: boolean;
+}
+
+export const ImageGallery: React.FC<ImageGalleryProps> = ({
+  folder = ImageFolder.ALL,
+  onImageSelect,
+  allowMultiSelect = false,
+}) => {
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isLoading,
+    isError,
+    error,
+  } = useUserImages({
+    prefix: folder,
+    limit: 24,
+    signed: true, // Use signed URLs for security
+    expiresIn: 3600, // 1 hour
+  });
+
+  if (isLoading) {
+    return <ImageGallerySkeleton />;
+  }
+
+  if (isError) {
+    return <ErrorState error={error} />;
+  }
+
+  const allImages = data?.pages.flatMap((page) => page.items) ?? [];
+
+  if (allImages.length === 0) {
+    return <EmptyState />;
+  }
+
+  return (
+    <div className="image-gallery">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {allImages.map((image) => (
+          <ImageCard
+            key={image.key}
+            image={image}
+            onSelect={onImageSelect}
+          />
+        ))}
+      </div>
+
+      {hasNextPage && (
+        <button
+          onClick={() => fetchNextPage()}
+          className="load-more-btn"
+        >
+          Load More
+        </button>
+      )}
+    </div>
+  );
+};
+        ]]>
+      </code-example>
+    </step>
+
+    <step>
+      <number>5</number>
+      <title>Add Folder Filter UI</title>
+      <description>
+        Create a filter/tab component to switch between different image folders.
+      </description>
+      <code-example language="typescript">
+        <![CDATA[
+// components/ImageFolderFilter.tsx
+
+import React from 'react';
+import { ImageFolder } from '@/types/media.types';
+
+interface ImageFolderFilterProps {
+  activeFolder: ImageFolder;
+  onFolderChange: (folder: ImageFolder) => void;
+}
+
+export const ImageFolderFilter: React.FC<ImageFolderFilterProps> = ({
+  activeFolder,
+  onFolderChange,
+}) => {
+  const folders = [
+    { value: ImageFolder.ALL, label: 'All Images' },
+    { value: ImageFolder.COVERS, label: 'Cover Images' },
+    { value: ImageFolder.ACCOUNTS, label: 'Account Avatars' },
+    { value: ImageFolder.INSPIRATIONS, label: 'Inspirations' },
+  ];
+
+  return (
+    <div className="flex gap-2 border-b mb-6">
+      {folders.map((folder) => (
+        <button
+          key={folder.value}
+          onClick={() => onFolderChange(folder.value)}
+          className={`px-4 py-2 ${
+            activeFolder === folder.value
+              ? 'border-b-2 border-blue-500 text-blue-600'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          {folder.label}
+        </button>
+      ))}
+    </div>
+  );
+};
+        ]]>
+      </code-example>
+    </step>
+
+    <step>
+      <number>6</number>
+      <title>Implement Error Handling</title>
+      <description>
+        Add proper error handling with user-friendly messages and retry logic.
+      </description>
+      <code-example language="typescript">
+        <![CDATA[
+// components/ErrorState.tsx
+
+import React from 'react';
+
+interface ErrorStateProps {
+  error: any;
+  onRetry?: () => void;
+}
+
+export const ErrorState: React.FC<ErrorStateProps> = ({ error, onRetry }) => {
+  const getErrorMessage = () => {
+    if (error?.response?.status === 401) {
+      return 'Please sign in to view your images.';
+    }
+    if (error?.response?.status === 500) {
+      return 'Unable to load images. Please try again later.';
+    }
+    return 'Something went wrong loading your images.';
+  };
+
+  return (
+    <div className="error-state text-center py-12">
+      <div className="text-red-500 mb-4">
+        <svg className="w-16 h-16 mx-auto" /* error icon */ />
+      </div>
+      <h3 className="text-lg font-semibold mb-2">Oops!</h3>
+      <p className="text-gray-600 mb-4">{getErrorMessage()}</p>
+      {onRetry && (
+        <button
+          onClick={onRetry}
+          className="btn btn-primary"
+        >
+          Try Again
+        </button>
+      )}
+    </div>
+  );
+};
+        ]]>
+      </code-example>
+    </step>
+
+    <step>
+      <number>7</number>
+      <title>Add Loading and Empty States</title>
+      <description>
+        Create skeleton loaders and empty state components for better UX.
+      </description>
+      <code-example language="typescript">
+        <![CDATA[
+// components/ImageGallerySkeleton.tsx
+
+export const ImageGallerySkeleton = () => {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+      {Array.from({ length: 8 }).map((_, i) => (
+        <div key={i} className="animate-pulse">
+          <div className="bg-gray-200 aspect-square rounded-lg" />
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// components/EmptyState.tsx
+
+export const EmptyState = () => {
+  return (
+    <div className="empty-state text-center py-12">
+      <div className="text-gray-400 mb-4">
+        <svg className="w-24 h-24 mx-auto" /* empty folder icon */ />
+      </div>
+      <h3 className="text-lg font-semibold mb-2">No images yet</h3>
+      <p className="text-gray-600 mb-4">
+        Upload your first image to get started
+      </p>
+      <button className="btn btn-primary">
+        Upload Image
+      </button>
+    </div>
+  );
+};
+        ]]>
+      </code-example>
+    </step>
+
+    <step>
+      <number>8</number>
+      <title>Add Unit Tests</title>
+      <description>
+        Write tests for the API service, hooks, and components.
+      </description>
+      <code-example language="typescript">
+        <![CDATA[
+// services/api/media.service.test.ts
+
+import { mediaService } from './media.service';
+import { apiClient } from './client';
+
+jest.mock('./client');
+
+describe('mediaService', () => {
+  describe('listUserImages', () => {
+    it('should fetch images with default params', async () => {
+      const mockResponse = {
+        data: {
+          items: [],
+          hasMore: false,
+        },
+      };
+
+      (apiClient.get as jest.Mock).mockResolvedValue(mockResponse);
+
+      const result = await mediaService.listUserImages();
+
+      expect(apiClient.get).toHaveBeenCalledWith('/api/media/images?');
+      expect(result).toEqual(mockResponse.data);
+    });
+
+    it('should include query parameters', async () => {
+      const mockResponse = { data: { items: [], hasMore: false } };
+      (apiClient.get as jest.Mock).mockResolvedValue(mockResponse);
+
+      await mediaService.listUserImages({
+        limit: 10,
+        prefix: 'covers/',
+        signed: true,
+      });
+
+      expect(apiClient.get).toHaveBeenCalledWith(
+        '/api/media/images?limit=10&prefix=covers%2F&signed=true'
+      );
+    });
+  });
+});
+        ]]>
+      </code-example>
+    </step>
+  </implementation-steps>
+
+  <integration-points>
+    <integration-point>
+      <name>Post Creation Flow</name>
+      <description>
+        Allow users to select existing uploaded images when creating posts,
+        instead of always uploading new ones.
+      </description>
+      <location>Post creation modal/form</location>
+      <priority>high</priority>
+    </integration-point>
+
+    <integration-point>
+      <name>Profile Management</name>
+      <description>
+        Display user's uploaded account avatars in profile settings,
+        allow selection of existing avatar.
+      </description>
+      <location>Profile settings page</location>
+      <priority>medium</priority>
+    </integration-point>
+
+    <integration-point>
+      <name>Inspiration Board</name>
+      <description>
+        Show user's saved inspiration images in a gallery view.
+      </description>
+      <location>Inspiration/mood board section</location>
+      <priority>medium</priority>
+    </integration-point>
+
+    <integration-point>
+      <name>Media Library</name>
+      <description>
+        Create a dedicated "Media Library" page showing all user images
+        with advanced filtering, sorting, and management capabilities.
+      </description>
+      <location>New dedicated page (e.g., /media or /library)</location>
+      <priority>low</priority>
+    </integration-point>
+  </integration-points>
+
+  <testing-checklist>
+    <test-case>
+      <id>TC-001</id>
+      <title>Fetch images with default parameters</title>
+      <steps>
+        1. Open the image gallery
+        2. Verify API is called with default params (limit=50, no cursor)
+        3. Verify images are displayed in grid layout
+      </steps>
+      <expected>Images load successfully with default settings</expected>
+    </test-case>
+
+    <test-case>
+      <id>TC-002</id>
+      <title>Pagination - Load more</title>
+      <steps>
+        1. Load initial page with limit=10
+        2. Click "Load More" button
+        3. Verify nextCursor is sent in second request
+        4. Verify new images are appended (no duplicates)
+      </steps>
+      <expected>Pagination works correctly, no duplicate images</expected>
+    </test-case>
+
+    <test-case>
+      <id>TC-003</id>
+      <title>Filter by folder/prefix</title>
+      <steps>
+        1. Select "Cover Images" filter
+        2. Verify API is called with prefix=covers/
+        3. Verify only cover images are displayed
+      </steps>
+      <expected>Filter correctly limits results to selected folder</expected>
+    </test-case>
+
+    <test-case>
+      <id>TC-004</id>
+      <title>Signed URLs</title>
+      <steps>
+        1. Enable signed URLs (signed=true)
+        2. Verify images load using signedUrl field
+        3. Verify URLs contain signature parameters
+      </steps>
+      <expected>Signed URLs are generated and used correctly</expected>
+    </test-case>
+
+    <test-case>
+      <id>TC-005</id>
+      <title>Empty state</title>
+      <steps>
+        1. Test with user who has no uploaded images
+        2. Verify empty state component is shown
+        3. Verify call-to-action button is present
+      </steps>
+      <expected>Friendly empty state shown when no images exist</expected>
+    </test-case>
+
+    <test-case>
+      <id>TC-006</id>
+      <title>Error handling - 401 Unauthorized</title>
+      <steps>
+        1. Clear authentication token
+        2. Attempt to load images
+        3. Verify 401 error is caught
+        4. Verify user is prompted to sign in
+      </steps>
+      <expected>User is redirected to login or shown auth error</expected>
+    </test-case>
+
+    <test-case>
+      <id>TC-007</id>
+      <title>Error handling - 500 Server Error</title>
+      <steps>
+        1. Mock server error response
+        2. Verify error state is shown
+        3. Verify retry button is available
+        4. Click retry and verify request is sent again
+      </steps>
+      <expected>Error handled gracefully with retry option</expected>
+    </test-case>
+
+    <test-case>
+      <id>TC-008</id>
+      <title>Image selection</title>
+      <steps>
+        1. Click on an image
+        2. Verify selection state is updated
+        3. Verify onImageSelect callback is triggered
+        4. Test multi-select if enabled
+      </steps>
+      <expected>Image selection works correctly</expected>
+    </test-case>
+
+    <test-case>
+      <id>TC-009</id>
+      <title>Mobile responsiveness</title>
+      <steps>
+        1. Open on mobile device or resize browser
+        2. Verify grid adapts to smaller screen
+        3. Verify touch interactions work
+        4. Test infinite scroll on mobile
+      </steps>
+      <expected>Gallery is fully functional on mobile devices</expected>
+    </test-case>
+
+    <test-case>
+      <id>TC-010</id>
+      <title>Performance - Large result sets</title>
+      <steps>
+        1. Test with user who has 500+ images
+        2. Verify initial load is fast (only fetches limit)
+        3. Verify pagination doesn't cause memory issues
+        4. Verify images lazy load appropriately
+      </steps>
+      <expected>Performance remains good with large datasets</expected>
+    </test-case>
+  </testing-checklist>
+
+  <performance-considerations>
+    <consideration>
+      <title>Image Optimization</title>
+      <description>
+        Consider using next/image or similar for automatic image optimization.
+        Implement lazy loading for images not in viewport.
+      </description>
+    </consideration>
+
+    <consideration>
+      <title>Caching Strategy</title>
+      <description>
+        Use React Query or SWR for automatic caching and revalidation.
+        Set appropriate stale times (5-10 minutes recommended).
+        Implement cache invalidation when user uploads new images.
+      </description>
+    </consideration>
+
+    <consideration>
+      <title>Pagination Size</title>
+      <description>
+        Balance between fewer requests (larger limit) and faster initial load (smaller limit).
+        Recommended: 20-30 items per page for grid layouts.
+      </description>
+    </consideration>
+
+    <consideration>
+      <title>Signed URL Expiration</title>
+      <description>
+        Choose appropriate expiration time based on use case.
+        For gallery view: 1 hour (3600s) is sufficient.
+        For long-lived pages: Consider shorter expiration with auto-refresh.
+      </description>
+    </consideration>
+  </performance-considerations>
+
+  <security-considerations>
+    <consideration>
+      <title>Signed URLs vs Public URLs</title>
+      <description>
+        Use signed=true if S3 bucket is private or for sensitive images.
+        Use signed=false (public URLs) for better performance if images are public.
+      </description>
+    </consideration>
+
+    <consideration>
+      <title>URL Exposure</title>
+      <description>
+        Be cautious about storing signed URLs in browser storage.
+        Signed URLs expire, so avoid long-term caching.
+        Don't log or expose signed URLs in client-side error tracking.
+      </description>
+    </consideration>
+
+    <consideration>
+      <title>Rate Limiting</title>
+      <description>
+        Implement client-side rate limiting or debouncing for pagination requests.
+        Prevent users from spamming the API.
+      </description>
+    </consideration>
+  </security-considerations>
+
+  <documentation-links>
+    <link>
+      <title>Backend API Documentation</title>
+      <url>https://github.com/zapshipr/backend/blob/main/src/modules/media/README.md</url>
+    </link>
+    <link>
+      <title>React Query Documentation</title>
+      <url>https://tanstack.com/query/latest/docs/react/overview</url>
+    </link>
+    <link>
+      <title>SWR Documentation</title>
+      <url>https://swr.vercel.app/</url>
+    </link>
+    <link>
+      <title>AWS S3 Presigned URLs</title>
+      <url>https://docs.aws.amazon.com/AmazonS3/latest/userguide/ShareObjectPreSignedURL.html</url>
+    </link>
+  </documentation-links>
+
+  <deliverables>
+    <deliverable>
+      <item>TypeScript types/interfaces for API communication</item>
+      <status>pending</status>
+    </deliverable>
+    <deliverable>
+      <item>API service method with proper error handling</item>
+      <status>pending</status>
+    </deliverable>
+    <deliverable>
+      <item>Custom React hook for data fetching (useUserImages)</item>
+      <status>pending</status>
+    </deliverable>
+    <deliverable>
+      <item>ImageGallery component with responsive grid layout</item>
+      <status>pending</status>
+    </deliverable>
+    <deliverable>
+      <item>Pagination implementation (infinite scroll or load more)</item>
+      <status>pending</status>
+    </deliverable>
+    <deliverable>
+      <item>Folder filter UI component</item>
+      <status>pending</status>
+    </deliverable>
+    <deliverable>
+      <item>Loading states (skeleton loaders)</item>
+      <status>pending</status>
+    </deliverable>
+    <deliverable>
+      <item>Error states with retry functionality</item>
+      <status>pending</status>
+    </deliverable>
+    <deliverable>
+      <item>Empty state component</item>
+      <status>pending</status>
+    </deliverable>
+    <deliverable>
+      <item>Unit tests for services and components</item>
+      <status>pending</status>
+    </deliverable>
+    <deliverable>
+      <item>Integration tests for key user flows</item>
+      <status>pending</status>
+    </deliverable>
+    <deliverable>
+      <item>Documentation updates (README, Storybook, etc.)</item>
+      <status>pending</status>
+    </deliverable>
+  </deliverables>
+
+  <notes>
+    <note>
+      The backend endpoint is already deployed and tested. Frontend can start integration immediately.
+    </note>
+    <note>
+      Consider creating a reusable ImagePicker component that can be used across multiple features
+      (post creation, profile settings, etc.).
+    </note>
+    <note>
+      If implementing signed URLs, be aware that they expire. Plan for graceful handling when
+      signed URLs expire while user is viewing the gallery.
+    </note>
+    <note>
+      The API automatically filters to only return image file types. Frontend doesn't need
+      additional filtering logic.
+    </note>
+    <note>
+      Consider adding image metadata display (size, dimensions, upload date) in a detail view
+      or tooltip for better user experience.
+    </note>
+  </notes>
+
+  <support-contacts>
+    <contact>
+      <role>Backend Developer</role>
+      <name>Backend Team</name>
+      <slack>@backend-channel</slack>
+    </contact>
+    <contact>
+      <role>API Documentation</role>
+      <location>/src/modules/media/README.md</location>
+    </contact>
+    <contact>
+      <role>Questions/Issues</role>
+      <method>Create GitHub issue or ping in #frontend-backend channel</method>
+    </contact>
+  </support-contacts>
+</frontend-integration-task>

@@ -60,7 +60,7 @@ export const createPostsRouter = (logger: ILogger, db: NodePgDatabase<typeof dbS
     const postsController = new PostsController(postsService, logger)
     const workspaceMiddleware = createWorkspaceMiddleware(logger, db)
 
-    router.use(authMiddleware)
+    router.use('/workspaces', authMiddleware)
 
     // Workspace-scoped routes
     router.post(

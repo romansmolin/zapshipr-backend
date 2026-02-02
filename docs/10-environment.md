@@ -23,6 +23,8 @@ DB_SSL=false  # true для production с SSL
 
 ```env
 PORT=4000  # Порт API сервера
+TRUST_PROXY=true  # Включить доверие к proxy (нужно для X-Forwarded-Proto)
+CORS_ORIGINS=https://app.example.com,https://admin.example.com  # Доп. CORS origin'ы через запятую
 ```
 
 ### Аутентификация
@@ -30,6 +32,11 @@ PORT=4000  # Порт API сервера
 ```env
 JWT_SECRET=your-secret-key-here  # Секрет для access token
 JWT_REFRESH_SECRET=your-refresh-secret-key  # Секрет для refresh token
+AUTH_COOKIE_DOMAIN=.example.com  # Домен cookie (оставьте пустым для host-only)
+AUTH_COOKIE_SAMESITE=none  # none | lax | strict
+AUTH_COOKIE_SECURE=true  # true | false (если не задан, определяется автоматически)
+AUTH_COOKIE_PATH=/  # Путь cookie
+AUTH_COOKIE_MAX_AGE_DAYS=7  # Срок жизни refresh cookie в днях
 ```
 
 ### Google OAuth
@@ -147,4 +154,3 @@ AWS_S3_BUCKET_NAME=your-bucket
 REDIS_URL=redis://localhost:6379
 OPENAI_API_KEY=sk-your-openai-key
 ```
-

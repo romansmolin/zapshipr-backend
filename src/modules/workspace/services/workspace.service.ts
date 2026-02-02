@@ -10,7 +10,9 @@ import type {
     MainPrompt,
     UpdateMainPrompt,
 } from '../validation/workspace.schemas'
+import type { Onboarding, UpdateOnboardingInput } from '../validation/onboarding.schemas'
 import type { IWorkspaceService } from './workspace-service.interface'
+import { normalizeOnboarding, validateOnboardingInput } from '../utils/onboarding-normalizer'
 
 export class WorkspaceService implements IWorkspaceService {
     constructor(
@@ -21,24 +23,39 @@ export class WorkspaceService implements IWorkspaceService {
     async create(userId: string, data: CreateWorkspaceInput): Promise<WorkspaceDto> {
         this.logger.info('Creating workspace', { userId, name: data.name })
 
+        // Validate that client didn't send forbidden server-side fields
+        validateOnboardingInput(data.onboarding)
+
         // Проверяем, есть ли у пользователя уже workspaces
         const workspacesCount = await this.repository.countByUserId(userId)
         const isFirstWorkspace = workspacesCount === 0
 
+        // Create workspace first to get the ID
         const workspace = await this.repository.create({
             userId,
             name: data.name,
             description: data.description || null,
             isDefault: isFirstWorkspace, // Если это первый workspace - делаем его дефолтным
+            onboarding: null, // Will be set in the next step
         })
 
+        // Normalize onboarding with the workspace ID
+        const normalizedOnboarding = normalizeOnboarding(data.onboarding, workspace.id)
+
+        // Update workspace with normalized onboarding
+        const updatedWorkspace = await this.repository.updateOnboarding(workspace.id, normalizedOnboarding)
+
+        if (!updatedWorkspace) {
+            throw new BaseAppError('Failed to set onboarding', ErrorCode.UNKNOWN_ERROR, 500)
+        }
+
         this.logger.info('Workspace created', {
-            workspaceId: workspace.id,
-            isDefault: workspace.isDefault,
+            workspaceId: updatedWorkspace.id,
+            isDefault: updatedWorkspace.isDefault,
             isFirstWorkspace,
         })
 
-        return toWorkspaceDto(workspace)
+        return toWorkspaceDto(updatedWorkspace)
     }
 
     async getById(id: string, userId: string): Promise<WorkspaceDto> {
@@ -234,5 +251,77 @@ export class WorkspaceService implements IWorkspaceService {
         this.logger.info('Workspace set as default', { workspaceId, userId })
 
         return toWorkspaceDto(defaultWorkspace)
+    }
+
+    async getOnboarding(workspaceId: string, userId: string): Promise<Onboarding> {
+        this.logger.info('Getting onboarding', { workspaceId, userId })
+
+        const workspace = await this.repository.findById(workspaceId)
+
+        if (!workspace) {
+            throw new BaseAppError('Workspace not found', ErrorCode.NOT_FOUND, 404)
+        }
+
+        if (workspace.userId !== userId) {
+            throw new BaseAppError('Access denied', ErrorCode.FORBIDDEN, 403)
+        }
+
+        if (!workspace.onboarding) {
+            throw new BaseAppError('Onboarding not found', ErrorCode.NOT_FOUND, 404)
+        }
+
+        return workspace.onboarding as Onboarding
+    }
+
+    async updateOnboarding(workspaceId: string, userId: string, data: UpdateOnboardingInput): Promise<Onboarding> {
+        this.logger.info('Updating onboarding', { workspaceId, userId })
+
+        // Validate that client didn't send forbidden server-side fields
+        validateOnboardingInput(data)
+
+        const workspace = await this.repository.findById(workspaceId)
+
+        if (!workspace) {
+            throw new BaseAppError('Workspace not found', ErrorCode.NOT_FOUND, 404)
+        }
+
+        if (workspace.userId !== userId) {
+            throw new BaseAppError('Access denied', ErrorCode.FORBIDDEN, 403)
+        }
+
+        if (!workspace.onboarding) {
+            throw new BaseAppError('Onboarding not found', ErrorCode.NOT_FOUND, 404)
+        }
+
+        const currentOnboarding = workspace.onboarding as Onboarding
+
+        // Merge current onboarding with update data
+        const mergedInput = {
+            goal: data.goal ?? currentOnboarding.goal,
+            audience: data.audience ?? currentOnboarding.audience,
+            voice: data.voice ?? currentOnboarding.voice,
+            contentStrategy: data.contentStrategy ?? currentOnboarding.contentStrategy,
+            constraints: data.constraints ?? currentOnboarding.constraints,
+            sales: data.sales ?? currentOnboarding.sales,
+            examples: data.examples ?? currentOnboarding.examples,
+            additionalInfo: data.additionalInfo ?? currentOnboarding.additionalInfo,
+        }
+
+        // Normalize the merged data (this will update meta.updatedAt and recalculate sales if needed)
+        const normalizedOnboarding = normalizeOnboarding(mergedInput, workspaceId)
+
+        // Preserve the original createdAt
+        normalizedOnboarding.meta.createdAt = currentOnboarding.meta.createdAt
+        normalizedOnboarding.meta.version = currentOnboarding.meta.version + 1
+
+        const updatedWorkspace = await this.repository.updateOnboarding(workspaceId, normalizedOnboarding)
+
+        if (!updatedWorkspace) {
+            throw new BaseAppError('Failed to update onboarding', ErrorCode.UNKNOWN_ERROR, 500)
+        }
+
+        this.logger.info('Onboarding updated', { workspaceId, userId })
+
+        return updatedWorkspace.onboarding as Onboarding
     }
 }

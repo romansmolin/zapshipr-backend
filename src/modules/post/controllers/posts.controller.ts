@@ -201,11 +201,11 @@ export class PostsController {
 
     async getPostsByFilters(req: Request, res: Response, _next: NextFunction): Promise<void> {
         const userId = req.user?.id
-        if (!userId) {
-            throw new BaseAppError('Unauthorized', ErrorCode.UNAUTHORIZED, 401)
-        }
+        if (!userId) throw new BaseAppError('Unauthorized', ErrorCode.UNAUTHORIZED, 401)
+        this.logger.debug('userId: ', { userId })
 
         const workspaceId = this.getWorkspaceId(req)
+
         const filters: PostFilters = {
             page: Number(getFirstValue(req.query.page)) || undefined,
             limit: Number(getFirstValue(req.query.limit)) || undefined,
@@ -216,7 +216,7 @@ export class PostsController {
         }
 
         const result = await this.postsService.getPostsByFilters(userId, workspaceId, filters)
-
+        this.logger.debug('POSTS: ', result)
         res.json(result)
     }
 

@@ -1,5 +1,12 @@
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
-import { IMediaUploader } from './media-uploader.interface'
+import {
+    DeleteObjectCommand,
+    GetObjectCommand,
+    ListObjectsV2Command,
+    PutObjectCommand,
+    S3Client,
+} from '@aws-sdk/client-s3'
+import { getSignedUrl as awsGetSignedUrl } from '@aws-sdk/s3-request-presigner'
+import { IMediaUploader, ListObjectsResult } from './media-uploader.interface'
 import { ILogger } from '../logger/logger.interface'
 
 export class S3Uploader implements IMediaUploader {
@@ -62,5 +69,60 @@ export class S3Uploader implements IMediaUploader {
             key,
             bucket: this.bucket,
         })
+    }
+
+    async listObjects(params: {
+        prefix: string
+        maxKeys?: number
+        continuationToken?: string
+    }): Promise<ListObjectsResult> {
+        const command = new ListObjectsV2Command({
+            Bucket: this.bucket,
+            Prefix: params.prefix,
+            MaxKeys: params.maxKeys || 50,
+            ContinuationToken: params.continuationToken,
+        })
+
+        const response = await this.client.send(command)
+
+        const items =
+            response.Contents?.filter((obj) => obj.Key && !obj.Key.endsWith('/')).map((obj) => ({
+                key: obj.Key!,
+                size: obj.Size || 0,
+                lastModified: obj.LastModified || new Date(),
+                contentType: undefined,
+            })) || []
+
+        this.logger.info('Listed objects from S3', {
+            operation: 'listObjects',
+            prefix: params.prefix,
+            bucket: this.bucket,
+            count: items.length,
+            isTruncated: response.IsTruncated || false,
+        })
+
+        return {
+            items,
+            nextContinuationToken: response.NextContinuationToken,
+            isTruncated: response.IsTruncated || false,
+        }
+    }
+
+    async getSignedUrl(key: string, expiresIn: number): Promise<string> {
+        const command = new GetObjectCommand({
+            Bucket: this.bucket,
+            Key: key,
+        })
+
+        const signedUrl = await awsGetSignedUrl(this.client, command, { expiresIn })
+
+        this.logger.info('Generated signed URL', {
+            operation: 'getSignedUrl',
+            key,
+            bucket: this.bucket,
+            expiresIn,
+        })
+
+        return signedUrl
     }
 }

@@ -11,6 +11,7 @@ export const workspaces = pgTable('workspaces', {
     avatarUrl: varchar('avatar_url', { length: 1024 }),
     isDefault: boolean('is_default').default(false).notNull(),
     mainPrompt: jsonb('main_prompt'), // Структурированный main prompt для AI
+    onboarding: jsonb('onboarding'), // Structured onboarding configuration
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (table) => ({

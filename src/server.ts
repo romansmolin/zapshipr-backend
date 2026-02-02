@@ -8,6 +8,7 @@ import { createUserRoutes } from './modules/user/routes/user.routes'
 import { createWorkspaceRouter } from './modules/workspace/routes/workspace.routes'
 import { createInspirationsRouter } from './modules/inspiration/routes/inspirations.routes'
 import { createWorkspaceTagsRouter } from './modules/inspiration/routes/workspace-tags.routes'
+import { createMediaRouter } from './modules/media/routes/media.routes'
 import { createErrorHandler } from './shared/http/error-handler'
 import { ConsoleLogger } from './shared/logger/console-logger'
 
@@ -24,6 +25,7 @@ const startServer = async () => {
     const workspaceRoutes = createWorkspaceRouter(logger, db)
     const inspirationsRoutes = createInspirationsRouter(logger, db)
     const workspaceTagsRoutes = createWorkspaceTagsRouter(logger, db)
+    const mediaRoutes = createMediaRouter(logger)
 
     app.use(authRoutes)
     app.use(accountsRoutes)
@@ -33,6 +35,7 @@ const startServer = async () => {
     app.use(workspaceRoutes)
     app.use(inspirationsRoutes)
     app.use(workspaceTagsRoutes)
+    app.use(mediaRoutes)
 
     app.use(createErrorHandler(logger))
 

@@ -34,5 +34,13 @@ export const createWorkspaceRouter = (logger: ILogger, db: NodePgDatabase<typeof
         asyncHandler(controller.updateMainPrompt.bind(controller))
     )
 
+    // Onboarding endpoints
+    router.get('/workspaces/:id/onboarding', authMiddleware, asyncHandler(controller.getOnboarding.bind(controller)))
+    router.put(
+        '/workspaces/:id/onboarding',
+        authMiddleware,
+        asyncHandler(controller.updateOnboarding.bind(controller))
+    )
+
     return router
 }
