@@ -28,6 +28,21 @@ export class UserController implements IUserController {
         })
     }
 
+    async deleteUserAccount(req: Request, res: Response, next: NextFunction): Promise<void> {
+        const userId = this.getUserId(req)
+
+        this.logger.info('Deleting user account', {
+            operation: 'UserController.deleteUserAccount',
+            userId,
+        })
+
+        await this.userService.deleteUserAccout(userId)
+
+        res.json({
+            message: 'User account deleted successfully',
+        })
+    }
+
     private getUserId(req: Request): string {
         const userId = req.user?.id
 

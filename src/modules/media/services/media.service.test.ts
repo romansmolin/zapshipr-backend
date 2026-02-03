@@ -1,13 +1,15 @@
 import { describe, it, expect, jest, beforeEach } from '@jest/globals'
 import { MediaService } from './media.service'
 import { ILogger } from '@/shared/logger/logger.interface'
-import { IMediaUploader, ListObjectsResult } from '@/shared/media-uploader/media-uploader.interface'
+import { IMediaUploader } from '@/shared/media-uploader/media-uploader.interface'
+import { IMediaRepository } from '../repositories/media-repository.interface'
 import { BaseAppError } from '@/shared/errors/base-error'
 import { ErrorCode } from '@/shared/consts/error-codes.const'
 
 describe('MediaService', () => {
     let mediaService: MediaService
     let mockLogger: jest.Mocked<ILogger>
+    let mockMediaRepository: jest.Mocked<IMediaRepository>
     let mockMediaUploader: jest.Mocked<IMediaUploader>
 
     beforeEach(() => {
@@ -18,6 +20,15 @@ describe('MediaService', () => {
             debug: jest.fn(),
         } as jest.Mocked<ILogger>
 
+        mockMediaRepository = {
+            create: jest.fn(),
+            findByKey: jest.fn(),
+            findByUserId: jest.fn(),
+            countByUserId: jest.fn(),
+            deleteByKey: jest.fn(),
+            deleteByUserId: jest.fn(),
+        } as jest.Mocked<IMediaRepository>
+
         mockMediaUploader = {
             upload: jest.fn(),
             delete: jest.fn(),
@@ -25,138 +36,126 @@ describe('MediaService', () => {
             getSignedUrl: jest.fn(),
         } as jest.Mocked<IMediaUploader>
 
-        mediaService = new MediaService(mockLogger, mockMediaUploader)
-
-        // Set environment variable for tests
-        process.env.AWS_S3_BUCKET = 'test-bucket'
+        mediaService = new MediaService(mockLogger, mockMediaRepository, mockMediaUploader)
     })
 
     describe('listUserImages', () => {
-        it('should list user images with default prefix', async () => {
+        it('should list user images with pagination metadata', async () => {
             const userId = 'user-123'
-            const mockS3Response: ListObjectsResult = {
-                items: [
-                    {
-                        key: 'user-123/covers/image1.jpg',
-                        size: 1024,
-                        lastModified: new Date('2024-01-01'),
-                    },
-                    {
-                        key: 'user-123/accounts/image2.png',
-                        size: 2048,
-                        lastModified: new Date('2024-01-02'),
-                    },
-                ],
-                isTruncated: false,
-            }
+            const mockDbItems = [
+                {
+                    id: '1',
+                    userId: 'user-123',
+                    key: 'user-123/covers/image1.jpg',
+                    url: 'https://test-bucket.s3.amazonaws.com/user-123/covers/image1.jpg',
+                    size: 1024,
+                    contentType: 'image/jpeg',
+                    lastModified: new Date('2024-01-01'),
+                    createdAt: new Date('2024-01-01'),
+                    updatedAt: new Date('2024-01-01'),
+                },
+                {
+                    id: '2',
+                    userId: 'user-123',
+                    key: 'user-123/accounts/image2.png',
+                    url: 'https://test-bucket.s3.amazonaws.com/user-123/accounts/image2.png',
+                    size: 2048,
+                    contentType: 'image/png',
+                    lastModified: new Date('2024-01-02'),
+                    createdAt: new Date('2024-01-02'),
+                    updatedAt: new Date('2024-01-02'),
+                },
+            ]
 
-            mockMediaUploader.listObjects.mockResolvedValue(mockS3Response)
+            mockMediaRepository.countByUserId.mockResolvedValue(2)
+            mockMediaRepository.findByUserId.mockResolvedValue(mockDbItems)
 
             const result = await mediaService.listUserImages(userId, {
+                page: 1,
                 limit: 50,
                 signed: false,
                 expiresIn: 3600,
             })
 
-            expect(mockMediaUploader.listObjects).toHaveBeenCalledWith({
-                prefix: 'user-123/',
-                maxKeys: 50,
-                continuationToken: undefined,
+            expect(mockMediaRepository.countByUserId).toHaveBeenCalledWith(userId, undefined)
+            expect(mockMediaRepository.findByUserId).toHaveBeenCalledWith(userId, {
+                limit: 50,
+                offset: 0,
+                prefix: undefined,
             })
 
             expect(result.items).toHaveLength(2)
             expect(result.items[0].key).toBe('user-123/covers/image1.jpg')
-            expect(result.items[0].url).toBe(
-                'https://test-bucket.s3.amazonaws.com/user-123/covers/image1.jpg'
-            )
+            expect(result.items[0].url).toBe('https://test-bucket.s3.amazonaws.com/user-123/covers/image1.jpg')
             expect(result.items[0].signedUrl).toBeUndefined()
-            expect(result.hasMore).toBe(false)
-        })
-
-        it('should filter out non-image files', async () => {
-            const userId = 'user-123'
-            const mockS3Response: ListObjectsResult = {
-                items: [
-                    {
-                        key: 'user-123/image.jpg',
-                        size: 1024,
-                        lastModified: new Date('2024-01-01'),
-                    },
-                    {
-                        key: 'user-123/document.pdf',
-                        size: 2048,
-                        lastModified: new Date('2024-01-02'),
-                    },
-                    {
-                        key: 'user-123/video.mp4',
-                        size: 4096,
-                        lastModified: new Date('2024-01-03'),
-                    },
-                ],
-                isTruncated: false,
-            }
-
-            mockMediaUploader.listObjects.mockResolvedValue(mockS3Response)
-
-            const result = await mediaService.listUserImages(userId, {
-                limit: 50,
-                signed: false,
-                expiresIn: 3600,
-            })
-
-            expect(result.items).toHaveLength(1)
-            expect(result.items[0].key).toBe('user-123/image.jpg')
+            expect(result.page).toBe(1)
+            expect(result.pageSize).toBe(50)
+            expect(result.totalItems).toBe(2)
+            expect(result.totalPages).toBe(1)
+            expect(result.hasNextPage).toBe(false)
+            expect(result.hasPreviousPage).toBe(false)
         })
 
         it('should handle custom prefix', async () => {
             const userId = 'user-123'
             const customPrefix = 'covers/'
-            const mockS3Response: ListObjectsResult = {
-                items: [
-                    {
-                        key: 'user-123/covers/image1.jpg',
-                        size: 1024,
-                        lastModified: new Date('2024-01-01'),
-                    },
-                ],
-                isTruncated: false,
-            }
+            const mockDbItems = [
+                {
+                    id: '1',
+                    userId: 'user-123',
+                    key: 'user-123/covers/image1.jpg',
+                    url: 'https://test-bucket.s3.amazonaws.com/user-123/covers/image1.jpg',
+                    size: 1024,
+                    contentType: 'image/jpeg',
+                    lastModified: new Date('2024-01-01'),
+                    createdAt: new Date('2024-01-01'),
+                    updatedAt: new Date('2024-01-01'),
+                },
+            ]
 
-            mockMediaUploader.listObjects.mockResolvedValue(mockS3Response)
+            mockMediaRepository.countByUserId.mockResolvedValue(1)
+            mockMediaRepository.findByUserId.mockResolvedValue(mockDbItems)
 
             await mediaService.listUserImages(userId, {
+                page: 1,
                 limit: 50,
                 prefix: customPrefix,
                 signed: false,
                 expiresIn: 3600,
             })
 
-            expect(mockMediaUploader.listObjects).toHaveBeenCalledWith({
-                prefix: 'user-123/covers/',
-                maxKeys: 50,
-                continuationToken: undefined,
+            expect(mockMediaRepository.countByUserId).toHaveBeenCalledWith(userId, customPrefix)
+            expect(mockMediaRepository.findByUserId).toHaveBeenCalledWith(userId, {
+                limit: 50,
+                offset: 0,
+                prefix: customPrefix,
             })
         })
 
         it('should generate signed URLs when signed=true', async () => {
             const userId = 'user-123'
-            const mockS3Response: ListObjectsResult = {
-                items: [
-                    {
-                        key: 'user-123/image.jpg',
-                        size: 1024,
-                        lastModified: new Date('2024-01-01'),
-                    },
-                ],
-                isTruncated: false,
-            }
+            const mockDbItems = [
+                {
+                    id: '1',
+                    userId: 'user-123',
+                    key: 'user-123/image.jpg',
+                    url: 'https://test-bucket.s3.amazonaws.com/user-123/image.jpg',
+                    size: 1024,
+                    contentType: 'image/jpeg',
+                    lastModified: new Date('2024-01-01'),
+                    createdAt: new Date('2024-01-01'),
+                    updatedAt: new Date('2024-01-01'),
+                },
+            ]
 
-            mockMediaUploader.listObjects.mockResolvedValue(mockS3Response)
+            mockMediaRepository.countByUserId.mockResolvedValue(1)
+            mockMediaRepository.findByUserId.mockResolvedValue(mockDbItems)
             mockMediaUploader.getSignedUrl.mockResolvedValue(
                 'https://test-bucket.s3.amazonaws.com/user-123/image.jpg?signed=true'
             )
 
             const result = await mediaService.listUserImages(userId, {
+                page: 1,
                 limit: 50,
                 signed: true,
                 expiresIn: 7200,
@@ -168,69 +167,74 @@ describe('MediaService', () => {
             )
         })
 
-        it('should handle pagination with cursor', async () => {
+        it('should handle pagination with page 2', async () => {
             const userId = 'user-123'
-            const cursor = 'next-page-token'
-            const mockS3Response: ListObjectsResult = {
-                items: [
-                    {
-                        key: 'user-123/image.jpg',
-                        size: 1024,
-                        lastModified: new Date('2024-01-01'),
-                    },
-                ],
-                nextContinuationToken: 'another-page-token',
-                isTruncated: true,
-            }
+            const mockDbItems = [
+                {
+                    id: '3',
+                    userId: 'user-123',
+                    key: 'user-123/image3.jpg',
+                    url: 'https://test-bucket.s3.amazonaws.com/user-123/image3.jpg',
+                    size: 1024,
+                    contentType: 'image/jpeg',
+                    lastModified: new Date('2024-01-01'),
+                    createdAt: new Date('2024-01-01'),
+                    updatedAt: new Date('2024-01-01'),
+                },
+            ]
 
-            mockMediaUploader.listObjects.mockResolvedValue(mockS3Response)
+            mockMediaRepository.countByUserId.mockResolvedValue(30)
+            mockMediaRepository.findByUserId.mockResolvedValue(mockDbItems)
 
             const result = await mediaService.listUserImages(userId, {
+                page: 2,
                 limit: 10,
-                cursor,
                 signed: false,
                 expiresIn: 3600,
             })
 
-            expect(mockMediaUploader.listObjects).toHaveBeenCalledWith({
-                prefix: 'user-123/',
-                maxKeys: 10,
-                continuationToken: cursor,
+            expect(mockMediaRepository.findByUserId).toHaveBeenCalledWith(userId, {
+                limit: 10,
+                offset: 10,
+                prefix: undefined,
             })
 
-            expect(result.nextCursor).toBe('another-page-token')
-            expect(result.hasMore).toBe(true)
+            expect(result.page).toBe(2)
+            expect(result.pageSize).toBe(10)
+            expect(result.totalItems).toBe(30)
+            expect(result.totalPages).toBe(3)
+            expect(result.hasNextPage).toBe(true)
+            expect(result.hasPreviousPage).toBe(true)
         })
 
         it('should respect limit constraint', async () => {
             const userId = 'user-123'
-            const mockS3Response: ListObjectsResult = {
-                items: [],
-                isTruncated: false,
-            }
 
-            mockMediaUploader.listObjects.mockResolvedValue(mockS3Response)
+            mockMediaRepository.countByUserId.mockResolvedValue(0)
+            mockMediaRepository.findByUserId.mockResolvedValue([])
 
             await mediaService.listUserImages(userId, {
+                page: 1,
                 limit: 25,
                 signed: false,
                 expiresIn: 3600,
             })
 
-            expect(mockMediaUploader.listObjects).toHaveBeenCalledWith({
-                prefix: 'user-123/',
-                maxKeys: 25,
-                continuationToken: undefined,
+            expect(mockMediaRepository.findByUserId).toHaveBeenCalledWith(userId, {
+                limit: 25,
+                offset: 0,
+                prefix: undefined,
             })
         })
 
-        it('should throw BaseAppError on S3 failure', async () => {
+        it('should throw BaseAppError on repository failure', async () => {
             const userId = 'user-123'
 
-            mockMediaUploader.listObjects.mockRejectedValue(new Error('S3 connection failed'))
+            mockMediaRepository.countByUserId.mockRejectedValue(new Error('Database connection failed'))
 
             await expect(
                 mediaService.listUserImages(userId, {
+                    page: 1,
                     limit: 50,
                     signed: false,
                     expiresIn: 3600,
@@ -239,6 +243,7 @@ describe('MediaService', () => {
 
             await expect(
                 mediaService.listUserImages(userId, {
+                    page: 1,
                     limit: 50,
                     signed: false,
                     expiresIn: 3600,
@@ -246,33 +251,40 @@ describe('MediaService', () => {
             ).rejects.toThrow('Failed to retrieve user images from storage')
         })
 
-        it('should handle all common image extensions', async () => {
+        it('should calculate total pages correctly', async () => {
             const userId = 'user-123'
-            const mockS3Response: ListObjectsResult = {
-                items: [
-                    { key: 'user-123/test.jpg', size: 100, lastModified: new Date() },
-                    { key: 'user-123/test.jpeg', size: 100, lastModified: new Date() },
-                    { key: 'user-123/test.png', size: 100, lastModified: new Date() },
-                    { key: 'user-123/test.gif', size: 100, lastModified: new Date() },
-                    { key: 'user-123/test.webp', size: 100, lastModified: new Date() },
-                    { key: 'user-123/test.svg', size: 100, lastModified: new Date() },
-                    { key: 'user-123/test.bmp', size: 100, lastModified: new Date() },
-                    { key: 'user-123/test.ico', size: 100, lastModified: new Date() },
-                    { key: 'user-123/test.txt', size: 100, lastModified: new Date() },
-                ],
-                isTruncated: false,
-            }
 
-            mockMediaUploader.listObjects.mockResolvedValue(mockS3Response)
+            mockMediaRepository.countByUserId.mockResolvedValue(47)
+            mockMediaRepository.findByUserId.mockResolvedValue([])
 
             const result = await mediaService.listUserImages(userId, {
-                limit: 50,
+                page: 1,
+                limit: 10,
                 signed: false,
                 expiresIn: 3600,
             })
 
-            // Should include 8 image files, exclude .txt
-            expect(result.items).toHaveLength(8)
+            expect(result.totalItems).toBe(47)
+            expect(result.totalPages).toBe(5) // Math.ceil(47 / 10) = 5
+        })
+
+        it('should handle last page correctly', async () => {
+            const userId = 'user-123'
+
+            mockMediaRepository.countByUserId.mockResolvedValue(25)
+            mockMediaRepository.findByUserId.mockResolvedValue([])
+
+            const result = await mediaService.listUserImages(userId, {
+                page: 3,
+                limit: 10,
+                signed: false,
+                expiresIn: 3600,
+            })
+
+            expect(result.page).toBe(3)
+            expect(result.totalPages).toBe(3)
+            expect(result.hasNextPage).toBe(false)
+            expect(result.hasPreviousPage).toBe(true)
         })
     })
 })

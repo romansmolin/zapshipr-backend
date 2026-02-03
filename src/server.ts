@@ -25,7 +25,7 @@ const startServer = async () => {
     const workspaceRoutes = createWorkspaceRouter(logger, db)
     const inspirationsRoutes = createInspirationsRouter(logger, db)
     const workspaceTagsRoutes = createWorkspaceTagsRouter(logger, db)
-    const mediaRoutes = createMediaRouter(logger)
+    const mediaRoutes = createMediaRouter(logger, db)
 
     app.use(authRoutes)
     app.use(accountsRoutes)

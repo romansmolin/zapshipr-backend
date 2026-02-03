@@ -6,4 +6,5 @@ export interface IUserRepository {
     findById(id: string): Promise<User | null>
     updateRefreshToken(userId: string, refreshToken: string | null): Promise<void>
     updateUserPassword(userId: string, passwordHash: string): Promise<void>
+    deleteById(userId: string): Promise<void>
 }

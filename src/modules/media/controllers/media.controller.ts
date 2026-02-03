@@ -11,10 +11,8 @@ export class MediaController implements IMediaController {
     ) {}
 
     async listUserImages(req: Request, res: Response): Promise<void> {
-        // Extract userId from authenticated request
         const userId = req.user!.id
 
-        // Validate query parameters
         const query = listUserImagesQuerySchema.parse(req.query)
 
         this.logger.info('Received request to list user images', {
@@ -23,10 +21,9 @@ export class MediaController implements IMediaController {
             query,
         })
 
-        // Call service
         const result = await this.mediaService.listUserImages(userId, {
+            page: query.page,
             limit: query.limit,
-            cursor: query.cursor,
             prefix: query.prefix,
             signed: query.signed,
             expiresIn: query.expiresIn,

@@ -110,6 +110,26 @@ export class UserRepository implements IUserRepository {
         }
     }
 
+    async deleteById(userId: string): Promise<void> {
+        try {
+            await this.db.delete(users).where(eq(users.id, userId))
+
+            this.logger.info('User deleted successfully', {
+                operation: 'UserRepository.deleteById',
+                entity: 'users',
+                userId,
+            })
+        } catch (error) {
+            this.logger.error('Failed to delete user', {
+                operation: 'UserRepository.deleteById',
+                entity: 'users',
+                userId,
+                error: formatError(error),
+            })
+            throw error
+        }
+    }
+
     async getUserPlanName(userId: string): Promise<string | null> {
         try {
             const result = await this.db.execute(

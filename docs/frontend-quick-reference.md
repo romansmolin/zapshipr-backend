@@ -13,8 +13,8 @@ Authorization: Bearer {token}
 
 ```typescript
 interface ListUserImagesParams {
+  page?: number;         // page number, default: 1
   limit?: number;        // 1-100, default: 50
-  cursor?: string;       // pagination token
   prefix?: string;       // e.g., "covers/", "accounts/"
   signed?: boolean;      // default: false
   expiresIn?: number;    // 60-86400, default: 3600
@@ -30,8 +30,12 @@ interface MediaItem {
 
 interface ListUserImagesResponse {
   items: MediaItem[];
-  nextCursor?: string;
-  hasMore: boolean;
+  page: number;
+  pageSize: number;
+  totalItems: number;
+  totalPages: number;
+  hasNextPage: boolean;
+  hasPreviousPage: boolean;
 }
 ```
 
@@ -41,8 +45,8 @@ interface ListUserImagesResponse {
 export const mediaService = {
   async listUserImages(params: ListUserImagesParams = {}) {
     const query = new URLSearchParams();
+    if (params.page) query.append('page', params.page.toString());
     if (params.limit) query.append('limit', params.limit.toString());
-    if (params.cursor) query.append('cursor', params.cursor);
     if (params.prefix) query.append('prefix', params.prefix);
     if (params.signed) query.append('signed', params.signed.toString());
     if (params.expiresIn) query.append('expiresIn', params.expiresIn.toString());
@@ -61,10 +65,11 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 export function useUserImages(params = {}) {
   return useInfiniteQuery({
     queryKey: ['user-images', params],
-    queryFn: ({ pageParam }) =>
-      mediaService.listUserImages({ ...params, cursor: pageParam }),
+    queryFn: ({ pageParam = 1 }) =>
+      mediaService.listUserImages({ ...params, page: pageParam }),
     getNextPageParam: (lastPage) =>
-      lastPage.hasMore ? lastPage.nextCursor : undefined,
+      lastPage.hasNextPage ? lastPage.page + 1 : undefined,
+    initialPageParam: 1,
   });
 }
 ```
@@ -152,7 +157,8 @@ curl -H "Authorization: Bearer YOUR_TOKEN" \
 ✅ **Auto User-Scoped** - Backend automatically filters to current user's images
 ✅ **Image Files Only** - Non-image files are automatically filtered out
 ✅ **Use Signed URLs** - For private/secure images, set `signed=true`
-✅ **Pagination** - Use `nextCursor` from response for next page
+✅ **Direct Page Access** - Jump to any page directly (no need to fetch previous pages)
+✅ **Page Metadata** - Response includes `page`, `pageSize`, `totalItems`, `totalPages`, `hasNextPage`, `hasPreviousPage`
 ✅ **Cache Friendly** - Recommended stale time: 5 minutes
 
 ## Need Help?

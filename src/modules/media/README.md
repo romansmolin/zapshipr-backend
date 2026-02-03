@@ -16,11 +16,13 @@ List all images stored in S3 for the authenticated user.
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `limit` | number | No | 50 | Maximum number of items to return (1-100) |
-| `cursor` | string | No | - | Pagination cursor from previous response |
+| `page` | number | No | 1 | Page number (can jump to any page: 1, 2, 3, 10, etc.) |
+| `limit` | number | No | 50 | Maximum number of items per page (1-100) |
 | `prefix` | string | No | - | Optional sub-prefix under user folder (e.g., "covers/", "accounts/") |
 | `signed` | boolean | No | false | Generate signed URLs for secure access |
 | `expiresIn` | number | No | 3600 | Signed URL expiration in seconds (60-86400, only used when signed=true) |
+
+**Note on Pagination**: This endpoint uses standard offset-based pagination backed by a database. You can navigate to any page directly (e.g., jump from page 1 to page 10). The response includes `totalPages` to help build pagination UI.
 
 #### Response
 
@@ -35,8 +37,12 @@ List all images stored in S3 for the authenticated user.
       "lastModified": "2024-01-01T12:00:00.000Z"
     }
   ],
-  "nextCursor": "continuation-token",
-  "hasMore": true
+  "page": 1,
+  "pageSize": 50,
+  "totalItems": 150,
+  "totalPages": 3,
+  "hasNextPage": true,
+  "hasPreviousPage": false
 }
 ```
 
@@ -50,21 +56,31 @@ List all images stored in S3 for the authenticated user.
 | `items[].signedUrl` | string | Presigned URL (only present when signed=true) |
 | `items[].size` | number | File size in bytes |
 | `items[].lastModified` | string | ISO 8601 timestamp of last modification |
-| `nextCursor` | string | Token for fetching next page (only present when hasMore=true) |
-| `hasMore` | boolean | Whether more results are available |
+| `page` | number | Current page number |
+| `pageSize` | number | Number of items per page (same as limit parameter) |
+| `totalItems` | number | Total number of items across all pages (for current filter) |
+| `totalPages` | number | Total number of pages available |
+| `hasNextPage` | boolean | Whether a next page is available |
+| `hasPreviousPage` | boolean | Whether a previous page exists (true if page > 1) |
 
 #### Example Requests
 
-**List all user images (default)**
+**List page 1 (default)**
 ```bash
 curl -H "Authorization: Bearer <token>" \
   "https://api.example.com/api/media/images"
 ```
 
-**List with pagination**
+**List page 2**
 ```bash
 curl -H "Authorization: Bearer <token>" \
-  "https://api.example.com/api/media/images?limit=25&cursor=<cursor-token>"
+  "https://api.example.com/api/media/images?page=2&limit=25"
+```
+
+**Jump to page 5**
+```bash
+curl -H "Authorization: Bearer <token>" \
+  "https://api.example.com/api/media/images?page=5&limit=25"
 ```
 
 **List images in specific folder**
@@ -110,6 +126,39 @@ curl -H "Authorization: Bearer <token>" \
   "httpCode": 500
 }
 ```
+
+## Important: Populating the Database
+
+**This endpoint relies on a database table (`user_media`) that tracks all uploaded images.**
+
+### For New Uploads
+
+All upload flows must now write to the `user_media` table when images are uploaded to S3. Use the `MediaRepository.create()` method:
+
+```typescript
+import { MediaRepository } from '@/modules/media/repositories/media.repository'
+
+// After successful S3 upload:
+await mediaRepository.create({
+    userId: userId,
+    key: s3Key,
+    url: publicUrl,
+    size: fileSize,
+    contentType: mimeType,
+    lastModified: new Date(),
+})
+```
+
+### For Existing Images
+
+If you have existing images in S3 that aren't in the database, you'll need to run a one-time sync script. Contact the backend team for assistance.
+
+### Where to Update
+
+Common upload locations that need updating:
+- Post creation with media (`src/modules/post/services/posts.service.ts`)
+- Account avatar upload (`src/modules/social/routes/accounts.routes.ts`)
+- Any other S3 upload flows
 
 ## Architecture
 

@@ -908,4 +908,88 @@ export class PostsRepository implements IPostsRepository {
             throw new BaseAppError('Failed to get failed post targets', ErrorCode.UNKNOWN_ERROR, 500)
         }
     }
+
+    async deleteAllWorkspacePosts(
+        userId: string,
+        workspaceId: string
+    ): Promise<{ deletedCount: number; mediaUrls: string[] }> {
+        try {
+            return await this.db.transaction(async (tx) => {
+                this.logger.info('Deleting all workspace posts', {
+                    operation: 'PostsRepository.deleteAllWorkspacePosts',
+                    userId,
+                    workspaceId,
+                })
+
+                // Get all posts for this user and workspace
+                const postRows = await tx
+                    .select({ id: posts.id, coverImageUrl: posts.coverImageUrl })
+                    .from(posts)
+                    .where(and(eq(posts.userId, userId), eq(posts.workspaceId, workspaceId)))
+
+                if (postRows.length === 0) {
+                    this.logger.info('No posts to delete', {
+                        operation: 'PostsRepository.deleteAllWorkspacePosts',
+                        userId,
+                        workspaceId,
+                    })
+                    return { deletedCount: 0, mediaUrls: [] }
+                }
+
+                const postIds = postRows.map((row) => row.id)
+
+                // Get all media URLs before deletion (for S3 cleanup)
+                const mediaRows = await tx
+                    .select({ id: mediaAssets.id, url: mediaAssets.url })
+                    .from(mediaAssets)
+                    .innerJoin(postMediaAssets, eq(postMediaAssets.mediaAssetId, mediaAssets.id))
+                    .where(inArray(postMediaAssets.postId, postIds))
+
+                const mediaUrls = mediaRows.map((row) => row.url)
+
+                // Add cover image URLs to the list
+                postRows.forEach((row) => {
+                    if (row.coverImageUrl) {
+                        mediaUrls.push(row.coverImageUrl)
+                    }
+                })
+
+                // Delete post_media_assets relations
+                await tx.delete(postMediaAssets).where(inArray(postMediaAssets.postId, postIds))
+
+                // Delete media_assets
+                const mediaIds = mediaRows.map((row) => row.id)
+                if (mediaIds.length > 0) {
+                    await tx.delete(mediaAssets).where(inArray(mediaAssets.id, mediaIds))
+                }
+
+                // Delete post_targets
+                await tx.delete(postTargets).where(inArray(postTargets.postId, postIds))
+
+                // Delete posts
+                await tx.delete(posts).where(and(eq(posts.userId, userId), eq(posts.workspaceId, workspaceId)))
+
+                this.logger.info('Successfully deleted all workspace posts', {
+                    operation: 'PostsRepository.deleteAllWorkspacePosts',
+                    userId,
+                    workspaceId,
+                    deletedCount: postRows.length,
+                    mediaCount: mediaUrls.length,
+                })
+
+                return {
+                    deletedCount: postRows.length,
+                    mediaUrls,
+                }
+            })
+        } catch (error) {
+            this.logger.error('Failed to delete all workspace posts', {
+                operation: 'PostsRepository.deleteAllWorkspacePosts',
+                userId,
+                workspaceId,
+                error: formatError(error),
+            })
+            throw new BaseAppError('Failed to delete all workspace posts', ErrorCode.UNKNOWN_ERROR, 500)
+        }
+    }
 }

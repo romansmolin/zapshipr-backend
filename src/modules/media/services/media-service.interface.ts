@@ -1,8 +1,8 @@
 import { ListUserImagesResponse } from '../entity/media.dto'
 
 export interface ListUserImagesOptions {
+    page: number
     limit: number
-    cursor?: string
     prefix?: string
     signed: boolean
     expiresIn: number

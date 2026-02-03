@@ -9,6 +9,10 @@ export interface MediaItem {
 
 export interface ListUserImagesResponse {
     items: MediaItem[]
-    nextCursor?: string
-    hasMore: boolean
+    page: number
+    pageSize: number
+    totalItems: number
+    totalPages: number
+    hasNextPage: boolean
+    hasPreviousPage: boolean
 }

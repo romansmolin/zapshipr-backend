@@ -80,4 +80,6 @@ export interface IPostsRepository {
     deletePostTarget(userId: string, postId: string, socialAccountId: string): Promise<void>
 
     getPostsTargetedOnlyByAccount(userId: string, accountId: string): Promise<string[]>
+
+    deleteAllWorkspacePosts(userId: string, workspaceId: string): Promise<{ deletedCount: number; mediaUrls: string[] }>
 }

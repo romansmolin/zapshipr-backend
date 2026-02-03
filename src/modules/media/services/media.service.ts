@@ -4,10 +4,12 @@ import { BaseAppError } from '@/shared/errors/base-error'
 import { ErrorCode } from '@/shared/consts/error-codes.const'
 import { ListUserImagesResponse, MediaItem } from '../entity/media.dto'
 import { IMediaService, ListUserImagesOptions } from './media-service.interface'
+import { IMediaRepository } from '../repositories/media-repository.interface'
 
 export class MediaService implements IMediaService {
     constructor(
         private readonly logger: ILogger,
+        private readonly mediaRepository: IMediaRepository,
         private readonly mediaUploader: IMediaUploader
     ) {}
 
@@ -16,42 +18,40 @@ export class MediaService implements IMediaService {
         options: ListUserImagesOptions
     ): Promise<ListUserImagesResponse> {
         try {
-            // Build the user-scoped prefix
-            // Format: {userId}/[optional-subprefix]
-            // This matches the existing upload pattern seen in posts.service.ts and upload-account-avatar.ts
-            const userPrefix = options.prefix ? `${userId}/${options.prefix}` : `${userId}/`
-
-            this.logger.info('Listing user images from S3', {
+            this.logger.info('Listing user images from database', {
                 operation: 'listUserImages',
                 userId,
-                prefix: userPrefix,
+                page: options.page,
                 limit: options.limit,
+                prefix: options.prefix,
                 signed: options.signed,
             })
 
-            // Call S3 list operation
-            const result = await this.mediaUploader.listObjects({
-                prefix: userPrefix,
-                maxKeys: options.limit,
-                continuationToken: options.cursor,
-            })
+            // Calculate offset for pagination
+            const offset = (options.page - 1) * options.limit
 
-            // Filter to only include image files (common image extensions)
-            const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.svg', '.bmp', '.ico']
-            const imageItems = result.items.filter((item) =>
-                imageExtensions.some((ext) => item.key.toLowerCase().endsWith(ext))
-            )
+            // Get total count for pagination metadata
+            const totalItems = await this.mediaRepository.countByUserId(userId, options.prefix)
+
+            // Calculate total pages
+            const totalPages = Math.ceil(totalItems / options.limit)
+
+            // Get paginated items from database
+            const dbItems = await this.mediaRepository.findByUserId(userId, {
+                limit: options.limit,
+                offset,
+                prefix: options.prefix,
+            })
 
             // Map to response items
             const items: MediaItem[] = await Promise.all(
-                imageItems.map(async (item) => {
-                    const baseUrl = `https://${process.env.AWS_S3_BUCKET}.s3.amazonaws.com/${item.key}`
-
+                dbItems.map(async (item) => {
                     const mediaItem: MediaItem = {
                         key: item.key,
-                        url: baseUrl,
+                        url: item.url,
                         size: item.size,
                         lastModified: item.lastModified.toISOString(),
+                        contentType: item.contentType ?? undefined,
                     }
 
                     // Optionally generate signed URL
@@ -69,14 +69,20 @@ export class MediaService implements IMediaService {
             this.logger.info('Successfully listed user images', {
                 operation: 'listUserImages',
                 userId,
-                count: items.length,
-                hasMore: result.isTruncated,
+                page: options.page,
+                totalItems,
+                totalPages,
+                itemsReturned: items.length,
             })
 
             return {
                 items,
-                nextCursor: result.nextContinuationToken,
-                hasMore: result.isTruncated,
+                page: options.page,
+                pageSize: options.limit,
+                totalItems,
+                totalPages,
+                hasNextPage: options.page < totalPages,
+                hasPreviousPage: options.page > 1,
             }
         } catch (error) {
             this.logger.error('Failed to list user images', {

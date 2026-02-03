@@ -25,4 +25,5 @@ export interface IUserService {
     decrementConnectedAccountsUsage(userId: string): Promise<void>
     getUserPlan(userId: string): Promise<UserPlanSnapshot | null>
     incrementAiUsage(userId: string): Promise<void>
+    deleteUserAccout(userId: string): Promise<void>
 }

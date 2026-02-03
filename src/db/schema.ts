@@ -11,6 +11,7 @@ import {
 import { inspirationsExtractions } from '@/modules/inspiration/entity/inspirations-extraction.schema'
 import { workspaceTags, tagCategory } from '@/modules/inspiration/entity/workspace-tag.schema'
 import { transcripts, transcriptSource, transcriptFormat } from '@/modules/inspiration/entity/transcript.schema'
+import { userMedia } from '@/modules/media/entity/user-media.schema'
 
 export const schema = {
     users,
@@ -26,6 +27,7 @@ export const schema = {
     inspirationsExtractions,
     workspaceTags,
     transcripts,
+    userMedia,
 }
 
 export type DBSchema = typeof schema
@@ -43,3 +45,4 @@ export {
 export { inspirationsExtractions } from '@/modules/inspiration/entity/inspirations-extraction.schema'
 export { workspaceTags, tagCategory } from '@/modules/inspiration/entity/workspace-tag.schema'
 export { transcripts, transcriptSource, transcriptFormat } from '@/modules/inspiration/entity/transcript.schema'
+export { userMedia } from '@/modules/media/entity/user-media.schema'
