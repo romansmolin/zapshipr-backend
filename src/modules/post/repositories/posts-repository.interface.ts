@@ -37,9 +37,9 @@ export interface IPostsRepository {
 
     createPostMediaAssetRelation(postId: string, mediaId: string, order: number): Promise<void>
 
-    getPostMediaAsset(postId: string): Promise<PostMediaAsset | null>
+    getPostMediaAsset(postId: string, mediaIndices?: number[] | null): Promise<PostMediaAsset | null>
 
-    getPostMediaAssets(postId: string): Promise<PostMediaAsset[]>
+    getPostMediaAssets(postId: string, mediaIndices?: number[] | null): Promise<PostMediaAsset[]>
 
     getPostCoverImageUrl(postId: string): Promise<string | null>
 

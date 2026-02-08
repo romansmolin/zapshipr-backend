@@ -24,6 +24,7 @@ export class AuthController implements IAuthController {
         const result = await this.authService.signIn(payload)
 
         this.setAuthCookie(req, res, result.refreshToken)
+        this.logger.info('TOKEN: ', { token: result.refreshToken })
 
         this.logger.info('User signed in', { operation: 'AuthController.signIn', userId: result.user.id })
 
@@ -137,11 +138,16 @@ export class AuthController implements IAuthController {
         const forwardedProto = req?.headers['x-forwarded-proto']
         const forwardedProtoValue = Array.isArray(forwardedProto) ? forwardedProto[0] : forwardedProto
         const isHttps =
-            req?.secure || (typeof forwardedProtoValue === 'string' && forwardedProtoValue.split(',')[0].trim() === 'https')
+            req?.secure ||
+            (typeof forwardedProtoValue === 'string' && forwardedProtoValue.split(',')[0].trim() === 'https')
 
         const secureEnv = process.env.AUTH_COOKIE_SECURE?.toLowerCase()
         let secure =
-            secureEnv === 'true' ? true : secureEnv === 'false' ? false : isHttps || process.env.NODE_ENV === 'production'
+            secureEnv === 'true'
+                ? true
+                : secureEnv === 'false'
+                  ? false
+                  : isHttps || process.env.NODE_ENV === 'production'
 
         if (sameSite === 'none') {
             secure = true

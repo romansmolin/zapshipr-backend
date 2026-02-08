@@ -8,6 +8,8 @@ import { UserPlans } from '@/shared/consts/plans'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import type { IApiClient } from '@/shared/http-client'
 import type { IUserService } from '@/modules/user/services/user.service.interface'
+import type { IWorkspaceProfileService } from '@/modules/workspace/services/workspace-profile.service'
+import type { WorkspaceAIContext } from '@/modules/workspace/entity/workspace-profile.types'
 
 import type { AiIntroductoryResult, IAiService } from './ai.service.interface'
 
@@ -134,16 +136,19 @@ export class AiService implements IAiService {
     private readonly model: string
     private readonly envLimits: EnvLimits
     private readonly userService: IUserService
+    private readonly workspaceProfileService: IWorkspaceProfileService
 
     constructor(
         apiClient: IApiClient,
         logger: ILogger,
         userService: IUserService,
+        workspaceProfileService: IWorkspaceProfileService,
         options?: { apiKey?: string; model?: string }
     ) {
         this.apiClient = apiClient
         this.logger = logger
         this.userService = userService
+        this.workspaceProfileService = workspaceProfileService
         this.apiKey = options?.apiKey || process.env.OPENAI_API_KEY || ''
         this.model = options?.model || process.env.OPENAI_CONTENT_MODEL || 'gpt-4o-mini'
         this.envLimits = this.loadEnvLimits()
@@ -172,6 +177,24 @@ export class AiService implements IAiService {
 
         this.ensureSupportedPlatforms(payload)
 
+        // Fetch workspace context if workspaceId provided
+        let workspaceContext: WorkspaceAIContext | null = null
+        if (payload.workspaceId) {
+            try {
+                workspaceContext = await this.workspaceProfileService.getNormalizedAIContext(payload.workspaceId)
+                this.logger.info('Workspace context fetched for AI generation', {
+                    operation: 'ai_generate_content',
+                    workspaceId: payload.workspaceId,
+                })
+            } catch (error) {
+                this.logger.warn('Failed to fetch workspace context', {
+                    operation: 'ai_generate_content',
+                    workspaceId: payload.workspaceId,
+                    error: error instanceof Error ? error.message : String(error),
+                })
+            }
+        }
+
         const maxAttempts = 2
         let lastValidationError: unknown = null
 
@@ -179,7 +202,7 @@ export class AiService implements IAiService {
             const isRepairAttempt = attempt > 1
 
             try {
-                const aiOutput = await this.fetchAndValidateResponse(payload, isRepairAttempt)
+                const aiOutput = await this.fetchAndValidateResponse(payload, isRepairAttempt, workspaceContext)
                 const results = this.transformOutput(payload, aiOutput)
                 this.ensureForbiddenCompliance(results, payload.forbiddenWords || [])
 
@@ -188,6 +211,11 @@ export class AiService implements IAiService {
                     attempt,
                     generatedItems: results.length,
                 })
+
+                // Record generation signals if workspace context was used
+                if (workspaceContext) {
+                    await this.recordGenerationSignals(workspaceContext.workspaceId, results, payload)
+                }
 
                 return results
             } catch (error) {
@@ -277,8 +305,12 @@ export class AiService implements IAiService {
         }
     }
 
-    private async fetchAndValidateResponse(payload: AiRequest, isRepairAttempt: boolean): Promise<AiOutput> {
-        const messages = this.buildMessages(payload, isRepairAttempt)
+    private async fetchAndValidateResponse(
+        payload: AiRequest,
+        isRepairAttempt: boolean,
+        workspaceContext: WorkspaceAIContext | null = null
+    ): Promise<AiOutput> {
+        const messages = this.buildMessages(payload, isRepairAttempt, workspaceContext)
 
         const requestBody = {
             model: this.model,
@@ -341,15 +373,23 @@ export class AiService implements IAiService {
         return AiOutputSchema.parse(parsed)
     }
 
-    private buildMessages(payload: AiRequest, isRepairAttempt: boolean): OpenAiMessage[] {
+    private buildMessages(
+        payload: AiRequest,
+        isRepairAttempt: boolean,
+        workspaceContext: WorkspaceAIContext | null = null
+    ): OpenAiMessage[] {
+        const systemPrompt = workspaceContext
+            ? this.buildEnhancedSystemPrompt(workspaceContext)
+            : AI_SYSTEM_PROMPT
+
         const messages: OpenAiMessage[] = [
             {
                 role: 'system',
-                content: AI_SYSTEM_PROMPT,
+                content: systemPrompt,
             },
             {
                 role: 'user',
-                content: this.buildUserPrompt(payload),
+                content: this.buildUserPrompt(payload, workspaceContext),
             },
         ]
 
@@ -363,10 +403,16 @@ export class AiService implements IAiService {
         return messages
     }
 
-    private buildUserPrompt(payload: AiRequest): string {
+    private buildUserPrompt(payload: AiRequest, workspaceContext: WorkspaceAIContext | null = null): string {
         const includeHashtags = payload.includeHashtags ?? true
         const notesForAi = payload.notesForAi ?? 'null'
-        const forbiddenWordsJson = JSON.stringify(payload.forbiddenWords || [])
+
+        // Merge forbidden words from payload and workspace context
+        const forbiddenWords = [
+            ...(payload.forbiddenWords || []),
+            ...(workspaceContext?.constraints.forbiddenWords || []),
+        ]
+        const forbiddenWordsJson = JSON.stringify(forbiddenWords)
         const selectedAccountsJson = JSON.stringify(payload.selectedAccounts, null, 2)
 
         const limitsLines = [
@@ -398,6 +444,124 @@ export class AiService implements IAiService {
             'Respect forbidden words, tones, platform limits, and hashtag rules.',
             'Return only the JSON object per schema.',
         ].join('\n')
+    }
+
+    private buildEnhancedSystemPrompt(context: WorkspaceAIContext): string {
+        const contextParts = [
+            AI_SYSTEM_PROMPT,
+            '',
+            '=== WORKSPACE CONTEXT ===',
+            '',
+            `BRAND & VOICE:`,
+            `- Type: ${context.voice.brandType || 'not specified'}`,
+            `- Tones: ${context.voice.tones.join(', ')}`,
+            `- Perspective: ${context.voice.perspective || 'not specified'}`,
+            '',
+            `AUDIENCE:`,
+            `- Type: ${context.audience.type}`,
+            `- Awareness Level: ${context.audience.awarenessLevel || 'not specified'}`,
+            ...(context.audience.painPoints ? [`- Pain Points: ${context.audience.painPoints}`] : []),
+            ...(context.audience.languages.length > 0 ? [`- Languages: ${context.audience.languages.join(', ')}`] : []),
+            '',
+            `CONTENT STRATEGY:`,
+            `- Goal: ${context.goal.primary}`,
+            `- Content Pillars: ${context.contentStrategy.pillars.join(', ')}`,
+            ...(context.contentStrategy.topics && context.contentStrategy.topics.length > 0
+                ? [`- Topics: ${context.contentStrategy.topics.join(', ')}`]
+                : []),
+            ...(context.contentStrategy.formats && context.contentStrategy.formats.length > 0
+                ? [`- Preferred Formats: ${context.contentStrategy.formats.join(', ')}`]
+                : []),
+            '',
+            `SALES APPROACH:`,
+            `- Profile: ${context.sales.profile}`,
+            `- Max Sales Posts Ratio: ${(context.sales.policy.maxSalesPostsRatio * 100).toFixed(0)}%`,
+            `- CTA Severity: ${context.sales.policy.ctaSeverity}`,
+            '',
+            `CONSTRAINTS:`,
+            `- Platforms: ${context.constraints.platforms.join(', ')}`,
+            ...(context.constraints.hardConstraints.length > 0
+                ? [`- Hard Constraints: ${context.constraints.hardConstraints.join(', ')}`]
+                : []),
+            ...(context.constraints.forbiddenWords.length > 0
+                ? [`- Forbidden Words: ${context.constraints.forbiddenWords.join(', ')}`]
+                : []),
+        ]
+
+        // Add user tags if present
+        const allTags = [
+            ...context.tags.topics,
+            ...context.tags.formats,
+            ...context.tags.tones,
+            ...context.tags.styles,
+            ...context.tags.other,
+        ]
+        if (allTags.length > 0) {
+            contextParts.push('', `USER TAGS:`, `- ${allTags.join(', ')}`)
+        }
+
+        // Add learned patterns if confidence is high enough
+        if (context.learned.confidence > 0.3) {
+            contextParts.push(
+                '',
+                `LEARNED PATTERNS (confidence: ${(context.learned.confidence * 100).toFixed(0)}%):`,
+                ...(context.learned.frequentTones.length > 0
+                    ? [`- Frequent Tones: ${context.learned.frequentTones.join(', ')}`]
+                    : []),
+                ...(context.learned.frequentFormats.length > 0
+                    ? [`- Frequent Formats: ${context.learned.frequentFormats.join(', ')}`]
+                    : []),
+                ...(context.learned.preferredPlatforms.length > 0
+                    ? [`- Preferred Platforms: ${context.learned.preferredPlatforms.join(', ')}`]
+                    : []),
+                ...(context.learned.avgContentLength
+                    ? [`- Avg Content Length: ${context.learned.avgContentLength} chars`]
+                    : [])
+            )
+        }
+
+        contextParts.push(
+            '',
+            'IMPORTANT: Adapt all generated content to align with this workspace profile.',
+            '========================='
+        )
+
+        return contextParts.join('\n')
+    }
+
+    private async recordGenerationSignals(
+        workspaceId: string,
+        results: AiIntroductoryResult[],
+        payload: AiRequest
+    ): Promise<void> {
+        try {
+            // Record content_generated signal for each result
+            for (const result of results) {
+                await this.workspaceProfileService.recordSignal(workspaceId, {
+                    type: 'content_generated',
+                    source: 'ai_service',
+                    data: {
+                        platform: result.platform,
+                        language: result.language,
+                        contentLength: result.charCounts.text,
+                        hashtagCount: result.hashtags.length,
+                        toneRequested: payload.tone,
+                    },
+                })
+            }
+
+            this.logger.info('Generation signals recorded', {
+                operation: 'ai_generate_content',
+                workspaceId,
+                signalCount: results.length,
+            })
+        } catch (error) {
+            this.logger.warn('Failed to record generation signals', {
+                operation: 'ai_generate_content',
+                workspaceId,
+                error: error instanceof Error ? error.message : String(error),
+            })
+        }
     }
 
     private transformOutput(payload: AiRequest, aiOutput: AiOutput): AiIntroductoryResult[] {

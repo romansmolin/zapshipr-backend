@@ -97,6 +97,46 @@ export class UserRepository implements IUserRepository {
         }
     }
 
+    async updateUserProfile(
+        userId: string,
+        data: { name?: string; email?: string; avatar?: string | null }
+    ): Promise<User> {
+        try {
+            const [updatedUser] = await this.db
+                .update(users)
+                .set({
+                    ...data,
+                    updatedAt: new Date(),
+                })
+                .where(eq(users.id, userId))
+                .returning()
+
+            if (!updatedUser) {
+                throw new AppError({
+                    errorMessageCode: ErrorMessageCode.USER_NOT_FOUND,
+                    httpCode: 404,
+                })
+            }
+
+            return this.mapUserRow(updatedUser)
+        } catch (error) {
+            if (isDuplicateKeyError(error)) {
+                throw new AppError({
+                    errorMessageCode: ErrorMessageCode.USER_ALREADY_EXISTS,
+                    httpCode: 409,
+                })
+            }
+
+            this.logger.error('Failed to update user profile', {
+                operation: 'UserRepository.updateUserProfile',
+                entity: 'users',
+                userId,
+                error: formatError(error),
+            })
+            throw error
+        }
+    }
+
     async updateUserPassword(userId: string, passwordHash: string): Promise<void> {
         try {
             await this.db.update(users).set({ passwordHash }).where(eq(users.id, userId))

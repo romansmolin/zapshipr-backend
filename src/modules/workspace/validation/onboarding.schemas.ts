@@ -93,28 +93,24 @@ export const HardConstraintEnum = z.enum([
 
 export const SalesProfileEnum = z.enum(['no_sales', 'indirect_sales', 'direct_sales'])
 
-export const ContentIntentEnum = z.enum([
-    'value',
-    'authority',
-    'engagement',
-    'story',
-    'soft_promo',
-    'direct_sale',
-])
+export const ContentIntentEnum = z.enum(['value', 'authority', 'engagement', 'story', 'soft_promo', 'direct_sale'])
 
 export const CtaSeverityEnum = z.enum(['none', 'implicit', 'soft', 'direct'])
 
-// Input schemas (what client sends)
+// Completion level and form type enums
+export const CompletionLevelEnum = z.enum(['quick_start', 'partial', 'complete'])
+export const OnboardingFormTypeEnum = z.enum(['quick', 'complex'])
+
 export const goalInputSchema = z.object({
     primaryGoal: PrimaryGoalEnum,
-    expectedOutcome: z.string().min(1),
-    successSignals: z.array(SuccessSignalEnum).min(1),
+    expectedOutcome: z.string().min(1).optional(),
+    successSignals: z.array(SuccessSignalEnum).min(1).optional(),
 })
 
 export const audienceInputSchema = z.object({
     audienceType: AudienceTypeEnum,
-    awarenessLevel: AwarenessLevelEnum,
-    painOrDesire: z.string().min(1),
+    awarenessLevel: AwarenessLevelEnum.optional(),
+    painOrDesire: z.string().min(1).optional(),
     geography: z.string().optional(),
     languages: z.array(z.string()).optional(),
 })
@@ -127,17 +123,17 @@ export const personalityAnchorsInputSchema = z
     .optional()
 
 export const voiceInputSchema = z.object({
-    brandType: BrandTypeEnum,
+    brandType: BrandTypeEnum.optional(),
     tones: z.array(ToneEnum).min(1),
     personalityAnchors: personalityAnchorsInputSchema,
-    perspective: PerspectiveEnum,
+    perspective: PerspectiveEnum.optional(),
 })
 
 export const contentStrategyInputSchema = z.object({
-    topics: z.array(z.string()).min(1),
+    topics: z.array(z.string()).min(1).optional(),
     pillars: z.array(ContentPillarEnum).min(1),
-    formats: z.array(ContentFormatEnum).min(1),
-    postingFrequency: PostingFrequencyEnum,
+    formats: z.array(ContentFormatEnum).min(1).optional(),
+    postingFrequency: PostingFrequencyEnum.optional(),
 })
 
 export const constraintsInputSchema = z.object({
@@ -171,7 +167,6 @@ export const examplesInputSchema = z
     })
     .optional()
 
-// Client input schema - sales is optional (server will derive defaults)
 export const onboardingInputSchema = z.object({
     goal: goalInputSchema,
     audience: audienceInputSchema,
@@ -181,28 +176,30 @@ export const onboardingInputSchema = z.object({
     sales: salesInputSchema.optional(),
     examples: examplesInputSchema,
     additionalInfo: z.string().optional(),
+    formType: OnboardingFormTypeEnum.optional(),
 })
 
-// Server-side complete schema (with workspaceId and meta)
 export const onboardingMetaSchema = z.object({
     version: z.number().default(1),
     createdAt: z.string(),
     updatedAt: z.string(),
+    completionLevel: CompletionLevelEnum.optional(),
+    formType: OnboardingFormTypeEnum.optional(),
 })
 
 export const onboardingSchema = onboardingInputSchema.extend({
     workspaceId: z.string().uuid(),
     meta: onboardingMetaSchema,
-    sales: salesInputSchema, // Required in server model
+    sales: salesInputSchema,
 })
 
-// Update schema - all fields optional for partial updates
 export const updateOnboardingInputSchema = onboardingInputSchema.partial()
 
-// Type exports
 export type OnboardingInput = z.infer<typeof onboardingInputSchema>
 export type UpdateOnboardingInput = z.infer<typeof updateOnboardingInputSchema>
 export type Onboarding = z.infer<typeof onboardingSchema>
 export type PrimaryGoal = z.infer<typeof PrimaryGoalEnum>
 export type SalesProfile = z.infer<typeof SalesProfileEnum>
 export type SalesPolicy = z.infer<typeof salesPolicyInputSchema>
+export type CompletionLevel = z.infer<typeof CompletionLevelEnum>
+export type OnboardingFormType = z.infer<typeof OnboardingFormTypeEnum>

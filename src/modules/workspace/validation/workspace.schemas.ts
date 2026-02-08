@@ -1,6 +1,14 @@
 import { z } from 'zod'
 import { onboardingInputSchema } from './onboarding.schemas'
 
+const parseBoolean = (value: unknown): unknown => {
+    if (typeof value === 'boolean') return value
+    if (typeof value !== 'string') return value
+    if (value.toLowerCase() === 'true') return true
+    if (value.toLowerCase() === 'false') return false
+    return value
+}
+
 export const createWorkspaceSchema = z.object({
     name: z.string().min(1, 'Name is required').max(255, 'Name is too long'),
     description: z.string().optional(),
@@ -10,6 +18,7 @@ export const createWorkspaceSchema = z.object({
 export const updateWorkspaceSchema = z.object({
     name: z.string().min(1, 'Name is required').max(255, 'Name is too long').optional(),
     description: z.string().optional(),
+    removeAvatar: z.preprocess(parseBoolean, z.boolean().optional()),
 })
 
 export const mainPromptSchema = z.object({
@@ -41,5 +50,4 @@ export type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceSchema>
 export type MainPrompt = z.infer<typeof mainPromptSchema>
 export type UpdateMainPrompt = z.infer<typeof updateMainPromptSchema>
 export type WorkspaceIdParam = z.infer<typeof workspaceIdParamSchema>
-
 

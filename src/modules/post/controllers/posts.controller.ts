@@ -77,9 +77,16 @@ const parseDate = (value: unknown, timeZone?: string | null): Date | null => {
     return null
 }
 
+const clampPagination = (value: unknown, min: number, max: number): number | undefined => {
+    const num = Number(getFirstValue(value))
+    if (!Number.isFinite(num)) return undefined
+    return Math.min(max, Math.max(min, Math.trunc(num)))
+}
+
 const parseCreatePostsRequest = (body: Request['body']): CreatePostsRequest => {
     const posts = parseJson<CreatePostsRequest['posts']>(body.posts) ?? []
     const copyDataUrls = parseJson<string[]>(body.copyDataUrls) ?? undefined
+    const mediaTransforms = parseJson<CreatePostsRequest['mediaTransforms']>(body.mediaTransforms) ?? undefined
     const timezone = typeof body.timezone === 'string' && body.timezone.trim() !== '' ? body.timezone.trim() : null
     const scheduledAtLocal =
         typeof body.scheduledAtLocal === 'string' && body.scheduledAtLocal.trim() !== ''
@@ -104,6 +111,7 @@ const parseCreatePostsRequest = (body: Request['body']): CreatePostsRequest => {
             ? undefined
             : (coverTimestamp as number | undefined),
         copyDataUrls,
+        mediaTransforms,
     }
 }
 
@@ -202,13 +210,12 @@ export class PostsController {
     async getPostsByFilters(req: Request, res: Response, _next: NextFunction): Promise<void> {
         const userId = req.user?.id
         if (!userId) throw new BaseAppError('Unauthorized', ErrorCode.UNAUTHORIZED, 401)
-        this.logger.debug('userId: ', { userId })
 
         const workspaceId = this.getWorkspaceId(req)
 
         const filters: PostFilters = {
-            page: Number(getFirstValue(req.query.page)) || undefined,
-            limit: Number(getFirstValue(req.query.limit)) || undefined,
+            page: clampPagination(req.query.page, 1, 100000) ?? undefined,
+            limit: clampPagination(req.query.limit, 1, 100) ?? undefined,
             status: getFirstValue(req.query.status) as PostFilters['status'],
             platform: getFirstValue(req.query.platform) as PostFilters['platform'],
             fromDate: parseDate(getFirstValue(req.query.fromDate)) ?? undefined,
@@ -216,7 +223,6 @@ export class PostsController {
         }
 
         const result = await this.postsService.getPostsByFilters(userId, workspaceId, filters)
-        this.logger.debug('POSTS: ', result)
         res.json(result)
     }
 
@@ -256,14 +262,10 @@ export class PostsController {
     async getFailedPostTargets(req: Request, res: Response, _next: NextFunction): Promise<void> {
         const userId = req.user?.id
 
-        this.logger.debug('User ID: ', { userId })
-
         if (!userId) throw new BaseAppError('Unauthorized', ErrorCode.UNAUTHORIZED, 401)
 
         const workspaceId = this.getWorkspaceId(req)
         const result = await this.postsService.getFailedPostTargets(userId, workspaceId)
-
-        this.logger.debug('Failed Targets: ', { result })
 
         res.json({ targets: result })
     }

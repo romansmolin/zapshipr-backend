@@ -130,6 +130,7 @@ export class PostsRepository implements IPostsRepository {
                         isAutoMusicEnabled: target.isAutoMusicEnabled ?? false,
                         instagramLocationId: target.instagramLocationId ?? null,
                         instagramFacebookPageId: target.instagramFacebookPageId ?? null,
+                        mediaIndices: target.mediaIndices ?? null,
                         threadsReplies: target.threadsReplies ?? [],
                         tikTokPostPrivacyLevel: target.tikTokPostPrivacyLevel ?? null,
                     }))
@@ -380,26 +381,10 @@ export class PostsRepository implements IPostsRepository {
         }
     }
 
-    async getPostMediaAsset(postId: string): Promise<PostMediaAsset | null> {
+    async getPostMediaAsset(postId: string, mediaIndices?: number[] | null): Promise<PostMediaAsset | null> {
         try {
-            const [row] = await this.db
-                .select({
-                    mediaId: mediaAssets.id,
-                    url: mediaAssets.url,
-                    type: mediaAssets.type,
-                    order: postMediaAssets.order,
-                })
-                .from(postMediaAssets)
-                .innerJoin(mediaAssets, eq(postMediaAssets.mediaAssetId, mediaAssets.id))
-                .where(eq(postMediaAssets.postId, postId))
-                .orderBy(asc(postMediaAssets.order))
-                .limit(1)
-
-            if (!row) {
-                return null
-            }
-
-            return toPostMediaAsset(row)
+            const mediaAssetsRows = await this.getPostMediaAssets(postId, mediaIndices)
+            return mediaAssetsRows[0] ?? null
         } catch (error) {
             this.logger.error('Failed to get post media asset', {
                 operation: 'PostsRepository.getPostMediaAsset',
@@ -410,7 +395,7 @@ export class PostsRepository implements IPostsRepository {
         }
     }
 
-    async getPostMediaAssets(postId: string): Promise<PostMediaAsset[]> {
+    async getPostMediaAssets(postId: string, mediaIndices?: number[] | null): Promise<PostMediaAsset[]> {
         try {
             const rows = await this.db
                 .select({
@@ -424,7 +409,17 @@ export class PostsRepository implements IPostsRepository {
                 .where(eq(postMediaAssets.postId, postId))
                 .orderBy(asc(postMediaAssets.order))
 
-            return rows.map(toPostMediaAsset)
+            const allMediaAssets = rows.map(toPostMediaAsset)
+            if (!mediaIndices) {
+                return allMediaAssets
+            }
+
+            if (mediaIndices.length === 0) {
+                return []
+            }
+
+            const allowedIndices = new Set(mediaIndices)
+            return allMediaAssets.filter((_, index) => allowedIndices.has(index))
         } catch (error) {
             this.logger.error('Failed to get post media assets', {
                 operation: 'PostsRepository.getPostMediaAssets',
@@ -493,6 +488,7 @@ export class PostsRepository implements IPostsRepository {
                         isAutoMusicEnabled: target.isAutoMusicEnabled ?? false,
                         instagramLocationId: target.instagramLocationId ?? null,
                         instagramFacebookPageId: target.instagramFacebookPageId ?? null,
+                        mediaIndices: target.mediaIndices ?? null,
                         threadsReplies: target.threadsReplies ?? [],
                         tikTokPostPrivacyLevel: target.tikTokPostPrivacyLevel ?? null,
                     }))

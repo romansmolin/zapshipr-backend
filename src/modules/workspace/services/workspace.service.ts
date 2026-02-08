@@ -1,6 +1,9 @@
+import path from 'path'
+
 import { ErrorCode } from '@/shared/consts/error-codes.const'
 import { BaseAppError } from '@/shared/errors/base-error'
 import type { ILogger } from '@/shared/logger'
+import type { IMediaUploader } from '@/shared/media-uploader/media-uploader.interface'
 
 import { toWorkspaceDto, type WorkspaceDto } from '../entity/workspace.dto'
 import type { IWorkspaceRepository } from '../repositories/workspace-repository.interface'
@@ -13,41 +16,64 @@ import type {
 import type { Onboarding, UpdateOnboardingInput } from '../validation/onboarding.schemas'
 import type { IWorkspaceService } from './workspace-service.interface'
 import { normalizeOnboarding, validateOnboardingInput } from '../utils/onboarding-normalizer'
+import type { IWorkspaceProfileService } from './workspace-profile.service'
+import type { WorkspaceAIContext } from '../entity/workspace-profile.types'
 
 export class WorkspaceService implements IWorkspaceService {
     constructor(
         private repository: IWorkspaceRepository,
+        private mediaUploader: IMediaUploader,
+        private profileService: IWorkspaceProfileService,
         private logger: ILogger
     ) {}
 
-    async create(userId: string, data: CreateWorkspaceInput): Promise<WorkspaceDto> {
+    async create(userId: string, data: CreateWorkspaceInput, file?: Express.Multer.File): Promise<WorkspaceDto> {
         this.logger.info('Creating workspace', { userId, name: data.name })
 
-        // Validate that client didn't send forbidden server-side fields
         validateOnboardingInput(data.onboarding)
 
-        // Проверяем, есть ли у пользователя уже workspaces
         const workspacesCount = await this.repository.countByUserId(userId)
         const isFirstWorkspace = workspacesCount === 0
+        let avatarUrl: string | undefined
 
-        // Create workspace first to get the ID
+        if (file) {
+            if (!file.mimetype.startsWith('image/'))
+                throw new BaseAppError('Avatar must be an image', ErrorCode.BAD_REQUEST, 400)
+
+            const extension = path.extname(file.originalname) || '.jpg'
+            const key = `${userId}/workspaces/avatar-${Date.now()}${extension}`
+
+            avatarUrl = await this.mediaUploader.upload({
+                key,
+                body: file.buffer,
+                contentType: file.mimetype,
+            })
+        }
+
         const workspace = await this.repository.create({
             userId,
             name: data.name,
             description: data.description || null,
-            isDefault: isFirstWorkspace, // Если это первый workspace - делаем его дефолтным
-            onboarding: null, // Will be set in the next step
+            avatarUrl,
+            isDefault: isFirstWorkspace,
+            onboarding: null,
         })
 
-        // Normalize onboarding with the workspace ID
         const normalizedOnboarding = normalizeOnboarding(data.onboarding, workspace.id)
 
-        // Update workspace with normalized onboarding
         const updatedWorkspace = await this.repository.updateOnboarding(workspace.id, normalizedOnboarding)
 
-        if (!updatedWorkspace) {
-            throw new BaseAppError('Failed to set onboarding', ErrorCode.UNKNOWN_ERROR, 500)
-        }
+        if (!updatedWorkspace) throw new BaseAppError('Failed to set onboarding', ErrorCode.UNKNOWN_ERROR, 500)
+
+        // Record onboarding completion signal
+        await this.profileService.recordSignal(workspace.id, {
+            type: 'onboarding_completed',
+            source: 'workspace_creation',
+            data: {
+                completionLevel: normalizedOnboarding.meta.completionLevel,
+                primaryGoal: normalizedOnboarding.goal.primaryGoal,
+            },
+        })
 
         this.logger.info('Workspace created', {
             workspaceId: updatedWorkspace.id,
@@ -82,26 +108,57 @@ export class WorkspaceService implements IWorkspaceService {
         return workspaces.map(toWorkspaceDto)
     }
 
-    async update(id: string, userId: string, data: UpdateWorkspaceInput): Promise<WorkspaceDto> {
+    async update(
+        id: string,
+        userId: string,
+        data: UpdateWorkspaceInput,
+        file?: Express.Multer.File
+    ): Promise<WorkspaceDto> {
         this.logger.info('Updating workspace', { workspaceId: id, userId })
 
         const existingWorkspace = await this.repository.findById(id)
 
-        if (!existingWorkspace) {
-            throw new BaseAppError('Workspace not found', ErrorCode.NOT_FOUND, 404)
-        }
+        if (!existingWorkspace) throw new BaseAppError('Workspace not found', ErrorCode.NOT_FOUND, 404)
 
-        if (existingWorkspace.userId !== userId) {
-            throw new BaseAppError('Access denied', ErrorCode.FORBIDDEN, 403)
+        if (existingWorkspace.userId !== userId) throw new BaseAppError('Access denied', ErrorCode.FORBIDDEN, 403)
+
+        let avatarUrl: string | null | undefined
+
+        if (file) {
+            if (!file.mimetype.startsWith('image/'))
+                throw new BaseAppError('Avatar must be an image', ErrorCode.BAD_REQUEST, 400)
+
+            const extension = path.extname(file.originalname) || '.jpg'
+
+            const key = `${userId}/workspaces/${id}/avatar-${Date.now()}${extension}`
+
+            avatarUrl = await this.mediaUploader.upload({
+                key,
+                body: file.buffer,
+                contentType: file.mimetype,
+            })
+        } else if (data.removeAvatar === true) {
+            avatarUrl = null
         }
 
         const workspace = await this.repository.update(id, {
             name: data.name,
             description: data.description,
+            avatarUrl,
         })
 
-        if (!workspace) {
-            throw new BaseAppError('Failed to update workspace', ErrorCode.UNKNOWN_ERROR, 500)
+        if (!workspace) throw new BaseAppError('Failed to update workspace', ErrorCode.UNKNOWN_ERROR, 500)
+
+        if (existingWorkspace.avatarUrl && existingWorkspace.avatarUrl !== workspace.avatarUrl) {
+            try {
+                await this.mediaUploader.delete(existingWorkspace.avatarUrl)
+            } catch (error) {
+                this.logger.warn('Failed to delete previous workspace avatar from S3', {
+                    workspaceId: id,
+                    userId,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                })
+            }
         }
 
         return toWorkspaceDto(workspace)
@@ -305,6 +362,7 @@ export class WorkspaceService implements IWorkspaceService {
             sales: data.sales ?? currentOnboarding.sales,
             examples: data.examples ?? currentOnboarding.examples,
             additionalInfo: data.additionalInfo ?? currentOnboarding.additionalInfo,
+            formType: data.formType, // Only include if explicitly provided
         }
 
         // Normalize the merged data (this will update meta.updatedAt and recalculate sales if needed)
@@ -314,14 +372,51 @@ export class WorkspaceService implements IWorkspaceService {
         normalizedOnboarding.meta.createdAt = currentOnboarding.meta.createdAt
         normalizedOnboarding.meta.version = currentOnboarding.meta.version + 1
 
+        // Preserve original formType if not explicitly changed
+        if (!data.formType && currentOnboarding.meta.formType) {
+            normalizedOnboarding.meta.formType = currentOnboarding.meta.formType
+        }
+
         const updatedWorkspace = await this.repository.updateOnboarding(workspaceId, normalizedOnboarding)
 
         if (!updatedWorkspace) {
             throw new BaseAppError('Failed to update onboarding', ErrorCode.UNKNOWN_ERROR, 500)
         }
 
+        // Record onboarding update signal
+        await this.profileService.recordSignal(workspaceId, {
+            type: 'onboarding_updated',
+            source: 'user_action',
+            data: {
+                completionLevel: normalizedOnboarding.meta.completionLevel,
+                version: normalizedOnboarding.meta.version,
+            },
+        })
+
         this.logger.info('Onboarding updated', { workspaceId, userId })
 
         return updatedWorkspace.onboarding as Onboarding
+    }
+
+    async verifyWorkspaceAccess(workspaceId: string, userId: string): Promise<void> {
+        this.logger.info('Verifying workspace access', { workspaceId, userId })
+
+        const workspace = await this.repository.findById(workspaceId)
+
+        if (!workspace) {
+            throw new BaseAppError('Workspace not found', ErrorCode.NOT_FOUND, 404)
+        }
+
+        if (workspace.userId !== userId) {
+            throw new BaseAppError('Access denied', ErrorCode.FORBIDDEN, 403)
+        }
+    }
+
+    async getAIContext(workspaceId: string, userId: string): Promise<WorkspaceAIContext> {
+        this.logger.info('Getting AI context', { workspaceId, userId })
+
+        await this.verifyWorkspaceAccess(workspaceId, userId)
+
+        return this.profileService.getNormalizedAIContext(workspaceId)
     }
 }

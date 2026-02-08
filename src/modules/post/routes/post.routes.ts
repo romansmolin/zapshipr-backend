@@ -17,6 +17,11 @@ import { S3Uploader } from '@/shared/media-uploader/media-uploader'
 import { PostsController } from '../controllers/posts.controller'
 import { PostsRepository } from '../repositories/posts.repository'
 import { PostsService } from '../services/posts.service'
+import { WorkspaceRepository } from '@/modules/workspace/repositories/workspace.repository'
+import { WorkspaceProfileSignalsRepository } from '@/modules/workspace/repositories/workspace-profile-signals.repository'
+import { WorkspaceTagsRepository } from '@/modules/inspiration/repositories/workspace-tags.repository'
+import { WorkspaceTagsService } from '@/modules/inspiration/services/workspace-tags/workspace-tags.service'
+import { WorkspaceProfileService } from '@/modules/workspace/services/workspace-profile.service'
 
 import type { ILogger } from '@/shared/logger/logger.interface'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
@@ -49,13 +54,27 @@ export const createPostsRouter = (logger: ILogger, db: NodePgDatabase<typeof dbS
         socialMediaPublisherFactory
     )
     const postScheduler = new BullMqPostScheduler()
+
+    // Workspace profile services for signal recording
+    const workspaceRepository = new WorkspaceRepository(db, logger)
+    const signalsRepository = new WorkspaceProfileSignalsRepository(db, logger)
+    const tagsRepository = new WorkspaceTagsRepository(db, logger)
+    const tagsService = new WorkspaceTagsService(tagsRepository, logger)
+    const workspaceProfileService = new WorkspaceProfileService(
+        workspaceRepository,
+        signalsRepository,
+        tagsService,
+        logger
+    )
+
     const postsService = new PostsService(
         postsRepository,
         mediaUploader,
         logger,
         socialMediaPostSender,
         socialMediaErrorHandler,
-        postScheduler
+        postScheduler,
+        workspaceProfileService
     )
     const postsController = new PostsController(postsService, logger)
     const workspaceMiddleware = createWorkspaceMiddleware(logger, db)

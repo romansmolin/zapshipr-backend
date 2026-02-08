@@ -336,7 +336,7 @@ export class TikTokContentPublisherService implements ITikTokContentPublisherSer
                 )
             }
 
-            const mediaAssets = await this.postRepository.getPostMediaAssets(postId)
+            const mediaAssets = await this.postRepository.getPostMediaAssets(postId, postTarget.mediaIndices)
 
             if (mediaAssets.length === 0) {
                 throw new BaseAppError('TikTok posts require video or image content', ErrorCode.BAD_REQUEST, 400)

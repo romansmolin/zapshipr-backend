@@ -53,7 +53,7 @@ export class LinkedinContentPublisherService implements ILinkedinContentPublishe
                     postTarget.socialAccountId
                 )
 
-            const mediaAssets = await this.postRepository.getPostMediaAssets(postId)
+            const mediaAssets = await this.postRepository.getPostMediaAssets(postId, postTarget.mediaIndices)
             const text = postTarget.text || mainCaption || ''
 
             if (mediaAssets.length === 0) {

@@ -256,7 +256,7 @@ export class BlueskyContentPublisherService implements IBlueskyConntentPublisher
             const links = postTarget.links?.filter((link) => link && link.trim().length > 0) || []
             const initialText = textWithTags
 
-            const mediaAssets = await this.postRepository.getPostMediaAssets(postId)
+            const mediaAssets = await this.postRepository.getPostMediaAssets(postId, postTarget.mediaIndices)
             const linkEmbedCandidate = links[0]
             const maxLength = Number(process.env.BLUESKY_POST_MAX_LENGTH || 300)
             let lastCharLength = 0

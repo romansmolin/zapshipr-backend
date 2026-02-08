@@ -12,6 +12,7 @@ import { inspirationsExtractions } from '@/modules/inspiration/entity/inspiratio
 import { workspaceTags, tagCategory } from '@/modules/inspiration/entity/workspace-tag.schema'
 import { transcripts, transcriptSource, transcriptFormat } from '@/modules/inspiration/entity/transcript.schema'
 import { userMedia } from '@/modules/media/entity/user-media.schema'
+import { workspaceProfileSignals } from '@/modules/workspace/entity/workspace-profile-signal.schema'
 
 export const schema = {
     users,
@@ -28,6 +29,7 @@ export const schema = {
     workspaceTags,
     transcripts,
     userMedia,
+    workspaceProfileSignals,
 }
 
 export type DBSchema = typeof schema
@@ -46,3 +48,4 @@ export { inspirationsExtractions } from '@/modules/inspiration/entity/inspiratio
 export { workspaceTags, tagCategory } from '@/modules/inspiration/entity/workspace-tag.schema'
 export { transcripts, transcriptSource, transcriptFormat } from '@/modules/inspiration/entity/transcript.schema'
 export { userMedia } from '@/modules/media/entity/user-media.schema'
+export { workspaceProfileSignals } from '@/modules/workspace/entity/workspace-profile-signal.schema'

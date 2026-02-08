@@ -69,6 +69,7 @@ export interface PostTarget {
     isAutoMusicEnabled?: boolean | null
     instagramLocationId?: string | null
     instagramFacebookPageId?: string | null
+    mediaIndices?: number[] | null
 }
 
 export interface PostTargetResponse {
@@ -85,6 +86,7 @@ export interface PostTargetResponse {
     isAutoMusicEnabled?: boolean | null
     instagramLocationId?: string | null
     instagramFacebookPageId?: string | null
+    mediaIndices?: number[] | null
     errorMessage?: string | null
 }
 

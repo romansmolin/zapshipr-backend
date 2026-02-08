@@ -268,7 +268,7 @@ export class InstagramContentPublisherService implements IInstagramContentPublis
                 postTarget.socialAccountId
             )
 
-            const mediaAssets = await this.postRepository.getPostMediaAssets(postId)
+            const mediaAssets = await this.postRepository.getPostMediaAssets(postId, postTarget.mediaIndices)
             const normalizedLegacyLocationId = postTarget.instagramLocationId?.trim()
             const legacyLocationId =
                 normalizedLegacyLocationId && normalizedLegacyLocationId.length > 0

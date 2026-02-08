@@ -68,6 +68,7 @@ export const postTargets = pgTable('post_targets', {
     isAutoMusicEnabled: boolean('is_auto_music_enabled'),
     instagramLocationId: text('instagram_location_id'),
     instagramFacebookPageId: text('instagram_facebook_page_id'),
+    mediaIndices: integer('media_indices').array(),
     threadsReplies: jsonb('threads_replies'),
     tikTokPostPrivacyLevel: text('tik_tok_post_privacy_level'),
 })

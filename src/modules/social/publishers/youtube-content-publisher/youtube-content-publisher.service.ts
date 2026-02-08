@@ -46,7 +46,7 @@ export class YouTubeContentPublisherService implements IYouTubeContentPublisherS
         mainCaption?: string
     ): Promise<void> {
         try {
-            const mediaAsset = await this.postRepository.getPostMediaAsset(postId)
+            const mediaAsset = await this.postRepository.getPostMediaAsset(postId, postTarget.mediaIndices)
 
             if (!mediaAsset?.url || !mediaAsset.type?.startsWith('video')) {
                 throw new BaseAppError('YouTube posts require video content', ErrorCode.BAD_REQUEST, 400)

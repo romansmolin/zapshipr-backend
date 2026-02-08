@@ -1,0 +1,1058 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<task>
+  <metadata>
+    <title>Implement Form Type Detection for Workspace Onboarding Edit View</title>
+    <priority>high</priority>
+    <category>feature</category>
+    <estimated_effort>4-6 hours</estimated_effort>
+    <created_date>2024-01-15</created_date>
+  </metadata>
+
+  <objective>
+    <summary>
+      Implement the ability to detect and display the appropriate onboarding form (Quick Start vs Complex)
+      when users edit an existing workspace based on the new 'formType' field from the backend.
+    </summary>
+    <background>
+      The backend now includes a 'formType' field ('quick' | 'complex') in workspace.onboarding.meta
+      that indicates which onboarding form was originally used when creating the workspace. This flag
+      persists permanently and allows the frontend to show the same form type during editing.
+
+      Previously, the system could not reliably determine which form to show during editing because
+      the completionLevel field recalculates based on filled fields. Now, formType provides an
+      explicit, persistent indicator of user preference.
+    </background>
+    <success_criteria>
+      - When editing a workspace, the correct form (Quick or Complex) is displayed based on formType
+      - Users can switch between Quick and Complex forms if desired
+      - New workspaces send formType during creation
+      - Legacy workspaces (without formType) are handled gracefully with fallback logic
+      - All workspace edit flows preserve or update formType appropriately
+    </success_criteria>
+  </objective>
+
+  <api_changes>
+    <change type="addition">
+      <endpoint>GET /api/workspaces/:id</endpoint>
+      <description>Response now includes formType in onboarding.meta</description>
+      <response_example>
+        <![CDATA[
+{
+  "id": "workspace-uuid",
+  "userId": "user-uuid",
+  "name": "My Workspace",
+  "description": null,
+  "avatarUrl": null,
+  "isDefault": true,
+  "onboarding": {
+    "workspaceId": "workspace-uuid",
+    "goal": {
+      "primaryGoal": "grow_audience",
+      "expectedOutcome": "Optional detailed outcome",
+      "successSignals": ["engagement", "followers_growth"]
+    },
+    "audience": {
+      "audienceType": "founders",
+      "awarenessLevel": "beginner",
+      "painOrDesire": "Optional pain points",
+      "languages": ["en"]
+    },
+    "voice": {
+      "tones": ["casual", "friendly"],
+      "brandType": "personal",
+      "perspective": "first_person_i"
+    },
+    "contentStrategy": {
+      "pillars": ["education", "storytelling"],
+      "topics": ["startups", "productivity"],
+      "formats": ["short_posts"],
+      "postingFrequency": "daily"
+    },
+    "constraints": {
+      "platforms": ["threads", "linkedin"],
+      "hardConstraints": ["no_emojis"],
+      "legalOrEthicalNotes": "Optional notes"
+    },
+    "sales": {
+      "profile": "indirect_sales",
+      "policy": {
+        "maxSalesPostsRatio": 0.2,
+        "allowedIntents": ["value", "authority", "engagement", "story", "soft_promo"],
+        "ctaSeverity": "soft"
+      }
+    },
+    "examples": {
+      "likedPost": { "text": "Example post", "url": "https://..." },
+      "dislikedPost": { "text": "Example post", "url": "https://..." }
+    },
+    "additionalInfo": "Optional additional notes",
+    "meta": {
+      "version": 1,
+      "createdAt": "2024-01-15T10:30:00Z",
+      "updatedAt": "2024-01-15T10:30:00Z",
+      "completionLevel": "quick_start",
+      "formType": "quick"  <!-- NEW FIELD -->
+    }
+  },
+  "createdAt": "2024-01-15T10:30:00Z",
+  "updatedAt": "2024-01-15T10:30:00Z"
+}
+        ]]>
+      </response_example>
+      <notes>
+        - formType is ALWAYS present (backend ensures it for legacy workspaces)
+        - For legacy workspaces: formType is derived from completionLevel ('quick_start' → 'quick', else 'complex')
+        - formType values: 'quick' | 'complex'
+      </notes>
+    </change>
+
+    <change type="addition">
+      <endpoint>POST /api/workspaces</endpoint>
+      <description>Can now accept formType in onboarding payload</description>
+      <request_example>
+        <![CDATA[
+{
+  "name": "My New Workspace",
+  "onboarding": {
+    "formType": "quick",  <!-- OPTIONAL: Specify which form was used -->
+    "goal": { "primaryGoal": "grow_audience" },
+    "audience": { "audienceType": "founders" },
+    "voice": { "tones": ["casual"] },
+    "contentStrategy": { "pillars": ["education"] },
+    "constraints": { "platforms": ["threads"] }
+  }
+}
+        ]]>
+      </request_example>
+      <notes>
+        - formType is OPTIONAL in request
+        - If not provided, backend derives it from completionLevel
+        - Frontend SHOULD send formType to explicitly indicate which form was shown
+      </notes>
+    </change>
+
+    <change type="addition">
+      <endpoint>PUT /api/workspaces/:id/onboarding</endpoint>
+      <description>Can now accept formType to switch between form types</description>
+      <request_example>
+        <![CDATA[
+<!-- Scenario 1: Update fields without changing form type -->
+{
+  "goal": { "primaryGoal": "generate_leads" }
+  <!-- formType not sent → original formType is preserved -->
+}
+
+<!-- Scenario 2: Switch from Quick to Complex form -->
+{
+  "formType": "complex",  <!-- Explicitly switch form type -->
+  "goal": {
+    "primaryGoal": "grow_audience",
+    "expectedOutcome": "Get 10k followers in 6 months"
+  },
+  "audience": {
+    "audienceType": "founders",
+    "awarenessLevel": "beginner"
+  }
+}
+
+<!-- Scenario 3: Switch from Complex to Quick form -->
+{
+  "formType": "quick",  <!-- Explicitly switch form type -->
+  "goal": { "primaryGoal": "grow_audience" },
+  "audience": { "audienceType": "founders" },
+  "voice": { "tones": ["casual"] },
+  "contentStrategy": { "pillars": ["education"] },
+  "constraints": { "platforms": ["threads"] }
+}
+        ]]>
+      </request_example>
+      <notes>
+        - formType is OPTIONAL in update request
+        - If formType is NOT sent: backend preserves original formType
+        - If formType IS sent: backend updates to new formType (allows switching)
+        - Backend always preserves original formType unless explicitly changed
+      </notes>
+    </change>
+  </api_changes>
+
+  <implementation_plan>
+    <phase number="1" name="Type Definitions and Utils">
+      <step number="1">
+        <title>Add FormType to TypeScript types</title>
+        <description>
+          Update workspace type definitions to include formType in meta
+        </description>
+        <file_location>types/workspace.ts or wherever workspace types are defined</file_location>
+        <code_example>
+          <![CDATA[
+export type OnboardingFormType = 'quick' | 'complex'
+
+export interface OnboardingMeta {
+  version: number
+  createdAt: string
+  updatedAt: string
+  completionLevel: 'quick_start' | 'partial' | 'complete'
+  formType?: OnboardingFormType  // Optional for backwards compatibility
+}
+
+export interface Onboarding {
+  workspaceId: string
+  goal: Goal
+  audience: Audience
+  voice: Voice
+  contentStrategy: ContentStrategy
+  constraints: Constraints
+  sales: Sales
+  examples?: Examples
+  additionalInfo?: string
+  meta: OnboardingMeta
+}
+
+export interface Workspace {
+  id: string
+  userId: string
+  name: string
+  description: string | null
+  avatarUrl: string | null
+  isDefault: boolean
+  onboarding: Onboarding | null
+  createdAt: string
+  updatedAt: string
+}
+          ]]>
+        </code_example>
+      </step>
+
+      <step number="2">
+        <title>Create utility function to determine form type</title>
+        <description>
+          Create a helper function to get formType with fallback logic for legacy workspaces
+        </description>
+        <file_location>utils/workspace.ts or similar</file_location>
+        <code_example>
+          <![CDATA[
+/**
+ * Gets the form type for a workspace with fallback for legacy workspaces.
+ *
+ * @param onboarding - The workspace onboarding data
+ * @returns 'quick' or 'complex'
+ */
+export function getWorkspaceFormType(onboarding: Onboarding | null): OnboardingFormType {
+  if (!onboarding?.meta) {
+    return 'quick' // Default fallback
+  }
+
+  // Use explicit formType if available
+  if (onboarding.meta.formType) {
+    return onboarding.meta.formType
+  }
+
+  // Fallback: derive from completionLevel for legacy workspaces
+  return onboarding.meta.completionLevel === 'quick_start' ? 'quick' : 'complex'
+}
+
+/**
+ * Checks if a workspace is using the quick form
+ */
+export function isQuickForm(workspace: Workspace): boolean {
+  return getWorkspaceFormType(workspace.onboarding) === 'quick'
+}
+
+/**
+ * Checks if a workspace is using the complex form
+ */
+export function isComplexForm(workspace: Workspace): boolean {
+  return getWorkspaceFormType(workspace.onboarding) === 'complex'
+}
+          ]]>
+        </code_example>
+      </step>
+    </phase>
+
+    <phase number="2" name="Workspace Creation Flow">
+      <step number="1">
+        <title>Update workspace creation to send formType</title>
+        <description>
+          When creating a workspace, include formType in the onboarding payload
+        </description>
+        <file_location>components/workspace/CreateWorkspaceForm.tsx or similar</file_location>
+        <code_example>
+          <![CDATA[
+// In Quick Start form submission
+const handleQuickStartSubmit = async (data: QuickStartFormData) => {
+  const payload = {
+    name: workspaceName,
+    onboarding: {
+      formType: 'quick' as const,  // Explicitly mark as quick form
+      goal: { primaryGoal: data.goal },
+      audience: { audienceType: data.audience },
+      voice: { tones: data.tones },
+      contentStrategy: { pillars: data.pillars },
+      constraints: { platforms: data.platforms }
+    }
+  }
+
+  await createWorkspace(payload)
+}
+
+// In Complex form submission
+const handleComplexSubmit = async (data: ComplexFormData) => {
+  const payload = {
+    name: workspaceName,
+    onboarding: {
+      formType: 'complex' as const,  // Explicitly mark as complex form
+      goal: {
+        primaryGoal: data.goal.primaryGoal,
+        expectedOutcome: data.goal.expectedOutcome,
+        successSignals: data.goal.successSignals
+      },
+      audience: {
+        audienceType: data.audience.audienceType,
+        awarenessLevel: data.audience.awarenessLevel,
+        painOrDesire: data.audience.painOrDesire,
+        languages: data.audience.languages
+      },
+      // ... all other fields
+    }
+  }
+
+  await createWorkspace(payload)
+}
+          ]]>
+        </code_example>
+      </step>
+    </phase>
+
+    <phase number="3" name="Workspace Edit Flow">
+      <step number="1">
+        <title>Update edit workspace component to detect form type</title>
+        <description>
+          When opening the edit view, detect the form type and show the appropriate form
+        </description>
+        <file_location>components/workspace/EditWorkspaceOnboarding.tsx or similar</file_location>
+        <code_example>
+          <![CDATA[
+import { useState, useEffect } from 'react'
+import { getWorkspaceFormType } from '@/utils/workspace'
+import QuickOnboardingForm from './QuickOnboardingForm'
+import ComplexOnboardingForm from './ComplexOnboardingForm'
+
+interface EditWorkspaceOnboardingProps {
+  workspace: Workspace
+  onSave: (data: OnboardingUpdatePayload) => Promise<void>
+}
+
+export function EditWorkspaceOnboarding({ workspace, onSave }: EditWorkspaceOnboardingProps) {
+  // Determine which form to show based on formType
+  const initialFormType = getWorkspaceFormType(workspace.onboarding)
+  const [currentFormType, setCurrentFormType] = useState<OnboardingFormType>(initialFormType)
+
+  // Track if user has switched forms
+  const [hasChangedFormType, setHasChangedFormType] = useState(false)
+
+  const handleFormTypeSwitch = (newFormType: OnboardingFormType) => {
+    setCurrentFormType(newFormType)
+    setHasChangedFormType(true)
+  }
+
+  const handleSave = async (data: Partial<Onboarding>) => {
+    const payload = {
+      ...data,
+      // Include formType if user switched forms
+      ...(hasChangedFormType && { formType: currentFormType })
+    }
+
+    await onSave(payload)
+  }
+
+  return (
+    <div className="edit-workspace-onboarding">
+      {/* Form Type Selector (optional - allow switching) */}
+      <FormTypeToggle
+        currentType={currentFormType}
+        onSwitch={handleFormTypeSwitch}
+      />
+
+      {/* Show appropriate form based on current form type */}
+      {currentFormType === 'quick' ? (
+        <QuickOnboardingForm
+          initialData={workspace.onboarding}
+          onSubmit={handleSave}
+        />
+      ) : (
+        <ComplexOnboardingForm
+          initialData={workspace.onboarding}
+          onSubmit={handleSave}
+        />
+      )}
+    </div>
+  )
+}
+          ]]>
+        </code_example>
+      </step>
+
+      <step number="2">
+        <title>Create Form Type Toggle Component (optional)</title>
+        <description>
+          Allow users to switch between Quick and Complex forms during editing
+        </description>
+        <file_location>components/workspace/FormTypeToggle.tsx</file_location>
+        <code_example>
+          <![CDATA[
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+
+interface FormTypeToggleProps {
+  currentType: OnboardingFormType
+  onSwitch: (newType: OnboardingFormType) => void
+}
+
+export function FormTypeToggle({ currentType, onSwitch }: FormTypeToggleProps) {
+  const isQuick = currentType === 'quick'
+
+  return (
+    <div className="form-type-toggle mb-6 p-4 bg-slate-50 rounded-lg">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-medium text-slate-700">Form Type:</span>
+          <Badge variant={isQuick ? 'default' : 'secondary'}>
+            {isQuick ? 'Quick Start' : 'Complete Setup'}
+          </Badge>
+        </div>
+
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onSwitch(isQuick ? 'complex' : 'quick')}
+        >
+          Switch to {isQuick ? 'Complete' : 'Quick'} Form
+        </Button>
+      </div>
+
+      <p className="text-xs text-slate-600 mt-2">
+        {isQuick
+          ? 'Quick Start: Edit only essential fields (5-7 fields)'
+          : 'Complete Setup: Edit all onboarding details for maximum personalization'
+        }
+      </p>
+    </div>
+  )
+}
+          ]]>
+        </code_example>
+      </step>
+
+      <step number="3">
+        <title>Update onboarding update API call</title>
+        <description>
+          Ensure the update API call includes formType when user switches forms
+        </description>
+        <file_location>api/workspaces.ts or services/workspace.service.ts</file_location>
+        <code_example>
+          <![CDATA[
+export interface UpdateOnboardingPayload {
+  goal?: Partial<Goal>
+  audience?: Partial<Audience>
+  voice?: Partial<Voice>
+  contentStrategy?: Partial<ContentStrategy>
+  constraints?: Partial<Constraints>
+  sales?: Partial<Sales>
+  examples?: Examples
+  additionalInfo?: string
+  formType?: OnboardingFormType  // Include when switching forms
+}
+
+export async function updateWorkspaceOnboarding(
+  workspaceId: string,
+  data: UpdateOnboardingPayload
+): Promise<Onboarding> {
+  const response = await fetch(`/api/workspaces/${workspaceId}/onboarding`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  })
+
+  if (!response.ok) {
+    throw new Error('Failed to update onboarding')
+  }
+
+  return response.json()
+}
+          ]]>
+        </code_example>
+      </step>
+    </phase>
+
+    <phase number="4" name="Form Components">
+      <step number="1">
+        <title>Ensure Quick Form only shows essential fields</title>
+        <description>
+          The Quick form should only include the 5-7 essential fields
+        </description>
+        <file_location>components/workspace/QuickOnboardingForm.tsx</file_location>
+        <fields>
+          <field required="true">goal.primaryGoal</field>
+          <field required="true">audience.audienceType</field>
+          <field required="true">voice.tones (1-3 selections)</field>
+          <field required="true">contentStrategy.pillars (1-5 selections)</field>
+          <field required="true">constraints.platforms (array)</field>
+        </fields>
+        <notes>
+          - All other fields should be HIDDEN in quick form
+          - Form should clearly indicate this is a simplified version
+          - Provide option to switch to Complex form for more customization
+        </notes>
+      </step>
+
+      <step number="2">
+        <title>Ensure Complex Form shows all fields</title>
+        <description>
+          The Complex form should show all available onboarding fields
+        </description>
+        <file_location>components/workspace/ComplexOnboardingForm.tsx</file_location>
+        <fields>
+          <field required="true">goal.primaryGoal</field>
+          <field required="false">goal.expectedOutcome</field>
+          <field required="false">goal.successSignals</field>
+          <field required="true">audience.audienceType</field>
+          <field required="false">audience.awarenessLevel</field>
+          <field required="false">audience.painOrDesire</field>
+          <field required="false">audience.geography</field>
+          <field required="false">audience.languages</field>
+          <field required="true">voice.tones</field>
+          <field required="false">voice.brandType</field>
+          <field required="false">voice.perspective</field>
+          <field required="false">voice.personalityAnchors</field>
+          <field required="true">contentStrategy.pillars</field>
+          <field required="false">contentStrategy.topics</field>
+          <field required="false">contentStrategy.formats</field>
+          <field required="false">contentStrategy.postingFrequency</field>
+          <field required="true">constraints.platforms</field>
+          <field required="false">constraints.hardConstraints</field>
+          <field required="false">constraints.legalOrEthicalNotes</field>
+          <field required="false">sales.profile</field>
+          <field required="false">sales.policy</field>
+          <field required="false">examples.likedPost</field>
+          <field required="false">examples.dislikedPost</field>
+          <field required="false">additionalInfo</field>
+        </fields>
+        <notes>
+          - All fields should be visible and editable
+          - Optional fields should be clearly marked
+          - Form should be organized in logical sections
+        </notes>
+      </step>
+    </phase>
+
+    <phase number="5" name="User Experience Enhancements">
+      <step number="1">
+        <title>Add visual indicators for form type</title>
+        <description>
+          Make it clear to users which form type they're using
+        </description>
+        <ui_elements>
+          <element>Badge or tag showing "Quick Start" or "Complete Setup"</element>
+          <element>Brief description of current form type</element>
+          <element>Toggle/switch to change form types (optional)</element>
+          <element>Confirmation dialog when switching from Complex to Quick (data loss warning)</element>
+        </ui_elements>
+      </step>
+
+      <step number="2">
+        <title>Handle form type switching gracefully</title>
+        <description>
+          When user switches from Complex to Quick, warn about data loss
+        </description>
+        <code_example>
+          <![CDATA[
+const handleSwitchToQuick = () => {
+  // Check if complex fields have data
+  const hasComplexData = checkForComplexData(workspace.onboarding)
+
+  if (hasComplexData) {
+    // Show confirmation dialog
+    showConfirmDialog({
+      title: 'Switch to Quick Start Form?',
+      message: 'You have additional details filled in. Switching to Quick Start will hide these fields (they won\'t be deleted, just hidden). Continue?',
+      confirmLabel: 'Switch to Quick',
+      onConfirm: () => {
+        setCurrentFormType('quick')
+        setHasChangedFormType(true)
+      }
+    })
+  } else {
+    // No data loss, switch immediately
+    setCurrentFormType('quick')
+    setHasChangedFormType(true)
+  }
+}
+
+function checkForComplexData(onboarding: Onboarding | null): boolean {
+  if (!onboarding) return false
+
+  // Check if any "complex-only" fields have values
+  return !!(
+    onboarding.goal?.expectedOutcome ||
+    onboarding.goal?.successSignals?.length ||
+    onboarding.audience?.awarenessLevel ||
+    onboarding.audience?.painOrDesire ||
+    onboarding.voice?.brandType ||
+    onboarding.voice?.perspective ||
+    onboarding.contentStrategy?.topics?.length ||
+    onboarding.contentStrategy?.formats?.length ||
+    onboarding.contentStrategy?.postingFrequency ||
+    onboarding.constraints?.hardConstraints?.length ||
+    onboarding.examples?.likedPost ||
+    onboarding.examples?.dislikedPost ||
+    onboarding.additionalInfo
+  )
+}
+          ]]>
+        </code_example>
+      </step>
+
+      <step number="3">
+        <title>Add helpful messaging</title>
+        <description>
+          Provide context about form types to help users understand the difference
+        </description>
+        <messaging>
+          <message context="quick_form_header">
+            <title>Quick Start Setup</title>
+            <description>Get started quickly with just the essentials. You can always switch to the complete form for more customization.</description>
+          </message>
+          <message context="complex_form_header">
+            <title>Complete Setup</title>
+            <description>Customize every detail of your workspace for maximum personalization and AI accuracy.</description>
+          </message>
+          <message context="switch_to_complex">
+            <title>Want more control?</title>
+            <description>Switch to Complete Setup to customize additional fields like brand voice, content strategy, and audience awareness.</description>
+          </message>
+          <message context="switch_to_quick">
+            <title>Keep it simple?</title>
+            <description>Switch to Quick Start to focus on just the essentials. Your other settings will be preserved.</description>
+          </message>
+        </messaging>
+      </step>
+    </phase>
+  </implementation_plan>
+
+  <testing_checklist>
+    <test_case id="1">
+      <description>Edit workspace with formType='quick' shows Quick form</description>
+      <steps>
+        1. Create a workspace using Quick Start form
+        2. Navigate to workspace edit page
+        3. Verify Quick Start form is displayed by default
+        4. Verify only 5-7 essential fields are visible
+      </steps>
+      <expected_result>Quick Start form is shown with minimal fields</expected_result>
+    </test_case>
+
+    <test_case id="2">
+      <description>Edit workspace with formType='complex' shows Complex form</description>
+      <steps>
+        1. Create a workspace using Complete Setup form
+        2. Navigate to workspace edit page
+        3. Verify Complete Setup form is displayed by default
+        4. Verify all onboarding fields are visible
+      </steps>
+      <expected_result>Complete Setup form is shown with all fields</expected_result>
+    </test_case>
+
+    <test_case id="3">
+      <description>Legacy workspace without formType defaults correctly</description>
+      <steps>
+        1. Fetch a legacy workspace (created before formType feature)
+        2. Check if formType is present in response (backend ensures it)
+        3. Navigate to workspace edit page
+        4. Verify correct form is shown based on derived formType
+      </steps>
+      <expected_result>Appropriate form shown based on completionLevel fallback</expected_result>
+    </test_case>
+
+    <test_case id="4">
+      <description>Updating workspace without changing formType preserves it</description>
+      <steps>
+        1. Open workspace with formType='quick'
+        2. Edit a field (e.g., change primaryGoal)
+        3. Save without changing formType
+        4. Reload workspace
+        5. Verify formType is still 'quick'
+      </steps>
+      <expected_result>Original formType is preserved</expected_result>
+    </test_case>
+
+    <test_case id="5">
+      <description>Switching from Quick to Complex works</description>
+      <steps>
+        1. Open workspace with formType='quick'
+        2. Click "Switch to Complete Form" button
+        3. Verify Complex form is now displayed
+        4. Fill in additional complex fields
+        5. Save with formType='complex' in payload
+        6. Reload workspace
+        7. Verify formType is now 'complex'
+      </steps>
+      <expected_result>Form type switches and persists correctly</expected_result>
+    </test_case>
+
+    <test_case id="6">
+      <description>Switching from Complex to Quick shows warning</description>
+      <steps>
+        1. Open workspace with formType='complex' and complex fields filled
+        2. Click "Switch to Quick Form" button
+        3. Verify warning dialog appears about hidden fields
+        4. Confirm switch
+        5. Verify Quick form is now displayed
+        6. Save with formType='quick' in payload
+        7. Reload workspace
+        8. Verify formType is now 'quick' but complex data still exists
+      </steps>
+      <expected_result>Warning shown, form switches, data preserved but hidden</expected_result>
+    </test_case>
+
+    <test_case id="7">
+      <description>New workspace creation sends formType</description>
+      <steps>
+        1. Create workspace using Quick Start form
+        2. Inspect network request payload
+        3. Verify formType='quick' is included
+        4. Create workspace using Complete Setup form
+        5. Inspect network request payload
+        6. Verify formType='complex' is included
+      </steps>
+      <expected_result>formType is sent in creation request</expected_result>
+    </test_case>
+
+    <test_case id="8">
+      <description>Visual indicators show current form type</description>
+      <steps>
+        1. Open workspace edit page
+        2. Verify badge/indicator shows current form type
+        3. Verify descriptive text explains current form
+        4. Switch form types
+        5. Verify indicator updates accordingly
+      </steps>
+      <expected_result>Clear visual feedback about current form type</expected_result>
+    </test_case>
+  </testing_checklist>
+
+  <edge_cases>
+    <edge_case id="1">
+      <scenario>Workspace has no onboarding data</scenario>
+      <handling>Default to Quick form, show empty form</handling>
+    </edge_case>
+
+    <edge_case id="2">
+      <scenario>Backend doesn't return formType (API error)</scenario>
+      <handling>Use fallback logic: derive from completionLevel or default to 'quick'</handling>
+    </edge_case>
+
+    <edge_case id="3">
+      <scenario>User switches forms multiple times without saving</scenario>
+      <handling>Track current form type in local state, only send formType on final save</handling>
+    </edge_case>
+
+    <edge_case id="4">
+      <scenario>User fills complex fields in Quick form view (shouldn't happen)</scenario>
+      <handling>Quick form should not expose complex fields at all</handling>
+    </edge_case>
+
+    <edge_case id="5">
+      <scenario>Network error during form type switch</scenario>
+      <handling>Revert to previous form type, show error message</handling>
+    </edge_case>
+  </edge_cases>
+
+  <code_examples>
+    <example id="complete_edit_component">
+      <title>Complete Edit Workspace Component Example</title>
+      <language>typescript</language>
+      <code>
+        <![CDATA[
+import { useState } from 'react'
+import { useWorkspace } from '@/hooks/useWorkspace'
+import { getWorkspaceFormType, isQuickForm } from '@/utils/workspace'
+import { updateWorkspaceOnboarding } from '@/api/workspaces'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { AlertDialog } from '@/components/ui/alert-dialog'
+import QuickOnboardingForm from './QuickOnboardingForm'
+import ComplexOnboardingForm from './ComplexOnboardingForm'
+
+interface EditWorkspaceOnboardingProps {
+  workspaceId: string
+}
+
+export function EditWorkspaceOnboarding({ workspaceId }: EditWorkspaceOnboardingProps) {
+  const { workspace, loading, refetch } = useWorkspace(workspaceId)
+
+  // Determine initial form type from workspace data
+  const initialFormType = workspace ? getWorkspaceFormType(workspace.onboarding) : 'quick'
+
+  const [currentFormType, setCurrentFormType] = useState<OnboardingFormType>(initialFormType)
+  const [hasChangedFormType, setHasChangedFormType] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [showSwitchDialog, setShowSwitchDialog] = useState(false)
+  const [pendingFormType, setPendingFormType] = useState<OnboardingFormType | null>(null)
+
+  if (loading || !workspace) {
+    return <div>Loading...</div>
+  }
+
+  const handleFormTypeSwitch = (newFormType: OnboardingFormType) => {
+    // If switching from complex to quick and complex data exists, show warning
+    if (newFormType === 'quick' && currentFormType === 'complex') {
+      const hasComplexData = checkForComplexData(workspace.onboarding)
+      if (hasComplexData) {
+        setPendingFormType(newFormType)
+        setShowSwitchDialog(true)
+        return
+      }
+    }
+
+    // Switch immediately
+    performFormTypeSwitch(newFormType)
+  }
+
+  const performFormTypeSwitch = (newFormType: OnboardingFormType) => {
+    setCurrentFormType(newFormType)
+    setHasChangedFormType(true)
+    setShowSwitchDialog(false)
+    setPendingFormType(null)
+  }
+
+  const handleSave = async (data: Partial<Onboarding>) => {
+    setIsSaving(true)
+
+    try {
+      const payload = {
+        ...data,
+        // Only include formType if user switched forms
+        ...(hasChangedFormType && { formType: currentFormType })
+      }
+
+      await updateWorkspaceOnboarding(workspaceId, payload)
+      await refetch()
+
+      // Reset changed flag after successful save
+      setHasChangedFormType(false)
+
+      // Show success message
+      showToast({ message: 'Workspace updated successfully', type: 'success' })
+    } catch (error) {
+      showToast({ message: 'Failed to update workspace', type: 'error' })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <div className="edit-workspace-onboarding max-w-4xl mx-auto p-6">
+      {/* Header with form type indicator */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-2xl font-bold">Edit Workspace Onboarding</h1>
+          <Badge variant={currentFormType === 'quick' ? 'default' : 'secondary'}>
+            {currentFormType === 'quick' ? 'Quick Start' : 'Complete Setup'}
+          </Badge>
+        </div>
+
+        {/* Form type toggle */}
+        <div className="bg-slate-50 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-900 mb-1">
+                {currentFormType === 'quick' ? 'Quick Start Mode' : 'Complete Setup Mode'}
+              </p>
+              <p className="text-xs text-slate-600">
+                {currentFormType === 'quick'
+                  ? 'Editing essential fields only. Switch to Complete Setup for full customization.'
+                  : 'Editing all available fields for maximum personalization.'
+                }
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleFormTypeSwitch(currentFormType === 'quick' ? 'complex' : 'quick')}
+            >
+              Switch to {currentFormType === 'quick' ? 'Complete' : 'Quick'}
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Form */}
+      {currentFormType === 'quick' ? (
+        <QuickOnboardingForm
+          initialData={workspace.onboarding}
+          onSubmit={handleSave}
+          isLoading={isSaving}
+        />
+      ) : (
+        <ComplexOnboardingForm
+          initialData={workspace.onboarding}
+          onSubmit={handleSave}
+          isLoading={isSaving}
+        />
+      )}
+
+      {/* Switch confirmation dialog */}
+      <AlertDialog
+        open={showSwitchDialog}
+        onOpenChange={setShowSwitchDialog}
+      >
+        <AlertDialog.Content>
+          <AlertDialog.Header>
+            <AlertDialog.Title>Switch to Quick Start Form?</AlertDialog.Title>
+            <AlertDialog.Description>
+              You have additional details filled in. Switching to Quick Start will hide these fields
+              (they won't be deleted, just hidden). You can switch back to Complete Setup anytime to see them again.
+            </AlertDialog.Description>
+          </AlertDialog.Header>
+          <AlertDialog.Footer>
+            <AlertDialog.Cancel onClick={() => setShowSwitchDialog(false)}>
+              Cancel
+            </AlertDialog.Cancel>
+            <AlertDialog.Action onClick={() => performFormTypeSwitch(pendingFormType!)}>
+              Switch to Quick Start
+            </AlertDialog.Action>
+          </AlertDialog.Footer>
+        </AlertDialog.Content>
+      </AlertDialog>
+    </div>
+  )
+}
+
+function checkForComplexData(onboarding: Onboarding | null): boolean {
+  if (!onboarding) return false
+
+  return !!(
+    onboarding.goal?.expectedOutcome ||
+    onboarding.goal?.successSignals?.length ||
+    onboarding.audience?.awarenessLevel ||
+    onboarding.audience?.painOrDesire ||
+    onboarding.voice?.brandType ||
+    onboarding.voice?.perspective ||
+    onboarding.contentStrategy?.topics?.length ||
+    onboarding.contentStrategy?.formats?.length ||
+    onboarding.contentStrategy?.postingFrequency ||
+    onboarding.constraints?.hardConstraints?.length ||
+    onboarding.examples?.likedPost ||
+    onboarding.examples?.dislikedPost ||
+    onboarding.additionalInfo
+  )
+}
+        ]]>
+      </code>
+    </example>
+  </code_examples>
+
+  <acceptance_criteria>
+    <criterion id="1">
+      <description>When editing a workspace, the correct form (Quick or Complex) is automatically displayed based on formType</description>
+      <verification>Manual testing: Open edit view for workspaces with different formTypes</verification>
+    </criterion>
+
+    <criterion id="2">
+      <description>Users can switch between Quick and Complex forms using a toggle/button</description>
+      <verification>Manual testing: Click switch button and verify form changes</verification>
+    </criterion>
+
+    <criterion id="3">
+      <description>Warning dialog appears when switching from Complex to Quick if complex data exists</description>
+      <verification>Manual testing: Fill complex fields, switch to Quick, verify dialog shows</verification>
+    </criterion>
+
+    <criterion id="4">
+      <description>formType is sent in workspace creation API calls</description>
+      <verification>Network inspection: Check POST /workspaces payload includes formType</verification>
+    </criterion>
+
+    <criterion id="5">
+      <description>formType is sent when user switches forms during edit</description>
+      <verification>Network inspection: Check PUT /workspaces/:id/onboarding includes formType when switched</verification>
+    </criterion>
+
+    <criterion id="6">
+      <description>formType is NOT sent when user edits without switching forms</description>
+      <verification>Network inspection: Check PUT /workspaces/:id/onboarding excludes formType when not switched</verification>
+    </criterion>
+
+    <criterion id="7">
+      <description>Legacy workspaces without formType display the correct form based on fallback logic</description>
+      <verification>Manual testing: Edit a pre-existing workspace, verify correct form shows</verification>
+    </criterion>
+
+    <criterion id="8">
+      <description>Visual indicators clearly show which form type is active</description>
+      <verification>Manual testing: Verify badge/text shows current form type</verification>
+    </criterion>
+
+    <criterion id="9">
+      <description>Quick form only shows 5-7 essential fields</description>
+      <verification>Manual testing: Count visible fields in Quick form</verification>
+    </criterion>
+
+    <criterion id="10">
+      <description>Complex form shows all available onboarding fields</description>
+      <verification>Manual testing: Verify all fields are accessible in Complex form</verification>
+    </criterion>
+  </acceptance_criteria>
+
+  <notes>
+    <note type="important">
+      The backend ALWAYS returns formType (it ensures it exists for legacy workspaces), so frontend
+      should treat formType as always present in the response.
+    </note>
+
+    <note type="important">
+      When updating onboarding, formType should ONLY be included in the request if the user explicitly
+      switched form types. This allows the backend to preserve the original formType.
+    </note>
+
+    <note type="tip">
+      Consider adding analytics tracking for:
+      - How often users switch between form types
+      - Which form type is more commonly used
+      - Whether users who start with Quick eventually switch to Complex
+    </note>
+
+    <note type="tip">
+      The form type switch feature is optional. If it adds complexity, you can start with just
+      detecting and showing the appropriate form, without allowing switching.
+    </note>
+
+    <note type="warning">
+      When switching from Complex to Quick, do NOT delete the complex field data. Just hide it.
+      The backend preserves all data even when formType changes.
+    </note>
+  </notes>
+
+  <resources>
+    <resource type="documentation">
+      <name>Backend API Documentation</name>
+      <description>Full workspace API documentation with formType details</description>
+      <location>See api_changes section above</location>
+    </resource>
+
+    <resource type="backend_implementation">
+      <name>Backend Implementation Files</name>
+      <files>
+        <file>src/modules/workspace/validation/onboarding.schemas.ts</file>
+        <file>src/modules/workspace/utils/onboarding-normalizer.ts</file>
+        <file>src/modules/workspace/services/workspace.service.ts</file>
+        <file>src/modules/workspace/entity/workspace.dto.ts</file>
+      </files>
+    </resource>
+
+    <resource type="plan">
+      <name>Backend Implementation Plan</name>
+      <location>/Users/romansmolin/.claude/plans/shimmering-forging-dahl.md</location>
+    </resource>
+  </resources>
+</task>

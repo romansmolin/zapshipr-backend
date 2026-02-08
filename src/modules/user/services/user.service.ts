@@ -1,3 +1,6 @@
+import path from 'path'
+import bcrypt from 'bcryptjs'
+
 import type { IUserRepository } from '../repositories/user-repository.interface'
 import { AppError, ErrorMessageCode } from '@/shared/errors/app-error'
 import type { ILogger } from '@/shared/logger/logger.interface'
@@ -11,6 +14,8 @@ import { IMediaUploader } from '@/shared/media-uploader/media-uploader.interface
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { schema as dbSchema } from '@/db/schema'
 import { eq, sql } from 'drizzle-orm'
+import type { User } from '../entity/user.schema'
+import type { UpdateUserSettingsInput } from '../validation/user.schemas'
 
 export class UserService implements IUserService {
     private readonly userRepository: IUserRepository
@@ -95,6 +100,131 @@ export class UserService implements IUserService {
     async incrementAiUsage(userId: string): Promise<void> {
         // TODO: Implement increment AI usage logic
         throw new Error('Not implemented')
+    }
+
+    async updateUserSettings(
+        userId: string,
+        data: UpdateUserSettingsInput,
+        avatarFile?: Express.Multer.File
+    ): Promise<User> {
+        const user = await this.userRepository.findById(userId)
+
+        if (!user) {
+            throw new AppError({
+                errorMessageCode: ErrorMessageCode.USER_NOT_FOUND,
+                httpCode: 404,
+            })
+        }
+
+        let nextAvatar = user.avatar ?? null
+
+        if (data.newPassword) {
+            if (user.passwordHash) {
+                if (!data.currentPassword) {
+                    throw new AppError({
+                        errorMessageCode: ErrorMessageCode.VALIDATION_ERROR,
+                        message: 'currentPassword is required',
+                        httpCode: 400,
+                    })
+                }
+
+                const isCurrentPasswordValid = await bcrypt.compare(data.currentPassword, user.passwordHash)
+
+                if (!isCurrentPasswordValid) {
+                    throw new AppError({
+                        errorMessageCode: ErrorMessageCode.INVALID_CREDENTIALS,
+                        httpCode: 401,
+                    })
+                }
+            }
+
+            const passwordHash = await bcrypt.hash(data.newPassword, 10)
+            await this.userRepository.updateUserPassword(userId, passwordHash)
+        }
+
+        if (avatarFile) {
+            if (!avatarFile.mimetype.startsWith('image/')) {
+                throw new AppError({
+                    errorMessageCode: ErrorMessageCode.VALIDATION_ERROR,
+                    message: 'Avatar must be an image',
+                    httpCode: 400,
+                })
+            }
+
+            const extension = path.extname(avatarFile.originalname) || '.jpg'
+            const key = `${userId}/avatars/${Date.now()}${extension}`
+            const uploadedAvatarUrl = await this.mediaUploader.upload({
+                key,
+                body: avatarFile.buffer,
+                contentType: avatarFile.mimetype,
+            })
+
+            await this.mediaRepository.create({
+                userId,
+                key,
+                url: uploadedAvatarUrl,
+                size: avatarFile.size,
+                contentType: avatarFile.mimetype,
+                lastModified: new Date(),
+            })
+
+            nextAvatar = uploadedAvatarUrl
+        } else if (data.removeAvatar === true) {
+            nextAvatar = null
+        }
+
+        const previousAvatar = user.avatar
+        const shouldDeletePreviousAvatar =
+            !!previousAvatar && (data.removeAvatar === true || (avatarFile && nextAvatar !== previousAvatar))
+
+        if (shouldDeletePreviousAvatar) {
+            try {
+                await this.mediaUploader.delete(previousAvatar)
+                const previousAvatarKey = this.extractKeyFromUrl(previousAvatar)
+                if (previousAvatarKey) {
+                    await this.mediaRepository.deleteByKey(previousAvatarKey)
+                }
+            } catch (error) {
+                this.logger.warn('Failed to delete previous user avatar', {
+                    operation: 'UserService.updateUserSettings',
+                    userId,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                })
+            }
+        }
+
+        const hasProfileFields =
+            data.name !== undefined || data.email !== undefined || nextAvatar !== (user.avatar ?? null)
+
+        if (hasProfileFields) {
+            const updatedUser = await this.userRepository.updateUserProfile(userId, {
+                name: data.name?.trim(),
+                email: data.email?.trim().toLowerCase(),
+                avatar: nextAvatar,
+            })
+
+            return updatedUser
+        }
+
+        const updatedUser = await this.userRepository.findById(userId)
+
+        if (!updatedUser) {
+            throw new AppError({
+                errorMessageCode: ErrorMessageCode.USER_NOT_FOUND,
+                httpCode: 404,
+            })
+        }
+
+        return updatedUser
+    }
+
+    private extractKeyFromUrl(url: string): string | null {
+        try {
+            const key = decodeURIComponent(new URL(url).pathname.replace(/^\/+/, ''))
+            return key || null
+        } catch (_error) {
+            return null
+        }
     }
 
     async deleteUserAccout(userId: string): Promise<void> {

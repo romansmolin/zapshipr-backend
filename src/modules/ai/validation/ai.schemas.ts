@@ -16,6 +16,7 @@ export const aiRequestSchema = z.object({
     notesForAi: z.string().nullable().optional(),
     forbiddenWords: z.array(z.string()).optional().nullable(),
     selectedAccounts: z.array(aiAccountSchema).min(1, { message: 'Selected accounts are required' }),
+    workspaceId: z.string().uuid().optional(),
 })
 
 export type AiRequest = z.infer<typeof aiRequestSchema>

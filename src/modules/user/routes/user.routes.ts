@@ -7,6 +7,7 @@ import { UserRepository } from '@/modules/user/repositories/users.repository'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import { asyncHandler } from '@/shared/http/async-handler'
 import { authMiddleware } from '@/middleware/auth.middleware'
+import { upload } from '@/middleware/upload.middleware'
 
 import { UserController } from '../controllers/user.controller'
 import { UserService } from '../services/user.service'
@@ -39,6 +40,12 @@ export const createUserRoutes = (logger: ILogger, db: NodePgDatabase<typeof dbSc
     const userController = new UserController(userService, logger)
 
     router.get('/user/info', authMiddleware, asyncHandler(userController.getUserInfo.bind(userController)))
+    router.put(
+        '/user/settings',
+        authMiddleware,
+        upload.single('avatar'),
+        asyncHandler(userController.updateUserSettings.bind(userController))
+    )
     router.delete(
         '/user/delete',
         authMiddleware,

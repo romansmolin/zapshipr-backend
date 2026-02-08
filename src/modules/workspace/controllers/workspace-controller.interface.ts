@@ -12,6 +12,9 @@ export interface IWorkspaceController {
     getOnboarding(req: Request, res: Response): Promise<void>
     updateOnboarding(req: Request, res: Response): Promise<void>
     setAsDefault(req: Request, res: Response): Promise<void>
+    getAIContext(req: Request, res: Response): Promise<void>
+    getTags(req: Request, res: Response): Promise<void>
+    createTag(req: Request, res: Response): Promise<void>
+    updateTag(req: Request, res: Response): Promise<void>
+    deleteTag(req: Request, res: Response): Promise<void>
 }
-
-

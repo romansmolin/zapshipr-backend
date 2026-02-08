@@ -407,9 +407,7 @@ export class AccountsController {
     }
 
     private requireCode(code?: string) {
-        if (!code) {
-            throw new BaseAppError('Missing authorization code', ErrorCode.BAD_REQUEST, 400)
-        }
+        if (!code) throw new BaseAppError('Missing authorization code', ErrorCode.BAD_REQUEST, 400)
 
         return code
     }

@@ -137,7 +137,7 @@ export class ThreadsContentPublisherService implements IThreadsContentPublisherS
                 postTarget.socialAccountId
             )
 
-            const mediaAssets = await this.postRepository.getPostMediaAssets(postId)
+            const mediaAssets = await this.postRepository.getPostMediaAssets(postId, postTarget.mediaIndices)
 
             let creationId: string
 

@@ -120,7 +120,7 @@ export class FacebookContentPublisherService implements IFacebookContentPublishe
                 postTarget.socialAccountId
             )
 
-            const mediaAssets = await this.postRepository.getPostMediaAssets(postId)
+            const mediaAssets = await this.postRepository.getPostMediaAssets(postId, postTarget.mediaIndices)
 
             let message = ''
 

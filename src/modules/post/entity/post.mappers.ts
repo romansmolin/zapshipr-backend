@@ -22,6 +22,14 @@ const normalizeStringArray = (value: unknown): string[] | null => {
     return null
 }
 
+const normalizeNumberArray = (value: unknown): number[] | null => {
+    if (Array.isArray(value)) {
+        return value.filter((item): item is number => typeof item === 'number' && Number.isInteger(item))
+    }
+
+    return null
+}
+
 const normalizeThreadsReplies = (value: unknown): string[] | null => {
     const normalized = normalizeStringArray(value)
     return normalized ?? []
@@ -47,6 +55,7 @@ export const toPostTargetResponse = (row: PostTargetRow): PostTargetResponse => 
         isAutoMusicEnabled: row.isAutoMusicEnabled ?? null,
         instagramLocationId: row.instagramLocationId ?? null,
         instagramFacebookPageId: row.instagramFacebookPageId ?? null,
+        mediaIndices: normalizeNumberArray(row.mediaIndices),
         threadsReplies: normalizeThreadsReplies(row.threadsReplies),
         tikTokPostPrivacyLevel: normalizeTikTokPrivacyLevel(row.tikTokPostPrivacyLevel),
         errorMessage: row.errorMessage ?? null,

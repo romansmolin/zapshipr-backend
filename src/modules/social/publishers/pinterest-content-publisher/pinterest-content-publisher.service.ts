@@ -53,7 +53,7 @@ export class PinterestContentPublisherService implements IPinterestContentPublis
                 postTarget.socialAccountId
             )
 
-            const mediaAsset = await this.postRepository.getPostMediaAsset(postId)
+            const mediaAsset = await this.postRepository.getPostMediaAsset(postId, postTarget.mediaIndices)
 
             if (!mediaAsset?.url)
                 throw new BaseAppError('Media asset not found for Pinterest post', ErrorCode.BAD_REQUEST, 400)

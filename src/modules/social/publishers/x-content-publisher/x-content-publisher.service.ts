@@ -46,7 +46,7 @@ export class XContentPublisherService implements IXContentPublisherService {
                 postTarget.socialAccountId
             )
 
-            const mediaAssets = await this.postRepository.getPostMediaAssets(postId)
+            const mediaAssets = await this.postRepository.getPostMediaAssets(postId, postTarget.mediaIndices)
             const text = formatCaptionWithTags(postTarget.text || mainCaption || '', postTarget.tags, 'x')
 
             const payload: Record<string, unknown> = { text }

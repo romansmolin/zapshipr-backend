@@ -108,14 +108,18 @@ export class BullMqPostScheduler implements IPostScheduler {
                 }
             }
 
-            // Apply jitter to spread load
-            const jitteredDate = JitterUtils.applyJitter(platform, scheduledDate, postId, userId)
+            const isImmediateRun = scheduledDate.getTime() <= Date.now()
+            const jitteredDate = isImmediateRun
+                ? new Date(scheduledDate)
+                : JitterUtils.applyJitter(platform, scheduledDate, postId, userId)
 
-            // Check if we need warmup time
-            const warmupDelay = JitterUtils.calculateWarmupDelay(jitteredDate)
-            if (warmupDelay > 0) {
-                console.log(`[SCHEDULER] Applying warmup delay of ${warmupDelay}ms for ${platform}:${postId}`)
-                jitteredDate.setTime(jitteredDate.getTime() + warmupDelay)
+            // Warmup is useful for future scheduled jobs, but should never delay "post now".
+            if (!isImmediateRun) {
+                const warmupDelay = JitterUtils.calculateWarmupDelay(jitteredDate)
+                if (warmupDelay > 0) {
+                    console.log(`[SCHEDULER] Applying warmup delay of ${warmupDelay}ms for ${platform}:${postId}`)
+                    jitteredDate.setTime(jitteredDate.getTime() + warmupDelay)
+                }
             }
 
             const delay = Math.max(jitteredDate.getTime() - Date.now(), 0)

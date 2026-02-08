@@ -1,4 +1,4 @@
-import type { OnboardingInput, Onboarding, PrimaryGoal, SalesProfile, SalesPolicy } from '../validation/onboarding.schemas'
+import type { OnboardingInput, Onboarding, PrimaryGoal, SalesProfile, SalesPolicy, CompletionLevel, OnboardingFormType } from '../validation/onboarding.schemas'
 
 // Mapping from primary goals to default sales profile
 const GOAL_SALES_PROFILE: Record<PrimaryGoal, SalesProfile> = {
@@ -31,11 +31,61 @@ const DEFAULT_SALES_POLICIES: Record<SalesProfile, SalesPolicy> = {
 }
 
 /**
+ * Calculates the completion level based on which fields are present.
+ * - quick_start: Only required 5-7 fields present
+ * - partial: Some deep setup fields present
+ * - complete: All recommended fields present
+ */
+export function calculateCompletionLevel(input: OnboardingInput): CompletionLevel {
+    // Count filled optional/deep fields
+    let deepFieldsCount = 0
+    const totalDeepFields = 9 // Total optional deep fields
+
+    if (input.goal.expectedOutcome) deepFieldsCount++
+    if (input.goal.successSignals && input.goal.successSignals.length > 0) deepFieldsCount++
+    if (input.audience.awarenessLevel) deepFieldsCount++
+    if (input.audience.painOrDesire) deepFieldsCount++
+    if (input.voice.brandType) deepFieldsCount++
+    if (input.voice.perspective) deepFieldsCount++
+    if (input.contentStrategy.topics && input.contentStrategy.topics.length > 0) deepFieldsCount++
+    if (input.contentStrategy.formats && input.contentStrategy.formats.length > 0) deepFieldsCount++
+    if (input.contentStrategy.postingFrequency) deepFieldsCount++
+
+    // Determine completion level
+    if (deepFieldsCount === 0) {
+        return 'quick_start'
+    } else if (deepFieldsCount < totalDeepFields) {
+        return 'partial'
+    } else {
+        return 'complete'
+    }
+}
+
+/**
+ * Derives form type from completion level or explicit input.
+ * If formType is explicitly provided by frontend, use it.
+ * Otherwise derive from completion level: 'quick_start' -> 'quick', else 'complex'
+ */
+function deriveFormType(
+    inputFormType: OnboardingFormType | undefined,
+    completionLevel: CompletionLevel
+): OnboardingFormType {
+    // If explicitly provided, use it
+    if (inputFormType) {
+        return inputFormType
+    }
+
+    // Otherwise derive from completion level
+    return completionLevel === 'quick_start' ? 'quick' : 'complex'
+}
+
+/**
  * Normalizes onboarding input by:
  * 1. Adding workspaceId
  * 2. Adding meta timestamps and version
  * 3. Deriving sales defaults if not provided
  * 4. Ensuring all arrays are present
+ * 5. Calculating completion level
  */
 export function normalizeOnboarding(input: OnboardingInput, workspaceId: string): Onboarding {
     const now = new Date().toISOString()
@@ -55,6 +105,12 @@ export function normalizeOnboarding(input: OnboardingInput, workspaceId: string)
         languages: input.audience.languages ?? [],
     }
 
+    // Calculate completion level
+    const completionLevel = calculateCompletionLevel(input)
+
+    // Determine form type
+    const formType = deriveFormType(input.formType, completionLevel)
+
     return {
         workspaceId,
         goal: input.goal,
@@ -72,6 +128,8 @@ export function normalizeOnboarding(input: OnboardingInput, workspaceId: string)
             version: 1,
             createdAt: now,
             updatedAt: now,
+            completionLevel,
+            formType,
         },
     }
 }

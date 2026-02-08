@@ -32,6 +32,27 @@ export interface CreatePostTargetRequest {
     isAutoMusicEnabled?: boolean | null
     instagramLocationId?: string | null
     instagramFacebookPageId?: string | null
+    mediaIndices?: number[] | null
+}
+
+export interface MediaTransformCrop {
+    x: number
+    y: number
+    scale: number
+}
+
+export interface MediaTransformSource {
+    width: number
+    height: number
+}
+
+export interface MediaTransformRequest {
+    mediaIndex: number
+    platform: PostPlatform
+    ratio: string
+    crop: MediaTransformCrop
+    source: MediaTransformSource
+    version: 1
 }
 
 export interface CreatePostsRequest {
@@ -44,4 +65,5 @@ export interface CreatePostsRequest {
     mainCaption?: string | null
     coverTimestamp?: number | null
     copyDataUrls?: string[] | null
+    mediaTransforms?: MediaTransformRequest[] | null
 }
