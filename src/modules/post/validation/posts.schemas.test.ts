@@ -42,6 +42,26 @@ describe('createPostsSchema mediaTransforms', () => {
         expect(result.success).toBe(true)
     })
 
+    it('accepts mediaTransforms without platform', () => {
+        const transform = createValidTransform()
+        const result = createPostsSchema.safeParse({
+            ...createBasePayload(),
+            mediaTransforms: [{ ...transform, platform: undefined }],
+        })
+
+        expect(result.success).toBe(true)
+    })
+
+    it('accepts ratio "original"', () => {
+        const transform = createValidTransform()
+        const result = createPostsSchema.safeParse({
+            ...createBasePayload(),
+            mediaTransforms: [{ ...transform, ratio: 'original' }],
+        })
+
+        expect(result.success).toBe(true)
+    })
+
     it('rejects invalid ratio format', () => {
         const result = createPostsSchema.safeParse({
             ...createBasePayload(),
@@ -58,6 +78,16 @@ describe('createPostsSchema mediaTransforms', () => {
         })
 
         expect(result.success).toBe(false)
+    })
+
+    it('accepts crop.x and crop.y in range [-1, 1]', () => {
+        const transform = createValidTransform()
+        const result = createPostsSchema.safeParse({
+            ...createBasePayload(),
+            mediaTransforms: [{ ...transform, crop: { ...transform.crop, x: -1, y: 1 } }],
+        })
+
+        expect(result.success).toBe(true)
     })
 
     it('rejects crop.scale less than or equal to zero', () => {

@@ -10,6 +10,7 @@ import { SocialMediaPostSenderService } from '@/modules/social/services/social-m
 import { asyncHandler } from '@/shared/http/async-handler'
 import { AxiosHttpClient } from '@/shared/http-client'
 import { BullMqPostScheduler } from '@/shared/queue'
+import { BullMqPostPreparationScheduler } from '@/shared/queue'
 import { SocialMediaErrorHandler } from '@/shared/social-media-errors'
 import { VideoProcessor } from '@/shared/video-processor/video-processor'
 import { S3Uploader } from '@/shared/media-uploader/media-uploader'
@@ -54,6 +55,7 @@ export const createPostsRouter = (logger: ILogger, db: NodePgDatabase<typeof dbS
         socialMediaPublisherFactory
     )
     const postScheduler = new BullMqPostScheduler()
+    const postPreparationScheduler = new BullMqPostPreparationScheduler()
 
     // Workspace profile services for signal recording
     const workspaceRepository = new WorkspaceRepository(db, logger)
@@ -74,6 +76,7 @@ export const createPostsRouter = (logger: ILogger, db: NodePgDatabase<typeof dbS
         socialMediaPostSender,
         socialMediaErrorHandler,
         postScheduler,
+        postPreparationScheduler,
         workspaceProfileService
     )
     const postsController = new PostsController(postsService, logger)
@@ -82,6 +85,12 @@ export const createPostsRouter = (logger: ILogger, db: NodePgDatabase<typeof dbS
     router.use('/workspaces', authMiddleware)
 
     // Workspace-scoped routes
+    router.post(
+        '/workspaces/:workspaceId/post/uploads/presign',
+        asyncHandler(workspaceMiddleware),
+        asyncHandler(postsController.createPresignedUploads.bind(postsController))
+    )
+
     router.post(
         '/workspaces/:workspaceId/post',
         asyncHandler(workspaceMiddleware),

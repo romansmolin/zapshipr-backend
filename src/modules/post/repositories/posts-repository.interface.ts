@@ -35,6 +35,8 @@ export interface IPostsRepository {
 
     savePostMediaAssets(data: { userId: string; url: string; type: string }): Promise<{ mediaId: string }>
 
+    updateMediaAsset(mediaId: string, data: { url: string; type: string }): Promise<void>
+
     createPostMediaAssetRelation(postId: string, mediaId: string, order: number): Promise<void>
 
     getPostMediaAsset(postId: string, mediaIndices?: number[] | null): Promise<PostMediaAsset | null>

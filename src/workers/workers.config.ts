@@ -6,6 +6,7 @@ import {
     BullMqPostWorker,
     BullMqTokenRefreshScheduler,
     BullMqInspirationWorker,
+    BullMqPostPreparationWorker,
 } from '@/shared/queue'
 import { schema } from '@/db/schema'
 
@@ -30,6 +31,7 @@ export interface Workers {
     accessTokensRefreshScheduler: BullMqTokenRefreshScheduler
     accessTokensRefreshWorker: BullMqAccessTokenWorker
     postWorkers: BullMqPostWorker[]
+    postPreparationWorker: BullMqPostPreparationWorker
     inspirationWorker: BullMqInspirationWorker
 }
 
@@ -53,6 +55,8 @@ export async function initializeWorkers(
 
     const accessTokensRefreshWorker = new BullMqAccessTokenWorker(logger, socialMediaTokenRefresher)
     accessTokensRefreshWorker.start()
+    const postPreparationWorker = new BullMqPostPreparationWorker(logger, postsService)
+    postPreparationWorker.start()
 
     // Initialize inspiration worker
     const inspirationsRepository = new InspirationsRepository(db, logger)
@@ -95,6 +99,7 @@ export async function initializeWorkers(
         accessTokensRefreshScheduler,
         accessTokensRefreshWorker,
         postWorkers,
+        postPreparationWorker,
         inspirationWorker,
     }
 }

@@ -10,6 +10,7 @@ import { SocialMediaErrorHandler } from '@/shared/social-media-errors'
 import { VideoProcessor } from '@/shared/video-processor/video-processor'
 import { ConsoleLogger } from '@/shared/logger/console-logger'
 import { S3Uploader } from '@/shared/media-uploader/media-uploader'
+import { BullMqPostScheduler } from '@/shared/queue'
 import { initializeWorkers } from '@/workers/workers.config'
 
 async function startWorkers() {
@@ -37,13 +38,15 @@ async function startWorkers() {
         socialMediaPublisherFactory
     )
     const socialMediaTokenRefresher = new SocialMediaTokenRefresherService(logger, accountRepository)
+    const postScheduler = new BullMqPostScheduler()
 
     const postsService = new PostsService(
         postsRepository,
         mediaUploader,
         logger,
         socialMediaPostSender,
-        socialMediaErrorHandler
+        socialMediaErrorHandler,
+        postScheduler
     )
 
     await initializeWorkers(logger, db, socialMediaPostSender, socialMediaTokenRefresher, postsService)

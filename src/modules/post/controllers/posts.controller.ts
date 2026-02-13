@@ -2,13 +2,17 @@ import { BaseAppError } from '@/shared/errors/base-error'
 import { ErrorCode } from '@/shared/consts/error-codes.const'
 import { workspaceIdParamSchema } from '@/modules/workspace/validation/workspace.schemas'
 
-import type { IPostsService, MediaCompatibilityError } from '@/modules/post/services/posts-service.interface'
+import type {
+    IPostsService,
+    MediaCompatibilityError,
+    PostCreateQueuedResponse,
+} from '@/modules/post/services/posts-service.interface'
 import type { CreatePostsRequest } from '@/modules/post/schemas/posts.schemas'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import type { PostFilters } from '@/modules/post/types/posts.types'
 import type { NextFunction, Request, Response } from 'express'
 
-import { createPostsSchema } from '../validation/posts.schemas'
+import { createPostsSchema, presignPostUploadsSchema } from '../validation/posts.schemas'
 import { hasTimeZoneInfo, parseDateWithTimeZone } from '@/shared/utils/timezone'
 
 const getFirstValue = (value: unknown): string | number | undefined => {
@@ -87,6 +91,7 @@ const parseCreatePostsRequest = (body: Request['body']): CreatePostsRequest => {
     const posts = parseJson<CreatePostsRequest['posts']>(body.posts) ?? []
     const copyDataUrls = parseJson<string[]>(body.copyDataUrls) ?? undefined
     const mediaTransforms = parseJson<CreatePostsRequest['mediaTransforms']>(body.mediaTransforms) ?? undefined
+    const uploadedMedia = parseJson<CreatePostsRequest['uploadedMedia']>(body.uploadedMedia) ?? undefined
     const timezone = typeof body.timezone === 'string' && body.timezone.trim() !== '' ? body.timezone.trim() : null
     const scheduledAtLocal =
         typeof body.scheduledAtLocal === 'string' && body.scheduledAtLocal.trim() !== ''
@@ -112,11 +117,18 @@ const parseCreatePostsRequest = (body: Request['body']): CreatePostsRequest => {
             : (coverTimestamp as number | undefined),
         copyDataUrls,
         mediaTransforms,
+        uploadedMedia,
     }
 }
 
 const isCompatibilityError = (value: unknown): value is MediaCompatibilityError => {
     return Boolean(value && typeof value === 'object' && 'ok' in value && (value as { ok?: boolean }).ok === false)
+}
+
+const isQueuedResponse = (value: unknown): value is PostCreateQueuedResponse => {
+    return Boolean(
+        value && typeof value === 'object' && 'queued' in value && (value as { queued?: boolean }).queued === true
+    )
 }
 
 export class PostsController {
@@ -153,6 +165,18 @@ export class PostsController {
             return
         }
 
+        if (isQueuedResponse(result)) {
+            this.logger.info('Post accepted for async processing', {
+                operation: 'PostsController.createPost',
+                userId,
+                postId: result.postId,
+                status: result.status,
+            })
+
+            res.status(202).json(result)
+            return
+        }
+
         this.logger.info('Post created', {
             operation: 'PostsController.createPost',
             userId,
@@ -161,6 +185,19 @@ export class PostsController {
         })
 
         res.status(201).json(result)
+    }
+
+    async createPresignedUploads(req: Request, res: Response, _next: NextFunction): Promise<void> {
+        const userId = req.user?.id
+        if (!userId) {
+            throw new BaseAppError('Unauthorized', ErrorCode.UNAUTHORIZED, 401)
+        }
+
+        const workspaceId = this.getWorkspaceId(req)
+        const payload = presignPostUploadsSchema.parse(req.body)
+        const urls = await this.postsService.createPresignedUploadUrls(userId, workspaceId, payload.files)
+
+        res.status(201).json({ items: urls })
     }
 
     async editPost(req: Request, res: Response, _next: NextFunction): Promise<void> {

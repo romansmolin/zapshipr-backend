@@ -1,6 +1,5 @@
 // enhanced-bullmq-post-scheduler.ts
 import { Queue, type JobsOptions } from 'bullmq'
-import { v4 as uuidv4 } from 'uuid'
 
 import { PostPlatforms, PostPlatformsWithoutX, type PostPlatform } from '@/modules/post/schemas/posts.schemas'
 
@@ -50,6 +49,14 @@ export class BullMqPostScheduler implements IPostScheduler {
         return this.queues[platform]
     }
 
+    private buildDeterministicJobId(
+        postId: string,
+        platform: PostPlatform,
+        socialAccountId?: string
+    ): string {
+        return `publish_${postId}_${platform}_${socialAccountId ?? 'default'}`
+    }
+
     async schedulePost(
         platform: PostPlatform,
         postId: string,
@@ -58,11 +65,9 @@ export class BullMqPostScheduler implements IPostScheduler {
         socialAccountId?: string
     ): Promise<void> {
         try {
-            // Generate unique job ID for idempotency
-            const jobId = uuidv4()
-
-            // Check if job already exists (idempotency check)
-            const existingJob = await this.findExistingJob(platform, postId, userId, socialAccountId)
+            const jobId = this.buildDeterministicJobId(postId, platform, socialAccountId)
+            const queue = this.getQueue(platform)
+            const existingJob = await queue.getJob(jobId)
             if (existingJob) {
                 console.log(
                     `[SCHEDULER] Job already exists for ${platform}:${postId}:${userId}:${socialAccountId}, skipping`
@@ -131,14 +136,12 @@ export class BullMqPostScheduler implements IPostScheduler {
                 backoff: {
                     type: 'custom',
                 },
-                // Use UUID for idempotency
                 jobId,
-                // Prevent duplicate jobs
                 removeOnComplete: 50,
                 removeOnFail: 100,
             }
 
-            const job = await this.getQueue(platform).add(
+            const job = await queue.add(
                 'publish-post',
                 {
                     jobId,
@@ -449,54 +452,6 @@ export class BullMqPostScheduler implements IPostScheduler {
     async close(): Promise<void> {
         await Promise.all(Object.values(this.queues).map((queue) => queue.close()))
         console.log('[SCHEDULER] All queues closed')
-    }
-
-    // ========== HELPER METHODS ==========
-
-    private async findExistingJob(
-        platform: PostPlatform,
-        postId: string,
-        userId: string,
-        socialAccountId?: string
-    ): Promise<any> {
-        try {
-            const queue = this.getQueue(platform)
-
-            // Check waiting jobs
-            const waitingJobs = await queue.getWaiting()
-            const existingWaiting = waitingJobs.find(
-                (job) =>
-                    job.data.postId === postId &&
-                    job.data.userId === userId &&
-                    (!socialAccountId || job.data.socialAccountId === socialAccountId)
-            )
-            if (existingWaiting) return existingWaiting
-
-            // Check delayed jobs
-            const delayedJobs = await queue.getDelayed()
-            const existingDelayed = delayedJobs.find(
-                (job) =>
-                    job.data.postId === postId &&
-                    job.data.userId === userId &&
-                    (!socialAccountId || job.data.socialAccountId === socialAccountId)
-            )
-            if (existingDelayed) return existingDelayed
-
-            // Check active jobs
-            const activeJobs = await queue.getActive()
-            const existingActive = activeJobs.find(
-                (job) =>
-                    job.data.postId === postId &&
-                    job.data.userId === userId &&
-                    (!socialAccountId || job.data.socialAccountId === socialAccountId)
-            )
-            if (existingActive) return existingActive
-
-            return null
-        } catch (error) {
-            console.warn(`[SCHEDULER] Error checking for existing job:`, error)
-            return null
-        }
     }
 
     // ========== QUOTA MANAGEMENT ==========

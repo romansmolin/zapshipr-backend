@@ -77,6 +77,7 @@ describe('PostsService mediaTransforms', () => {
             createBasePost: jest.fn(),
             updateBasePost: jest.fn(),
             savePostMediaAssets: jest.fn(),
+            updateMediaAsset: jest.fn(),
             createPostMediaAssetRelation: jest.fn(),
             getPostMediaAsset: jest.fn(),
             getPostMediaAssets: jest.fn(),
@@ -103,6 +104,7 @@ describe('PostsService mediaTransforms', () => {
             delete: jest.fn(),
             listObjects: jest.fn(),
             getSignedUrl: jest.fn(),
+            getPresignedUploadUrl: jest.fn(),
         } as unknown as jest.Mocked<IMediaUploader>
 
         socialMediaPostSender = {
@@ -118,6 +120,7 @@ describe('PostsService mediaTransforms', () => {
 
         postRepository.createBasePost.mockResolvedValue({ postId: 'post-1' })
         postRepository.savePostMediaAssets.mockResolvedValue({ mediaId: 'media-1' })
+        postRepository.updateMediaAsset.mockResolvedValue()
         postRepository.getPostDetails.mockResolvedValue(createBasePostResponse())
         postRepository.getPostMediaAsset.mockResolvedValue(null)
         postRepository.getPostMediaAssets.mockResolvedValue([])
@@ -126,7 +129,58 @@ describe('PostsService mediaTransforms', () => {
         postRepository.updateBasePost.mockResolvedValue()
         postRepository.updatePostTargets.mockResolvedValue()
         postRepository.deletePostMediaAsset.mockResolvedValue()
+        postRepository.deletePost.mockResolvedValue({ mediaUrls: [] })
         mediaUploader.upload.mockResolvedValue('https://cdn.example.com/media')
+    })
+
+    it('computes crop rectangle using actual image dimensions instead of frontend preview dimensions', () => {
+        const cropRect = (service as any).computeCropRect(
+            {
+                mediaIndex: 0,
+                ratio: '1:1',
+                crop: { x: 0.5, y: 0.1, scale: 2 },
+                source: { width: 120, height: 240 },
+                version: 1,
+            },
+            240,
+            480
+        )
+
+        expect(cropRect).toEqual({
+            width: 120,
+            height: 120,
+            left: 30,
+            top: 162,
+        })
+    })
+
+    it('maps center-offset coordinates to crop rectangle edges', () => {
+        const leftEdge = (service as any).computeCropRect(
+            {
+                mediaIndex: 0,
+                ratio: '1:1',
+                crop: { x: 1, y: 1, scale: 1 },
+                source: { width: 100, height: 100 },
+                version: 1,
+            },
+            200,
+            100
+        )
+
+        const rightEdge = (service as any).computeCropRect(
+            {
+                mediaIndex: 0,
+                ratio: '1:1',
+                crop: { x: -1, y: -1, scale: 1 },
+                source: { width: 100, height: 100 },
+                version: 1,
+            },
+            200,
+            100
+        )
+
+        expect(leftEdge.left).toBe(0)
+        expect(rightEdge.left).toBe(100)
     })
 
     it('applies media transform for uploaded image in create flow', async () => {
@@ -531,31 +585,59 @@ describe('PostsService mediaTransforms', () => {
         expect(socialMediaPostSender.sendPost).not.toHaveBeenCalled()
     })
 
-    it('falls back to sync postNow publishing when scheduler is missing', async () => {
-        await service.createPost(
-            createBaseRequest({
-                postType: 'text',
-                postStatus: PostStatus.PENDING,
-                postNow: true,
-                posts: [
-                    {
-                        account: 'account-1',
-                        platform: SocilaMediaPlatform.INSTAGRAM,
-                        text: 'hello',
-                    },
-                ],
-            }),
-            undefined,
-            'user-1',
-            'workspace-1'
-        )
+    it('returns INTERNAL_SERVER_ERROR when postNow scheduler is missing', async () => {
+        await expect(
+            service.createPost(
+                createBaseRequest({
+                    postType: 'text',
+                    postStatus: PostStatus.PENDING,
+                    postNow: true,
+                    posts: [
+                        {
+                            account: 'account-1',
+                            platform: SocilaMediaPlatform.INSTAGRAM,
+                            text: 'hello',
+                        },
+                    ],
+                }),
+                undefined,
+                'user-1',
+                'workspace-1'
+            )
+        ).rejects.toMatchObject({
+            code: ErrorCode.UNKNOWN_ERROR,
+            httpCode: 500,
+        })
 
-        expect(socialMediaPostSender.sendPost).toHaveBeenCalledTimes(1)
-        expect(socialMediaPostSender.sendPost).toHaveBeenCalledWith(
-            'user-1',
-            'post-1',
-            SocilaMediaPlatform.INSTAGRAM,
-            'account-1'
-        )
+        expect(socialMediaPostSender.sendPost).not.toHaveBeenCalled()
+    })
+
+    it('rolls back created base post when create flow fails after insert', async () => {
+        postRepository.createPostTargets.mockRejectedValueOnce(new Error('targets insert failed'))
+
+        await expect(
+            service.createPost(
+                createBaseRequest({
+                    postType: 'text',
+                    postStatus: PostStatus.PENDING,
+                    posts: [
+                        {
+                            account: 'account-1',
+                            platform: SocilaMediaPlatform.INSTAGRAM,
+                            text: 'hello',
+                        },
+                    ],
+                }),
+                undefined,
+                'user-1',
+                'workspace-1'
+            )
+        ).rejects.toMatchObject({
+            code: ErrorCode.UNKNOWN_ERROR,
+            httpCode: 500,
+        })
+
+        expect(postRepository.createBasePost).toHaveBeenCalledTimes(1)
+        expect(postRepository.deletePost).toHaveBeenCalledWith('post-1', 'user-1', 'workspace-1')
     })
 })

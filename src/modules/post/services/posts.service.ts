@@ -1,9 +1,10 @@
 import { randomUUID } from 'crypto'
-import { mkdir, readFile, rmdir, unlink, writeFile } from 'fs/promises'
+import { mkdir, rmdir, unlink, writeFile } from 'fs/promises'
 import * as path from 'path'
 
 import axios from 'axios'
 import ffmpeg = require('fluent-ffmpeg')
+import sharp from 'sharp'
 
 import { PostTargetEntity } from '@/modules/post/entity/post-target'
 import { ErrorCode } from '@/shared/consts/error-codes.const'
@@ -14,12 +15,25 @@ import { VideoConverter } from '@/shared/video-processor/video-converter'
 import { PostStatus } from '@/modules/post/types/posts.types'
 import { isValidTimeZone, parseDateWithTimeZone } from '@/shared/utils/timezone'
 
-import type { IPostsService, MediaCompatibilityError, ServiceErrorEnvelope } from './posts-service.interface'
+import type {
+    IPostsService,
+    MediaCompatibilityError,
+    ServiceErrorEnvelope,
+    PostCreateQueuedResponse,
+    PostPreparationJobPayload,
+} from './posts-service.interface'
 import type { IPostsRepository } from '@/modules/post/repositories/posts-repository.interface'
 import type { ISocialMediaPostSenderService } from '@/modules/social/services/social-media-post-sender.interface'
-import type { CreatePostsRequest, MediaTransformRequest, SocilaMediaPlatform } from '@/modules/post/schemas/posts.schemas'
+import type {
+    CreatePostsRequest,
+    MediaTransformRequest,
+    PresignUploadFileRequest,
+    PresignedUploadResponseItem,
+    SocilaMediaPlatform,
+    UploadedMediaRequest,
+} from '@/modules/post/schemas/posts.schemas'
 import type { IMediaUploader } from '@/shared/media-uploader'
-import type { IPostScheduler } from '@/shared/queue'
+import type { IPostPreparationScheduler, IPostScheduler } from '@/shared/queue'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import type { IWorkspaceProfileService } from '@/modules/workspace/services/workspace-profile.service'
 import type {
@@ -39,6 +53,7 @@ export class PostsService implements IPostsService {
     private videoConverter: VideoConverter
     private errorHandler: SocialMediaErrorHandler
     private postScheduler?: IPostScheduler
+    private postPreparationScheduler?: IPostPreparationScheduler
     private workspaceProfileService?: IWorkspaceProfileService
 
     constructor(
@@ -48,6 +63,7 @@ export class PostsService implements IPostsService {
         socialMediaPostSender: ISocialMediaPostSenderService,
         errorHandler: SocialMediaErrorHandler,
         postScheduler?: IPostScheduler,
+        postPreparationScheduler?: IPostPreparationScheduler,
         workspaceProfileService?: IWorkspaceProfileService
     ) {
         this.postRepository = postRepository
@@ -57,6 +73,7 @@ export class PostsService implements IPostsService {
         this.videoConverter = new VideoConverter(logger)
         this.errorHandler = errorHandler
         this.postScheduler = postScheduler
+        this.postPreparationScheduler = postPreparationScheduler
         this.workspaceProfileService = workspaceProfileService
 
         this.socialMediaPostSender.setOnPostSuccessCallback(this.checkAndUpdateBasePostStatus.bind(this))
@@ -89,6 +106,40 @@ export class PostsService implements IPostsService {
             errorId: randomUUID(),
             details,
         }
+    }
+
+    private getUploadFlowMode(): 'dual' | 'presigned' | 'multipart' {
+        const mode = (process.env.POST_UPLOAD_FLOW ?? 'dual').toLowerCase()
+        if (mode === 'presigned' || mode === 'multipart') {
+            return mode
+        }
+        return 'dual'
+    }
+
+    private isAsyncPostNowEnabled(): boolean {
+        return (process.env.POST_NOW_ASYNC_ENABLED ?? 'false').toLowerCase() === 'true'
+    }
+
+    private sanitizeExtension(value?: string | null): string | null {
+        if (!value) return null
+        const normalized = value.trim().toLowerCase().replace(/^\./, '')
+        if (!normalized) return null
+        if (!/^[a-z0-9]{1,10}$/.test(normalized)) return null
+        return normalized
+    }
+
+    private resolveExtension(mimeType: string, extension?: string | null): string {
+        const sanitized = this.sanitizeExtension(extension)
+        if (sanitized) return sanitized
+        return this.getFileExtensionFromMimeType(mimeType) ?? 'bin'
+    }
+
+    private buildS3UrlFromKey(key: string): string {
+        const bucket = process.env.AWS_S3_BUCKET
+        if (!bucket) {
+            throw new BaseAppError('AWS_S3_BUCKET is required for uploadedMedia references', ErrorCode.UNKNOWN_ERROR, 500)
+        }
+        return `https://${bucket}.s3.amazonaws.com/${key}`
     }
 
     private extractUploadedMediaFiles(
@@ -350,7 +401,15 @@ export class PostsService implements IPostsService {
         return { width, height }
     }
 
-    private resolveOutputSize(ratio: string): { width: number; height: number } {
+    private resolveOutputSize(ratio: string, cropRect: { width: number; height: number }): { width: number; height: number } {
+        if (ratio === 'original') {
+            const targetWidth = Math.min(1080, cropRect.width)
+            return {
+                width: targetWidth,
+                height: Math.round((targetWidth * cropRect.height) / cropRect.width),
+            }
+        }
+
         if (ratio === '1:1') {
             return { width: 1080, height: 1080 }
         }
@@ -370,10 +429,27 @@ export class PostsService implements IPostsService {
         }
     }
 
-    private computeCropRect(transform: MediaTransformRequest): { width: number; height: number; x: number; y: number } {
-        const ratio = this.parseRatio(transform.ratio)
-        const sourceWidth = Math.round(transform.source.width)
-        const sourceHeight = Math.round(transform.source.height)
+    private resolveTransformRatio(
+        transform: MediaTransformRequest,
+        sourceWidth: number,
+        sourceHeight: number
+    ): { width: number; height: number } {
+        if (transform.ratio === 'original') {
+            return {
+                width: sourceWidth,
+                height: sourceHeight,
+            }
+        }
+
+        return this.parseRatio(transform.ratio)
+    }
+
+    private computeCropRect(
+        transform: MediaTransformRequest,
+        sourceWidth: number,
+        sourceHeight: number
+    ): { width: number; height: number; left: number; top: number } {
+        const ratio = this.resolveTransformRatio(transform, sourceWidth, sourceHeight)
 
         if (sourceWidth <= 0 || sourceHeight <= 0) {
             throw new BaseAppError('Invalid source dimensions in mediaTransforms', ErrorCode.BAD_REQUEST, 400)
@@ -384,20 +460,17 @@ export class PostsService implements IPostsService {
 
         const cropWidth = this.clamp(Math.round(baseCropWidth / transform.crop.scale), 1, sourceWidth)
         const cropHeight = this.clamp(Math.round(baseCropHeight / transform.crop.scale), 1, sourceHeight)
-        const x = Math.round(this.clamp(transform.crop.x, 0, 1) * (sourceWidth - cropWidth))
-        const y = Math.round(this.clamp(transform.crop.y, 0, 1) * (sourceHeight - cropHeight))
+        const clampedX = this.clamp(transform.crop.x, -1, 1)
+        const clampedY = this.clamp(transform.crop.y, -1, 1)
+        const left = Math.round(((1 - clampedX) / 2) * (sourceWidth - cropWidth))
+        const top = Math.round(((1 - clampedY) / 2) * (sourceHeight - cropHeight))
 
         return {
             width: cropWidth,
             height: cropHeight,
-            x,
-            y,
+            left,
+            top,
         }
-    }
-
-    private createImageTransformTempDir(): Promise<string> {
-        const tempDir = path.join(process.cwd(), 'temp', 'post-image-transform', `transform-${Date.now()}-${randomUUID()}`)
-        return mkdir(tempDir, { recursive: true }).then(() => tempDir)
     }
 
     private getImageTransformOutputConfig(mimeType: string): { extension: string; mimeType: string } {
@@ -412,16 +485,6 @@ export class PostsService implements IPostsService {
             extension: 'jpg',
             mimeType: 'image/jpeg',
         }
-    }
-
-    private runImageTransform(inputPath: string, outputPath: string, filter: string): Promise<void> {
-        return new Promise((resolve, reject) => {
-            ffmpeg(inputPath)
-                .outputOptions(['-vf', filter, '-frames:v 1'])
-                .on('end', () => resolve())
-                .on('error', (error: Error) => reject(error))
-                .save(outputPath)
-        })
     }
 
     private getFileExtensionFromMimeType(contentType: string): string | null {
@@ -455,19 +518,52 @@ export class PostsService implements IPostsService {
         mimeType: string,
         transform: MediaTransformRequest
     ): Promise<{ buffer: Buffer; contentType: string }> {
-        const tempDir = await this.createImageTransformTempDir()
         const outputConfig = this.getImageTransformOutputConfig(mimeType)
-        const inputExtension = this.getFileExtensionFromMimeType(mimeType) ?? 'bin'
-        const inputPath = path.join(tempDir, `input-${Date.now()}.${inputExtension}`)
-        const outputPath = path.join(tempDir, `output-${Date.now()}.${outputConfig.extension}`)
-        const cropRect = this.computeCropRect(transform)
-        const outputSize = this.resolveOutputSize(transform.ratio)
-        const filter = `crop=${cropRect.width}:${cropRect.height}:${cropRect.x}:${cropRect.y},scale=${outputSize.width}:${outputSize.height}:flags=lanczos`
+        const frontendSourceWidth = Math.round(transform.source.width)
+        const frontendSourceHeight = Math.round(transform.source.height)
+
+        if (frontendSourceWidth <= 0 || frontendSourceHeight <= 0) {
+            throw new BaseAppError('Invalid source dimensions in mediaTransforms', ErrorCode.BAD_REQUEST, 400)
+        }
 
         try {
-            await writeFile(inputPath, imageBuffer)
-            await this.runImageTransform(inputPath, outputPath, filter)
-            const transformedBuffer = await readFile(outputPath)
+            const orientedImage = sharp(imageBuffer, { failOn: 'none' }).rotate()
+            const metadata = await orientedImage.metadata()
+            const actualWidth = metadata.width ?? 0
+            const actualHeight = metadata.height ?? 0
+
+            if (actualWidth <= 0 || actualHeight <= 0) {
+                throw new BaseAppError('Failed to read image dimensions for mediaTransforms', ErrorCode.BAD_REQUEST, 400)
+            }
+
+            const cropRect = this.computeCropRect(transform, actualWidth, actualHeight)
+            const outputSize = this.resolveOutputSize(transform.ratio, cropRect)
+
+            this.logger.debug('Resolved media transform', {
+                operation: 'transformImageWithFFmpeg',
+                ratio: transform.ratio,
+                crop: transform.crop,
+                source: transform.source,
+                actualSource: {
+                    width: actualWidth,
+                    height: actualHeight,
+                },
+                cropRect,
+                outputSize,
+            })
+
+            let transformed = orientedImage.extract(cropRect).resize(outputSize.width, outputSize.height, {
+                fit: 'fill',
+                kernel: sharp.kernel.lanczos3,
+            })
+
+            if (outputConfig.extension === 'png') {
+                transformed = transformed.png()
+            } else {
+                transformed = transformed.jpeg({ quality: 90 })
+            }
+
+            const transformedBuffer = await transformed.toBuffer()
 
             return {
                 buffer: transformedBuffer,
@@ -479,8 +575,6 @@ export class PostsService implements IPostsService {
                 ErrorCode.BAD_REQUEST,
                 400
             )
-        } finally {
-            await this.cleanupTempFiles([inputPath, outputPath], tempDir)
         }
     }
 
@@ -492,18 +586,23 @@ export class PostsService implements IPostsService {
             return null
         }
 
-        if (!medias) {
-            return null
-        }
-
         const mediaFiles = this.extractUploadedMediaFiles(medias)
-
-        if (mediaFiles.length === 0) {
-            return null
-        }
-
-        const hasVideo = mediaFiles.some((file) => file.mimetype.startsWith('video/'))
-        const hasImage = mediaFiles.some((file) => file.mimetype.startsWith('image/'))
+        const uploadedMedia = createPostsRequest.uploadedMedia ?? []
+        const copyDataUrls = createPostsRequest.copyDataUrls ?? []
+        const hasVideo =
+            mediaFiles.some((file) => file.mimetype.startsWith('video/')) ||
+            uploadedMedia.some((media) => media.type.startsWith('video/')) ||
+            copyDataUrls.some((url) => {
+                const mimeType = this.getFileMimeTypeFromURL(url, true)
+                return Boolean(mimeType?.startsWith('video/'))
+            })
+        const hasImage =
+            mediaFiles.some((file) => file.mimetype.startsWith('image/')) ||
+            uploadedMedia.some((media) => media.type.startsWith('image/')) ||
+            copyDataUrls.some((url) => {
+                const mimeType = this.getFileMimeTypeFromURL(url, true)
+                return Boolean(mimeType?.startsWith('image/'))
+            })
 
         if (!hasVideo && !hasImage) {
             return null
@@ -862,12 +961,182 @@ export class PostsService implements IPostsService {
         }
     }
 
+    private async saveUploadedMediaReferences(
+        uploadedMedia: UploadedMediaRequest[],
+        userId: string,
+        postId: string,
+        orderCounter: number
+    ): Promise<number> {
+        for (const media of uploadedMedia) {
+            const mediaUrl = media.url ?? this.buildS3UrlFromKey(media.key)
+            const { mediaId } = await this.postRepository.savePostMediaAssets({
+                userId,
+                url: mediaUrl,
+                type: media.type,
+            })
+
+            await this.postRepository.createPostMediaAssetRelation(postId, mediaId, orderCounter++)
+        }
+
+        return orderCounter
+    }
+
+    private async saveCopyMediaReferences(
+        copyDataUrls: string[] | null | undefined,
+        userId: string,
+        postId: string,
+        orderCounter: number
+    ): Promise<number> {
+        if (!copyDataUrls?.length) {
+            return orderCounter
+        }
+
+        for (const copyUrl of copyDataUrls) {
+            const mimeType = this.getFileMimeTypeFromURL(copyUrl, true) || 'application/octet-stream'
+            const { mediaId } = await this.postRepository.savePostMediaAssets({
+                userId,
+                url: copyUrl,
+                type: mimeType,
+            })
+            await this.postRepository.createPostMediaAssetRelation(postId, mediaId, orderCounter++)
+        }
+
+        return orderCounter
+    }
+
+    private async saveMultipartMediaWithoutTransforms(
+        medias: Express.Multer.File[] | { [fieldname: string]: Express.Multer.File[] } | undefined,
+        userId: string,
+        postId: string,
+        orderCounter: number
+    ): Promise<number> {
+        const mediaFiles = this.extractUploadedMediaFiles(medias)
+        if (mediaFiles.length === 0) {
+            return orderCounter
+        }
+
+        for (let index = 0; index < mediaFiles.length; index++) {
+            const file = mediaFiles[index]
+            const fallbackExtension = this.getFileExtensionFromMimeType(file.mimetype) ?? 'bin'
+            const fileName = this.buildSafeFilename(file.originalname, orderCounter + index, fallbackExtension)
+            const mediaUrl = await this.mediaUploader.upload({
+                key: `${userId}/posts/${fileName}`,
+                body: file.buffer,
+                contentType: file.mimetype,
+            })
+
+            const { mediaId } = await this.postRepository.savePostMediaAssets({
+                userId,
+                url: mediaUrl,
+                type: file.mimetype,
+            })
+
+            await this.postRepository.createPostMediaAssetRelation(postId, mediaId, orderCounter++)
+        }
+
+        return orderCounter
+    }
+
+    private async attachMediaReferencesForAsyncPostNow(
+        medias: Express.Multer.File[] | { [fieldname: string]: Express.Multer.File[] } | undefined,
+        request: CreatePostsRequest,
+        userId: string,
+        postId: string
+    ): Promise<void> {
+        let orderCounter = 1
+        orderCounter = await this.saveCopyMediaReferences(request.copyDataUrls, userId, postId, orderCounter)
+        orderCounter = await this.saveUploadedMediaReferences(request.uploadedMedia ?? [], userId, postId, orderCounter)
+        await this.saveMultipartMediaWithoutTransforms(medias, userId, postId, orderCounter)
+    }
+
+    private async enqueuePostPreparation(payload: PostPreparationJobPayload): Promise<void> {
+        const scheduler = this.requirePostPreparationScheduler()
+        const startedAt = Date.now()
+        await scheduler.schedulePostPreparation(payload)
+        this.logger.info('post_queue_enqueue_ms', {
+            operation: 'enqueuePostPreparation',
+            postId: payload.postId,
+            userId: payload.userId,
+            metric: 'post_queue_enqueue_ms',
+            value: Date.now() - startedAt,
+        })
+    }
+
+    private async applyMediaTransformsToStoredAssets(
+        payload: PostPreparationJobPayload
+    ): Promise<void> {
+        const mediaTransforms = payload.mediaTransforms
+        if (mediaTransforms.length === 0) {
+            return
+        }
+
+        const selectedMediaSet = new Set(payload.selectedMediaIndices)
+        const mediaAssets = await this.postRepository.getPostMediaAssets(payload.postId)
+
+        for (const transform of mediaTransforms) {
+            if (selectedMediaSet.size > 0 && !selectedMediaSet.has(transform.mediaIndex)) {
+                continue
+            }
+
+            const mediaAsset = mediaAssets[transform.mediaIndex]
+            if (!mediaAsset) {
+                throw new BaseAppError(
+                    `mediaTransforms[${transform.mediaIndex}] is out of range for stored media assets`,
+                    ErrorCode.BAD_REQUEST,
+                    400
+                )
+            }
+
+            if (!mediaAsset.type?.startsWith('image/')) {
+                throw new BaseAppError(
+                    `mediaTransforms[${transform.mediaIndex}] can only be applied to image media assets`,
+                    ErrorCode.BAD_REQUEST,
+                    400
+                )
+            }
+
+            if (!mediaAsset.mediaId) {
+                throw new BaseAppError(
+                    `mediaTransforms[${transform.mediaIndex}] cannot be applied because media asset ID is missing`,
+                    ErrorCode.BAD_REQUEST,
+                    400
+                )
+            }
+
+            const downloadResponse = await axios.get<ArrayBuffer>(mediaAsset.url, {
+                responseType: 'arraybuffer',
+            })
+            const sourceBuffer = Buffer.from(downloadResponse.data)
+            const transformedImage = await this.transformImageWithFFmpeg(sourceBuffer, mediaAsset.type, transform)
+            const extension = this.getFileExtensionFromMimeType(transformedImage.contentType) ?? 'jpg'
+            const transformedKey = `${payload.userId}/posts/transformed/${payload.postId}-${transform.mediaIndex}-${Date.now()}.${extension}`
+            const transformedUrl = await this.mediaUploader.upload({
+                key: transformedKey,
+                body: transformedImage.buffer,
+                contentType: transformedImage.contentType,
+            })
+
+            await this.postRepository.updateMediaAsset(mediaAsset.mediaId, {
+                url: transformedUrl,
+                type: transformedImage.contentType,
+            })
+        }
+    }
+
     private requirePostScheduler(): IPostScheduler {
         if (!this.postScheduler) {
             throw new BaseAppError('Post scheduler is not configured', ErrorCode.UNKNOWN_ERROR, 500)
         }
 
         return this.postScheduler
+    }
+
+    private requirePostPreparationScheduler(): IPostPreparationScheduler {
+        if (!this.postPreparationScheduler) {
+            throw new BaseAppError('Post preparation scheduler is not configured', ErrorCode.UNKNOWN_ERROR, 500)
+        }
+
+        return this.postPreparationScheduler
     }
 
     private async schedulePostTargets(
@@ -1161,16 +1430,95 @@ export class PostsService implements IPostsService {
         }
     }
 
+    async createPresignedUploadUrls(
+        userId: string,
+        workspaceId: string,
+        files: PresignUploadFileRequest[]
+    ): Promise<PresignedUploadResponseItem[]> {
+        const expiresIn = 15 * 60
+
+        return Promise.all(
+            files.map(async (file, index) => {
+                const extension = this.resolveExtension(file.mimeType, file.extension)
+                const key = `${userId}/posts/staged/${workspaceId}/${Date.now()}-${index}-${randomUUID()}.${extension}`
+                return this.mediaUploader.getPresignedUploadUrl({
+                    key,
+                    contentType: file.mimeType,
+                    expiresIn,
+                })
+            })
+        )
+    }
+
+    async processPostPreparationJob(payload: PostPreparationJobPayload): Promise<void> {
+        const startedAt = Date.now()
+        const postDetails = await this.postRepository.getPostDetails(payload.postId, payload.userId)
+
+        if (postDetails.status === PostStatus.DRAFT) {
+            return
+        }
+
+        try {
+            await this.applyMediaTransformsToStoredAssets(payload)
+
+            const postTargets: PostTarget[] = postDetails.targets.map((target) => ({
+                ...target,
+                postId: payload.postId,
+                socialAccountId: target.socialAccountId,
+            }))
+
+            await this.schedulePostTargets(payload.postId, payload.userId, new Date(), postTargets)
+
+            this.logger.info('post_preparation_ms', {
+                operation: 'processPostPreparationJob',
+                postId: payload.postId,
+                userId: payload.userId,
+                metric: 'post_preparation_ms',
+                value: Date.now() - startedAt,
+            })
+        } catch (error) {
+            await this.postRepository.updateBasePost(payload.postId, payload.userId, PostStatus.FAILED, postDetails.mainCaption)
+            throw error
+        }
+    }
+
+    private async rollbackFailedPostCreation(postId: string, userId: string, workspaceId: string): Promise<void> {
+        try {
+            await this.deletePost(postId, userId, workspaceId)
+            this.logger.warn('Rolled back post created during failed createPost flow', {
+                operation: 'rollbackFailedPostCreation',
+                postId,
+                userId,
+                workspaceId,
+            })
+        } catch (cleanupError) {
+            this.logger.error('Failed to rollback post after createPost error', {
+                operation: 'rollbackFailedPostCreation',
+                postId,
+                userId,
+                workspaceId,
+                error: cleanupError instanceof Error ? cleanupError.message : 'Unknown error',
+            })
+        }
+    }
+
     async createPost(
         createPostsRequest: CreatePostsRequest,
         medias: { [fieldname: string]: Express.Multer.File[] } | undefined | Express.Multer.File[],
         userId: string,
         workspaceId: string
-    ): Promise<CreatePostResponse | MediaCompatibilityError> {
+    ): Promise<CreatePostResponse | MediaCompatibilityError | PostCreateQueuedResponse> {
+        let createdPostId: string | null = null
+
         try {
+            const createStartedAt = Date.now()
             const uploadedMediaFiles = this.extractUploadedMediaFiles(medias)
             const copyMediaCount = createPostsRequest.copyDataUrls?.length ?? 0
-            const mediaPoolCount = createPostsRequest.postType === 'media' ? uploadedMediaFiles.length + copyMediaCount : 0
+            const uploadedMediaCount = createPostsRequest.uploadedMedia?.length ?? 0
+            const mediaPoolCount =
+                createPostsRequest.postType === 'media'
+                    ? uploadedMediaFiles.length + copyMediaCount + uploadedMediaCount
+                    : 0
             const normalizedCreatePostsRequest: CreatePostsRequest = {
                 ...createPostsRequest,
                 posts: this.normalizePostTargetsMediaIndices(createPostsRequest, mediaPoolCount),
@@ -1203,6 +1551,13 @@ export class PostsService implements IPostsService {
                 initialStatus = PostStatus.PENDING
             }
 
+            const useAsyncPostNow = isPostNow && this.isAsyncPostNowEnabled()
+            const uploadFlowMode = this.getUploadFlowMode()
+            const canUseUploadedMedia =
+                uploadFlowMode !== 'multipart' &&
+                Array.isArray(normalizedCreatePostsRequest.uploadedMedia) &&
+                normalizedCreatePostsRequest.uploadedMedia.length > 0
+
             let coverImageUrl: string | undefined
 
             if (medias && typeof medias === 'object' && !Array.isArray(medias)) {
@@ -1224,16 +1579,53 @@ export class PostsService implements IPostsService {
                 normalizedCreatePostsRequest.coverTimestamp ?? null,
                 coverImageUrl
             )
+            createdPostId = postId
 
-            if (normalizedCreatePostsRequest.postType === 'media' && (medias || normalizedCreatePostsRequest.copyDataUrls)) {
-                await this.uploadAndSaveMediaFiles(
-                    medias,
-                    userId,
-                    postId,
-                    normalizedCreatePostsRequest,
-                    normalizedCreatePostsRequest.copyDataUrls,
-                    selectedMediaIndices
-                )
+            if (normalizedCreatePostsRequest.postType === 'media') {
+                if (useAsyncPostNow) {
+                    const asyncMediaRequest = canUseUploadedMedia
+                        ? normalizedCreatePostsRequest
+                        : { ...normalizedCreatePostsRequest, uploadedMedia: undefined }
+                    await this.attachMediaReferencesForAsyncPostNow(
+                        canUseUploadedMedia ? undefined : medias,
+                        asyncMediaRequest,
+                        userId,
+                        postId
+                    )
+                } else if (medias || normalizedCreatePostsRequest.copyDataUrls) {
+                    await this.uploadAndSaveMediaFiles(
+                        medias,
+                        userId,
+                        postId,
+                        normalizedCreatePostsRequest,
+                        normalizedCreatePostsRequest.copyDataUrls,
+                        selectedMediaIndices
+                    )
+                } else if (canUseUploadedMedia) {
+                    let orderCounter = 1
+                    orderCounter = await this.saveCopyMediaReferences(
+                        normalizedCreatePostsRequest.copyDataUrls,
+                        userId,
+                        postId,
+                        orderCounter
+                    )
+                    await this.saveUploadedMediaReferences(
+                        normalizedCreatePostsRequest.uploadedMedia ?? [],
+                        userId,
+                        postId,
+                        orderCounter
+                    )
+
+                    if (this.getMediaTransforms(normalizedCreatePostsRequest).length > 0) {
+                        await this.applyMediaTransformsToStoredAssets({
+                            postId,
+                            userId,
+                            workspaceId,
+                            mediaTransforms: this.getMediaTransforms(normalizedCreatePostsRequest),
+                            selectedMediaIndices: Array.from(selectedMediaIndices),
+                        })
+                    }
+                }
             }
 
             const postTargets: PostTarget[] = normalizedCreatePostsRequest.posts.map((post) => ({
@@ -1277,6 +1669,38 @@ export class PostsService implements IPostsService {
             }
 
             if (isPostNow) {
+                if (useAsyncPostNow) {
+                    await this.enqueuePostPreparation({
+                        postId,
+                        userId,
+                        workspaceId,
+                        mediaTransforms: this.getMediaTransforms(normalizedCreatePostsRequest),
+                        selectedMediaIndices: Array.from(selectedMediaIndices),
+                    })
+
+                    await this.recordPostSignals(
+                        workspaceId,
+                        postId,
+                        postTargets,
+                        normalizedCreatePostsRequest,
+                        false
+                    )
+
+                    this.logger.info('post_create_ack_ms', {
+                        operation: 'createPost',
+                        postId,
+                        userId,
+                        metric: 'post_create_ack_ms',
+                        value: Date.now() - createStartedAt,
+                    })
+
+                    return {
+                        postId,
+                        status: PostStatus.PENDING,
+                        queued: true,
+                    }
+                }
+
                 if (this.postScheduler) {
                     await this.enqueueImmediatePostTargets(
                         postId,
@@ -1285,8 +1709,11 @@ export class PostsService implements IPostsService {
                         normalizedCreatePostsRequest.mainCaption ?? null
                     )
                 } else {
-                    // Fallback mode for environments/tests where post scheduler is not wired.
-                    await this.sendImmediatePostSynchronously(postId, userId, normalizedCreatePostsRequest)
+                    throw new BaseAppError(
+                        'Post scheduler is not configured for immediate publishing',
+                        ErrorCode.UNKNOWN_ERROR,
+                        500
+                    )
                 }
             }
 
@@ -1294,6 +1721,10 @@ export class PostsService implements IPostsService {
 
             return await this.postRepository.getPostDetails(postId, userId)
         } catch (error: unknown) {
+            if (createdPostId) {
+                await this.rollbackFailedPostCreation(createdPostId, userId, workspaceId)
+            }
+
             if (error instanceof AppError) throw error
             if (error instanceof BaseAppError) throw error
             throw new BaseAppError('Failed to create post', ErrorCode.UNKNOWN_ERROR, 500)

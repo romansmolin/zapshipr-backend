@@ -94,6 +94,35 @@ export class PostsRepository implements IPostsRepository {
         }
     }
 
+    async updateMediaAsset(mediaId: string, data: { url: string; type: string }): Promise<void> {
+        try {
+            const updated = await this.db
+                .update(mediaAssets)
+                .set({
+                    url: data.url,
+                    type: data.type,
+                })
+                .where(eq(mediaAssets.id, mediaId))
+                .returning({ id: mediaAssets.id })
+
+            if (updated.length === 0) {
+                throw new BaseAppError('Media asset not found', ErrorCode.NOT_FOUND, 404)
+            }
+        } catch (error) {
+            this.logger.error('Failed to update media asset', {
+                operation: 'PostsRepository.updateMediaAsset',
+                mediaId,
+                error: formatError(error),
+            })
+
+            if (error instanceof BaseAppError) {
+                throw error
+            }
+
+            throw new BaseAppError('Failed to update media asset', ErrorCode.UNKNOWN_ERROR, 500)
+        }
+    }
+
     async createPostMediaAssetRelation(postId: string, mediaId: string, order: number): Promise<void> {
         try {
             await this.db.insert(postMediaAssets).values({

@@ -26,20 +26,24 @@ const postTargetSchema = z.object({
 })
 
 const ratioSchema = z
-    .string()
-    .regex(/^\d+:\d+$/, { message: 'ratio must be in format "width:height"' })
-    .refine((ratio) => {
-        const [width, height] = ratio.split(':').map(Number)
-        return width > 0 && height > 0
-    }, { message: 'ratio values must be greater than zero' })
+    .union([
+        z.literal('original'),
+        z
+            .string()
+            .regex(/^\d+:\d+$/, { message: 'ratio must be in format "width:height"' })
+            .refine((ratio) => {
+                const [width, height] = ratio.split(':').map(Number)
+                return width > 0 && height > 0
+            }, { message: 'ratio values must be greater than zero' }),
+    ])
 
 const mediaTransformSchema = z.object({
     mediaIndex: z.number().int().min(0),
-    platform: z.nativeEnum(SocilaMediaPlatform),
+    platform: z.nativeEnum(SocilaMediaPlatform).optional(),
     ratio: ratioSchema,
     crop: z.object({
-        x: z.number().min(0).max(1),
-        y: z.number().min(0).max(1),
+        x: z.number().min(-1).max(1),
+        y: z.number().min(-1).max(1),
         scale: z.number().positive(),
     }),
     source: z.object({
@@ -47,6 +51,14 @@ const mediaTransformSchema = z.object({
         height: z.number().positive(),
     }),
     version: z.literal(1),
+})
+
+const uploadedMediaSchema = z.object({
+    key: z.string().min(1),
+    type: z.string().min(1),
+    originalName: z.string().nullable().optional(),
+    size: z.number().int().positive().nullable().optional(),
+    url: z.string().url().nullable().optional(),
 })
 
 export const createPostsSchema = z.object({
@@ -60,6 +72,7 @@ export const createPostsSchema = z.object({
     coverTimestamp: z.number().nullable().optional(),
     copyDataUrls: z.array(z.string()).nullable().optional(),
     mediaTransforms: z.array(mediaTransformSchema).nullable().optional(),
+    uploadedMedia: z.array(uploadedMediaSchema).nullable().optional(),
 }).superRefine((value, ctx) => {
     for (const [targetIndex, target] of value.posts.entries()) {
         if (!target.mediaIndices) {
@@ -138,4 +151,25 @@ export const createPostsSchema = z.object({
             seen.add(transform.mediaIndex)
         }
     }
+
+    if (value.uploadedMedia && value.uploadedMedia.length > 0 && value.postType !== 'media') {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'uploadedMedia is only allowed for media posts',
+            path: ['uploadedMedia'],
+        })
+    }
+})
+
+export const presignPostUploadsSchema = z.object({
+    files: z.array(
+        z.object({
+            mimeType: z.string().min(1),
+            size: z.number().int().positive(),
+            extension: z.string().trim().min(1).nullable().optional(),
+            checksum: z.string().trim().min(1).nullable().optional(),
+        })
+    )
+    .min(1)
+    .max(20),
 })

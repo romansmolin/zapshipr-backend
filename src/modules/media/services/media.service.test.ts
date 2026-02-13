@@ -34,6 +34,7 @@ describe('MediaService', () => {
             delete: jest.fn(),
             listObjects: jest.fn(),
             getSignedUrl: jest.fn(),
+            getPresignedUploadUrl: jest.fn(),
         } as jest.Mocked<IMediaUploader>
 
         mediaService = new MediaService(mockLogger, mockMediaRepository, mockMediaUploader)

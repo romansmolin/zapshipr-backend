@@ -11,6 +11,13 @@ export interface ListObjectsResult {
     isTruncated: boolean
 }
 
+export interface PresignedUploadUrlResult {
+    uploadUrl: string
+    key: string
+    expiresAt: string
+    headers?: Record<string, string>
+}
+
 export interface IMediaUploader {
     upload(data: { key: string; body: Buffer; contentType: string }): Promise<string>
     delete(url: string): Promise<void>
@@ -20,4 +27,9 @@ export interface IMediaUploader {
         continuationToken?: string
     }): Promise<ListObjectsResult>
     getSignedUrl(key: string, expiresIn: number): Promise<string>
+    getPresignedUploadUrl(data: {
+        key: string
+        contentType: string
+        expiresIn: number
+    }): Promise<PresignedUploadUrlResult>
 }

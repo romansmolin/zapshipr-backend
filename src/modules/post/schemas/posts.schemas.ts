@@ -48,11 +48,33 @@ export interface MediaTransformSource {
 
 export interface MediaTransformRequest {
     mediaIndex: number
-    platform: PostPlatform
-    ratio: string
+    platform?: PostPlatform
+    ratio: 'original' | string
     crop: MediaTransformCrop
     source: MediaTransformSource
     version: 1
+}
+
+export interface UploadedMediaRequest {
+    key: string
+    type: string
+    originalName?: string | null
+    size?: number | null
+    url?: string | null
+}
+
+export interface PresignUploadFileRequest {
+    mimeType: string
+    size: number
+    extension?: string | null
+    checksum?: string | null
+}
+
+export interface PresignedUploadResponseItem {
+    uploadUrl: string
+    key: string
+    expiresAt: string
+    headers?: Record<string, string>
 }
 
 export interface CreatePostsRequest {
@@ -66,4 +88,5 @@ export interface CreatePostsRequest {
     coverTimestamp?: number | null
     copyDataUrls?: string[] | null
     mediaTransforms?: MediaTransformRequest[] | null
+    uploadedMedia?: UploadedMediaRequest[] | null
 }

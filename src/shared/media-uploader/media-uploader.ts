@@ -6,7 +6,7 @@ import {
     S3Client,
 } from '@aws-sdk/client-s3'
 import { getSignedUrl as awsGetSignedUrl } from '@aws-sdk/s3-request-presigner'
-import { IMediaUploader, ListObjectsResult } from './media-uploader.interface'
+import { IMediaUploader, ListObjectsResult, PresignedUploadUrlResult } from './media-uploader.interface'
 import { ILogger } from '../logger/logger.interface'
 
 export class S3Uploader implements IMediaUploader {
@@ -124,5 +124,37 @@ export class S3Uploader implements IMediaUploader {
         })
 
         return signedUrl
+    }
+
+    async getPresignedUploadUrl(data: {
+        key: string
+        contentType: string
+        expiresIn: number
+    }): Promise<PresignedUploadUrlResult> {
+        const command = new PutObjectCommand({
+            Bucket: this.bucket,
+            Key: data.key,
+            ContentType: data.contentType,
+        })
+
+        const uploadUrl = await awsGetSignedUrl(this.client, command, { expiresIn: data.expiresIn })
+        const expiresAt = new Date(Date.now() + data.expiresIn * 1000).toISOString()
+
+        this.logger.info('Generated presigned upload URL', {
+            operation: 'getPresignedUploadUrl',
+            key: data.key,
+            bucket: this.bucket,
+            contentType: data.contentType,
+            expiresIn: data.expiresIn,
+        })
+
+        return {
+            uploadUrl,
+            key: data.key,
+            expiresAt,
+            headers: {
+                'Content-Type': data.contentType,
+            },
+        }
     }
 }
