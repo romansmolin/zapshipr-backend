@@ -25,6 +25,7 @@ export const createApp = () => {
     app.use(cookieParser())
 
     const defaultOrigins = ['http://localhost:3000', 'http://127.0.0.1:4040', 'https://zapshipr.com']
+
     const envOrigins = (process.env.CORS_ORIGINS ?? '')
         .split(',')
         .map((origin) => origin.trim())

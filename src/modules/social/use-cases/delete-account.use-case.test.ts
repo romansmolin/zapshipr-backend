@@ -1,0 +1,99 @@
+import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+
+import { SocilaMediaPlatform } from '@/modules/post/schemas/posts.schemas'
+
+import { DeleteAccountUseCase } from './delete-account.use-case'
+
+import type { IAccountRepository } from '@/modules/social/repositories/account-repository.interface'
+import type { ILogger } from '@/shared/logger/logger.interface'
+import type { IMediaUploader } from '@/shared/media-uploader/media-uploader.interface'
+import type { IPostsService } from '@/modules/post/services/posts-service.interface'
+
+describe('DeleteAccountUseCase', () => {
+    let accountRepository: jest.Mocked<IAccountRepository>
+    let logger: jest.Mocked<ILogger>
+    let mediaUploader: jest.Mocked<IMediaUploader>
+    let postsService: jest.Mocked<IPostsService>
+
+    beforeEach(() => {
+        accountRepository = {
+            connectAccount: jest.fn(),
+            getAccountById: jest.fn(),
+            getAccounts: jest.fn(),
+            getAccountsByPlatform: jest.fn(),
+            getAllAccounts: jest.fn(),
+            deleteAccount: jest.fn(),
+            deletePinterestBoardsByAccountId: jest.fn(),
+            findAccountsWithExpiringAccessTokens: jest.fn(),
+            updateAccessToken: jest.fn(),
+            updateAccessTokenById: jest.fn(),
+        } as unknown as jest.Mocked<IAccountRepository>
+
+        logger = {
+            info: jest.fn(),
+            warn: jest.fn(),
+            error: jest.fn(),
+            debug: jest.fn(),
+        } as jest.Mocked<ILogger>
+
+        mediaUploader = {
+            upload: jest.fn(),
+            delete: jest.fn(),
+            listObjects: jest.fn(),
+            getSignedUrl: jest.fn(),
+            getPresignedUploadUrl: jest.fn(),
+        } as unknown as jest.Mocked<IMediaUploader>
+
+        postsService = {
+            createPost: jest.fn(),
+            editPost: jest.fn(),
+            hasExistingMedia: jest.fn(),
+            deletePost: jest.fn(),
+            getPostsByDate: jest.fn(),
+            getPostsByFilters: jest.fn(),
+            getPostsFailedCount: jest.fn(),
+            getFailedPostTargets: jest.fn(),
+            retryPostTarget: jest.fn(),
+            deletePostTarget: jest.fn(),
+            cancelPostTarget: jest.fn(),
+            checkAndUpdateBasePostStatus: jest.fn(),
+            deletePostsOrphanedByAccount: jest.fn(),
+            createPresignedUploadUrls: jest.fn(),
+            processPostPreparationJob: jest.fn(),
+        } as unknown as jest.Mocked<IPostsService>
+
+        accountRepository.getAccountById.mockResolvedValue({
+            id: 'account-1',
+            userId: 'user-1',
+            platform: SocilaMediaPlatform.INSTAGRAM,
+            username: 'acc',
+            pageId: 'page',
+            pageName: 'page',
+            accessToken: 'token',
+            refreshToken: null,
+            expiresAt: null,
+            picture: 'https://easy-post.s3.amazonaws.com/user-1/accounts/avatar.jpg',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            metadata: null,
+            workspaceId: 'workspace-1',
+        } as any)
+        accountRepository.deleteAccount.mockResolvedValue(true)
+        postsService.deletePostsOrphanedByAccount.mockResolvedValue()
+        mediaUploader.delete.mockResolvedValue()
+    })
+
+    it('cleans orphaned account posts via postsService during account deletion', async () => {
+        const useCase = new DeleteAccountUseCase(accountRepository, logger, mediaUploader, undefined, postsService)
+
+        const result = await useCase.execute({
+            userId: 'user-1',
+            workspaceId: 'workspace-1',
+            accountId: 'account-1',
+        })
+
+        expect(result).toEqual({ success: true })
+        expect(postsService.deletePostsOrphanedByAccount).toHaveBeenCalledWith('user-1', 'account-1')
+    })
+})
+

@@ -10,6 +10,8 @@ import { AccountsController } from '@/modules/social/controllers/accounts.contro
 import { AccountsService } from '@/modules/social/services/accounts.service'
 import { OAuthStateService } from '@/modules/social/services/oauth-state.service'
 import { SocilaMediaConnectorService } from '@/modules/social/services/social-media-connector.service'
+import { PostsRepository } from '@/modules/post/repositories/posts.repository'
+import { PostsService } from '@/modules/post/services/posts.service'
 import { ConnectAccountUseCase } from '@/modules/social/use-cases/connect-account.use-case'
 import { DeleteAccountUseCase } from '@/modules/social/use-cases/delete-account.use-case'
 import { FindExpiringAccountsUseCase } from '@/modules/social/use-cases/find-expiring-accounts.use-case'
@@ -18,23 +20,52 @@ import { GetPinterestBoardsUseCase } from '@/modules/social/use-cases/get-pinter
 import { ListAccountsUseCase } from '@/modules/social/use-cases/list-accounts.use-case'
 import { UpdateAccessTokenByIdUseCase } from '@/modules/social/use-cases/update-access-token-by-id.use-case'
 import { UpdateAccessTokenUseCase } from '@/modules/social/use-cases/update-access-token.use-case'
+import { SocialMediaErrorHandler } from '@/shared/social-media-errors'
 import { asyncHandler } from '@/shared/http/async-handler'
 import { AxiosHttpClient } from '@/shared/http-client/axios-http-client'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import { S3Uploader } from '@/shared/media-uploader/media-uploader'
 import { getEnvVar } from '@/shared/utils/get-env-var'
+import type { ISocialMediaPostSenderService } from '@/modules/social/services/social-media-post-sender.interface'
+import type { SocilaMediaPlatform } from '@/modules/post/schemas/posts.schemas'
 
 export const createAccountsRouter = (logger: ILogger, db: NodePgDatabase<typeof dbSchema>): Router => {
     const router = createRouter()
 
     const accountRepository = new AccountRepository(db, logger)
+    const postsRepository = new PostsRepository(db, logger)
     const mediaUploader = new S3Uploader(logger)
     const apiClient = new AxiosHttpClient()
+    const socialMediaErrorHandler = new SocialMediaErrorHandler(logger)
+
+    // Account deletion only needs post cleanup methods; publishing methods are not used here.
+    const noopPostSender: ISocialMediaPostSenderService = {
+        async sendPost(_userId: string, _postId: string, _platform: SocilaMediaPlatform, _socialAccountId?: string) {
+            return
+        },
+        async sendPostToAllPlatforms(_userId: string, _postId: string) {
+            return
+        },
+        setOnPostSuccessCallback(_callback: (userId: string, postId: string) => Promise<void>) {
+            return
+        },
+        setOnPostFailureCallback(_callback: (userId: string, postId: string) => Promise<void>) {
+            return
+        },
+    }
+
+    const postsService = new PostsService(postsRepository, mediaUploader, logger, noopPostSender, socialMediaErrorHandler)
 
     const connectAccountUseCase = new ConnectAccountUseCase(accountRepository, logger)
     const listAccountsUseCase = new ListAccountsUseCase(accountRepository, logger)
     const getAccountByIdUseCase = new GetAccountByIdUseCase(accountRepository, logger)
-    const deleteAccountUseCase = new DeleteAccountUseCase(accountRepository, logger, mediaUploader)
+    const deleteAccountUseCase = new DeleteAccountUseCase(
+        accountRepository,
+        logger,
+        mediaUploader,
+        undefined,
+        postsService
+    )
     const getPinterestBoardsUseCase = new GetPinterestBoardsUseCase(accountRepository, logger)
     const updateAccessTokenUseCase = new UpdateAccessTokenUseCase(accountRepository, logger)
     const updateAccessTokenByIdUseCase = new UpdateAccessTokenByIdUseCase(accountRepository, logger)
