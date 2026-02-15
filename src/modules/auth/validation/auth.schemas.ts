@@ -15,6 +15,19 @@ export const signInSchema = z.object({
         .min(8, { message: 'Password must be at least 8 characters' }),
 })
 
+export const forgotPasswordSchema = z.object({
+    email: z.string({ error: 'Email is required' }).email({ message: 'Email must be valid' }),
+})
+
+export const resetPasswordSchema = z.object({
+    token: z
+        .string({ error: 'Reset token is required' })
+        .min(1, { message: 'Reset token is required' }),
+    newPassword: z
+        .string({ error: 'Password is required' })
+        .min(8, { message: 'Password must be at least 8 characters' }),
+})
+
 export const googleCallbackSchema = z.object({
     code: z.preprocess(
         (value) => (Array.isArray(value) ? value[0] : value),

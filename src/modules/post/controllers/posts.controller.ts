@@ -81,6 +81,34 @@ const parseDate = (value: unknown, timeZone?: string | null): Date | null => {
     return null
 }
 
+const parseFilterDate = (value: unknown): Date | null => {
+    if (value instanceof Date) return value
+
+    if (typeof value === 'number' && !Number.isNaN(value)) {
+        const parsed = new Date(value)
+        return Number.isNaN(parsed.getTime()) ? null : parsed
+    }
+
+    if (typeof value !== 'string' || value.trim() === '') {
+        return null
+    }
+
+    const trimmed = value.trim()
+
+    // Normalize ISO date-time with explicit offset to UTC wall-clock.
+    // Example: 2026-02-14T00:00:00+07:00 => 2026-02-14T00:00:00Z
+    const tzMatch = trimmed.match(
+        /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)(?:Z|[+-]\d{2}:\d{2})$/
+    )
+
+    if (tzMatch?.[1]) {
+        const parsed = new Date(`${tzMatch[1]}Z`)
+        return Number.isNaN(parsed.getTime()) ? null : parsed
+    }
+
+    return parseDate(trimmed)
+}
+
 const clampPagination = (value: unknown, min: number, max: number): number | undefined => {
     const num = Number(getFirstValue(value))
     if (!Number.isFinite(num)) return undefined
@@ -255,8 +283,8 @@ export class PostsController {
             limit: clampPagination(req.query.limit, 1, 100) ?? undefined,
             status: getFirstValue(req.query.status) as PostFilters['status'],
             platform: getFirstValue(req.query.platform) as PostFilters['platform'],
-            fromDate: parseDate(getFirstValue(req.query.fromDate)) ?? undefined,
-            toDate: parseDate(getFirstValue(req.query.toDate)) ?? undefined,
+            fromDate: parseFilterDate(getFirstValue(req.query.fromDate)) ?? undefined,
+            toDate: parseFilterDate(getFirstValue(req.query.toDate)) ?? undefined,
         }
 
         const result = await this.postsService.getPostsByFilters(userId, workspaceId, filters)
@@ -272,8 +300,8 @@ export class PostsController {
         const workspaceId = this.getWorkspaceId(req)
         const fromDateRaw = getFirstValue(req.query.fromDate)
         const toDateRaw = getFirstValue(req.query.toDate)
-        const fromDate = parseDate(fromDateRaw)
-        const toDate = parseDate(toDateRaw)
+        const fromDate = parseFilterDate(fromDateRaw)
+        const toDate = parseFilterDate(toDateRaw)
 
         if (!fromDate || !toDate) {
             throw new BaseAppError('fromDate and toDate are required', ErrorCode.BAD_REQUEST, 400)
@@ -293,7 +321,8 @@ export class PostsController {
         const workspaceId = this.getWorkspaceId(req)
         const count = await this.postsService.getPostsFailedCount(userId, workspaceId)
 
-        res.json({ count })
+        // Keep legacy `count` for backward compatibility and expose explicit `failedCount` for frontend.
+        res.json({ failedCount: count, count })
     }
 
     async getFailedPostTargets(req: Request, res: Response, _next: NextFunction): Promise<void> {

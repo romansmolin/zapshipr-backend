@@ -11,6 +11,15 @@ export interface SignInInput {
     password: string
 }
 
+export interface ForgotPasswordInput {
+    email: string
+}
+
+export interface ResetPasswordInput {
+    token: string
+    newPassword: string
+}
+
 export interface AuthResult {
     user: User
     accessToken: string
@@ -26,8 +35,8 @@ export interface IAuthService {
     signIn(payload: SignInInput): Promise<AuthResult>
     signUp(payload: SignUpInput): Promise<AuthResult>
     googleCallback(code: string): Promise<AuthResult>
-    changePassword(): Promise<void>
-    forgetPassword(): Promise<void>
+    changePassword(payload: ResetPasswordInput): Promise<void>
+    forgetPassword(payload: ForgotPasswordInput): Promise<void>
     getSession(refreshToken?: string): Promise<AuthResult>
     refresh(refreshToken?: string): Promise<RefreshResult>
     logout(): Promise<void>

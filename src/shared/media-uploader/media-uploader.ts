@@ -25,6 +25,44 @@ export class S3Uploader implements IMediaUploader {
         this.bucket = process.env.AWS_S3_BUCKET || ''
     }
 
+    private resolveS3ObjectKey(urlOrKey: string): string | null {
+        const rawValue = urlOrKey.trim()
+        if (!rawValue) return null
+
+        // Allow deleting by raw object key as a fallback.
+        if (!rawValue.startsWith('http://') && !rawValue.startsWith('https://')) {
+            return rawValue.replace(/^\/+/, '')
+        }
+
+        try {
+            const parsedUrl = new URL(rawValue)
+            const hostname = parsedUrl.hostname.toLowerCase()
+            const pathname = decodeURIComponent(parsedUrl.pathname).replace(/^\/+/, '')
+            const bucket = this.bucket.trim().toLowerCase()
+
+            if (!pathname) return null
+
+            // virtual-hosted-style: https://{bucket}.s3.amazonaws.com/{key}
+            // or https://{bucket}.s3.{region}.amazonaws.com/{key}
+            if (bucket && (hostname === `${bucket}.s3.amazonaws.com` || hostname.startsWith(`${bucket}.s3.`))) {
+                return pathname
+            }
+
+            // path-style: https://s3.amazonaws.com/{bucket}/{key}
+            // or https://s3.{region}.amazonaws.com/{bucket}/{key}
+            if (bucket && (hostname === 's3.amazonaws.com' || hostname.startsWith('s3.'))) {
+                const bucketPrefix = `${bucket}/`
+                if (pathname.startsWith(bucketPrefix)) {
+                    return pathname.slice(bucketPrefix.length)
+                }
+            }
+
+            return null
+        } catch {
+            return null
+        }
+    }
+
     async upload(data: { key: string; body: Buffer; contentType: string }): Promise<string> {
         const command = new PutObjectCommand({
             Bucket: this.bucket,
@@ -47,7 +85,7 @@ export class S3Uploader implements IMediaUploader {
     }
 
     async delete(url: string): Promise<void> {
-        const key = url.split('.s3.amazonaws.com/')[1]
+        const key = this.resolveS3ObjectKey(url)
 
         if (!key) {
             this.logger.warn('Invalid S3 URL provided for delete', {

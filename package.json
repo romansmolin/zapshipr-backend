@@ -14,6 +14,7 @@
         "worker:start": "node dist/worker.js",
         "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/server.ts",
         "worker:dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/worker.ts",
+        "seed:fake-posts": "ts-node src/scripts/seed-fake-posts.ts",
         "lint": "eslint 'src/**/*.ts'",
         "test": "jest",
         "test:watch": "jest --watch",

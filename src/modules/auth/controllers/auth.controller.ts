@@ -7,7 +7,13 @@ import { getEnvVar } from '@/shared/utils/get-env-var'
 
 import type { IAuthController } from './auth-controller.interface'
 import type { AuthResult, IAuthService } from '../services/auth-service.interface'
-import { googleCallbackSchema, signInSchema, signUpSchema } from '../validation/auth.schemas'
+import {
+    forgotPasswordSchema,
+    googleCallbackSchema,
+    resetPasswordSchema,
+    signInSchema,
+    signUpSchema,
+} from '../validation/auth.schemas'
 
 export class AuthController implements IAuthController {
     private readonly logger: ILogger
@@ -44,12 +50,14 @@ export class AuthController implements IAuthController {
     }
 
     async forgetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
-        await this.authService.forgetPassword()
+        const payload = forgotPasswordSchema.parse(req.body)
+        await this.authService.forgetPassword(payload)
         res.status(204).end()
     }
 
     async changePassword(req: Request, res: Response, next: NextFunction): Promise<void> {
-        await this.authService.changePassword()
+        const payload = resetPasswordSchema.parse(req.body)
+        await this.authService.changePassword(payload)
         res.status(204).end()
     }
 

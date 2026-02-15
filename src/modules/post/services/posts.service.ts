@@ -2166,6 +2166,20 @@ export class PostsService implements IPostsService {
     async deletePostTarget(userId: string, workspaceId: string, postId: string, socialAccountId: string): Promise<void> {
         try {
             await this.postRepository.deletePostTarget(userId, postId, socialAccountId)
+            const postDetails = await this.postRepository.getPostDetails(postId, userId)
+
+            if (postDetails.targets.length === 0) {
+                await this.deletePost(postId, userId, workspaceId)
+
+                this.logger.info('Deleted base post after removing last post target', {
+                    operation: 'deletePostTarget',
+                    userId,
+                    workspaceId,
+                    postId,
+                    socialAccountId,
+                })
+                return
+            }
 
             try {
                 await this.checkAndUpdateBasePostStatus(userId, postId)
@@ -2212,6 +2226,14 @@ export class PostsService implements IPostsService {
     async checkAndUpdateBasePostStatus(userId: string, postId: string): Promise<void> {
         try {
             const postDetails = await this.postRepository.getPostDetails(postId, userId)
+            if (postDetails.targets.length === 0) {
+                this.logger.warn('Skipping base post status update because post has no targets', {
+                    operation: 'checkAndUpdateBasePostStatus',
+                    userId,
+                    postId,
+                })
+                return
+            }
 
             const allTargetsDone = postDetails.targets.every((target) => target.status === PostStatus.DONE)
             const someTargetsDone = postDetails.targets.some((target) => target.status === PostStatus.DONE)

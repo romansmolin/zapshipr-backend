@@ -30,7 +30,9 @@ export const createApp = () => {
         .split(',')
         .map((origin) => origin.trim())
         .filter(Boolean)
+
     const frontendUrl = process.env.FRONTEND_URL?.trim()
+
     const allowedOrigins = new Set<string>([
         ...defaultOrigins,
         ...envOrigins,

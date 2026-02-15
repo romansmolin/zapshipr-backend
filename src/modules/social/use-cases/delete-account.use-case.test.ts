@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, jest } from '@jest/globals'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals'
 
 import { SocilaMediaPlatform } from '@/modules/post/schemas/posts.schemas'
 
@@ -14,6 +14,11 @@ describe('DeleteAccountUseCase', () => {
     let logger: jest.Mocked<ILogger>
     let mediaUploader: jest.Mocked<IMediaUploader>
     let postsService: jest.Mocked<IPostsService>
+    const previousBucket = process.env.AWS_S3_BUCKET
+
+    beforeAll(() => {
+        process.env.AWS_S3_BUCKET = 'easy-post'
+    })
 
     beforeEach(() => {
         accountRepository = {
@@ -94,6 +99,41 @@ describe('DeleteAccountUseCase', () => {
 
         expect(result).toEqual({ success: true })
         expect(postsService.deletePostsOrphanedByAccount).toHaveBeenCalledWith('user-1', 'account-1')
+        expect(mediaUploader.delete).toHaveBeenCalledWith('https://easy-post.s3.amazonaws.com/user-1/accounts/avatar.jpg')
+    })
+
+    it('deletes account image when it is stored as path-style S3 URL', async () => {
+        accountRepository.getAccountById.mockResolvedValue({
+            id: 'account-1',
+            userId: 'user-1',
+            platform: SocilaMediaPlatform.INSTAGRAM,
+            username: 'acc',
+            pageId: 'page',
+            pageName: 'page',
+            accessToken: 'token',
+            refreshToken: null,
+            expiresAt: null,
+            picture: 'https://s3.us-east-1.amazonaws.com/easy-post/user-1/accounts/avatar-path-style.jpg',
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            metadata: null,
+            workspaceId: 'workspace-1',
+        } as any)
+
+        const useCase = new DeleteAccountUseCase(accountRepository, logger, mediaUploader, undefined, postsService)
+
+        await useCase.execute({
+            userId: 'user-1',
+            workspaceId: 'workspace-1',
+            accountId: 'account-1',
+        })
+
+        expect(mediaUploader.delete).toHaveBeenCalledWith(
+            'https://s3.us-east-1.amazonaws.com/easy-post/user-1/accounts/avatar-path-style.jpg'
+        )
+    })
+
+    afterAll(() => {
+        process.env.AWS_S3_BUCKET = previousBucket
     })
 })
-

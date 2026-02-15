@@ -4,6 +4,7 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 
 import { schema as dbSchema } from '@/db/schema'
 import { UserRepository } from '@/modules/user/repositories/users.repository'
+import { NodemailerEmailService } from '@/modules/email/services/email.service'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import { asyncHandler } from '@/shared/http/async-handler'
 
@@ -14,13 +15,16 @@ export const createAuthRouter = (logger: ILogger, db: NodePgDatabase<typeof dbSc
     const router = createRouter()
 
     const userRepository = new UserRepository(db, logger)
-    const authService = new AuthService(userRepository, logger)
+    const emailService = new NodemailerEmailService(logger)
+    const authService = new AuthService(userRepository, emailService, logger)
     const authController = new AuthController(authService, logger)
 
     router.post('/auth/sign-up', asyncHandler(authController.signUp.bind(authController)))
     router.post('/auth/sign-in', asyncHandler(authController.signIn.bind(authController)))
 
     router.put('/auth/change-password', asyncHandler(authController.changePassword.bind(authController)))
+    router.post('/auth/password/reset', asyncHandler(authController.changePassword.bind(authController)))
+    router.post('/auth/password/forgot', asyncHandler(authController.forgetPassword.bind(authController)))
     router.post('/auth/forget-password', asyncHandler(authController.forgetPassword.bind(authController)))
 
     router.get('/auth/me', asyncHandler(authController.authMe.bind(authController)))

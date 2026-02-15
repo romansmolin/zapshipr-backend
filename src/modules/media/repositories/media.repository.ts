@@ -1,4 +1,4 @@
-import { eq, and, like, sql } from 'drizzle-orm'
+import { eq, and, desc, like, sql } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 
 import type { DBSchema } from '@/db/schema'
@@ -7,6 +7,7 @@ import type { ILogger } from '@/shared/logger'
 import type { InsertUserMedia, UserMedia } from '../entity/user-media.schema'
 import { userMedia } from '../entity/user-media.schema'
 import type { IMediaRepository } from './media-repository.interface'
+import { mediaAssets, postMediaAssets, posts } from '@/modules/post/entity/post.schema'
 
 export class MediaRepository implements IMediaRepository {
     constructor(
@@ -90,6 +91,24 @@ export class MediaRepository implements IMediaRepository {
             .where(and(...conditions))
 
         return result?.count ?? 0
+    }
+
+    async findPostMediaByUserId(userId: string): Promise<Array<{ url: string; contentType: string | null; lastModified: Date }>> {
+        this.logger.info('Finding post-linked media by user id', { userId })
+
+        const rows = await this.db
+            .select({
+                url: mediaAssets.url,
+                contentType: mediaAssets.type,
+                lastModified: mediaAssets.uploadedAt,
+            })
+            .from(mediaAssets)
+            .innerJoin(postMediaAssets, eq(postMediaAssets.mediaAssetId, mediaAssets.id))
+            .innerJoin(posts, eq(posts.id, postMediaAssets.postId))
+            .where(and(eq(posts.userId, userId), like(mediaAssets.type, 'image/%')))
+            .orderBy(desc(mediaAssets.uploadedAt))
+
+        return rows
     }
 
     async deleteByKey(key: string): Promise<void> {

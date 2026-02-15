@@ -121,14 +121,23 @@ export class DeleteAccountUseCase {
     private isS3Url(url: string): boolean {
         try {
             const parsedUrl = new URL(url)
-            const bucket = process.env.AWS_S3_BUCKET
+            const hostname = parsedUrl.hostname.toLowerCase()
+            const pathname = decodeURIComponent(parsedUrl.pathname).replace(/^\/+/, '')
+            const bucket = process.env.AWS_S3_BUCKET?.trim().toLowerCase()
 
             if (!bucket) {
-                return parsedUrl.hostname.includes('amazonaws.com')
+                return hostname.includes('amazonaws.com')
             }
 
-            const normalizedHostname = parsedUrl.hostname.toLowerCase()
-            return normalizedHostname === `${bucket}.s3.amazonaws.com` || normalizedHostname.startsWith(`${bucket}.s3.`)
+            if (hostname === `${bucket}.s3.amazonaws.com` || hostname.startsWith(`${bucket}.s3.`)) {
+                return true
+            }
+
+            if (hostname === 's3.amazonaws.com' || hostname.startsWith('s3.')) {
+                return pathname.startsWith(`${bucket}/`)
+            }
+
+            return false
         } catch {
             return false
         }

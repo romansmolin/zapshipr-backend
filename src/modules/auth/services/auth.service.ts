@@ -1,7 +1,16 @@
 import type { IUserRepository } from '@/modules/user/repositories/user-repository.interface'
+import type { IEmailService } from '@/modules/email/services/email.service.interface'
 import type { ILogger } from '@/shared/logger/logger.interface'
 
-import type { AuthResult, IAuthService, RefreshResult, SignInInput, SignUpInput } from './auth-service.interface'
+import type {
+    AuthResult,
+    ForgotPasswordInput,
+    IAuthService,
+    RefreshResult,
+    ResetPasswordInput,
+    SignInInput,
+    SignUpInput,
+} from './auth-service.interface'
 import { TokenService } from './token.service'
 import { SignUpUseCase } from '../use-cases/sign-up.use-case'
 import { SignInUseCase } from '../use-cases/sign-in.use-case'
@@ -27,7 +36,7 @@ export class AuthService implements IAuthService {
     private readonly changePasswordUseCase: ChangePasswordUseCase
     private readonly forgetPasswordUseCase: ForgetPasswordUseCase
 
-    constructor(userRepository: IUserRepository, logger: ILogger) {
+    constructor(userRepository: IUserRepository, emailService: IEmailService, logger: ILogger) {
         this.tokenService = new TokenService(userRepository, logger)
 
         // Initialize use cases
@@ -37,8 +46,8 @@ export class AuthService implements IAuthService {
         this.getSessionUseCase = new GetSessionUseCase(this.tokenService, logger)
         this.googleCallbackUseCase = new GoogleCallbackUseCase(userRepository, this.tokenService, logger)
         this.logoutUseCase = new LogoutUseCase(logger)
-        this.changePasswordUseCase = new ChangePasswordUseCase()
-        this.forgetPasswordUseCase = new ForgetPasswordUseCase()
+        this.changePasswordUseCase = new ChangePasswordUseCase(userRepository, this.tokenService, logger)
+        this.forgetPasswordUseCase = new ForgetPasswordUseCase(userRepository, this.tokenService, emailService, logger)
     }
 
     async signUp(payload: SignUpInput): Promise<AuthResult> {
@@ -49,12 +58,12 @@ export class AuthService implements IAuthService {
         return this.signInUseCase.execute(payload)
     }
 
-    async changePassword(): Promise<void> {
-        return this.changePasswordUseCase.execute()
+    async changePassword(payload: ResetPasswordInput): Promise<void> {
+        return this.changePasswordUseCase.execute(payload)
     }
 
-    async forgetPassword(): Promise<void> {
-        return this.forgetPasswordUseCase.execute()
+    async forgetPassword(payload: ForgotPasswordInput): Promise<void> {
+        return this.forgetPasswordUseCase.execute(payload)
     }
 
     async getSession(refreshToken?: string): Promise<AuthResult> {

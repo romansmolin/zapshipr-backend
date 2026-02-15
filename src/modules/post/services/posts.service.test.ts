@@ -43,12 +43,13 @@ const createBaseRequest = (overrides: Partial<CreatePostsRequest> = {}): CreateP
     ...overrides,
 })
 
-const createBasePostResponse = (): CreatePostResponse => ({
+const createBasePostResponse = (overrides: Partial<CreatePostResponse> = {}): CreatePostResponse => ({
     postId: 'post-1',
     type: 'media',
     status: PostStatus.DRAFT,
     createdAt: new Date(),
     targets: [],
+    ...overrides,
 })
 
 const createMockMediaAsset = (index: number) => ({
@@ -530,6 +531,37 @@ describe('PostsService mediaTransforms', () => {
         })
     })
 
+    it('deletes post media and cover image from S3 when deleting a post', async () => {
+        postRepository.getPostDetails.mockResolvedValueOnce(
+            createBasePostResponse({
+                status: PostStatus.PENDING,
+                targets: [
+                    {
+                        platform: SocilaMediaPlatform.INSTAGRAM,
+                        socialAccountId: 'account-1',
+                        status: PostStatus.PENDING,
+                    },
+                ],
+            })
+        )
+        postRepository.deletePost.mockResolvedValueOnce({
+            mediaUrls: [
+                'https://easy-post.s3.amazonaws.com/user-1/posts/a.jpg',
+                'https://easy-post.s3.us-east-1.amazonaws.com/user-1/posts/b.jpg',
+            ],
+            coverImageUrl: 'https://easy-post.s3.amazonaws.com/user-1/posts/cover.jpg',
+        })
+
+        await service.deletePost('post-1', 'user-1', 'workspace-1')
+
+        expect(mediaUploader.delete).toHaveBeenCalledTimes(3)
+        expect(mediaUploader.delete).toHaveBeenCalledWith('https://easy-post.s3.amazonaws.com/user-1/posts/a.jpg')
+        expect(mediaUploader.delete).toHaveBeenCalledWith(
+            'https://easy-post.s3.us-east-1.amazonaws.com/user-1/posts/b.jpg'
+        )
+        expect(mediaUploader.delete).toHaveBeenCalledWith('https://easy-post.s3.amazonaws.com/user-1/posts/cover.jpg')
+    })
+
     it('enqueues postNow publishing when scheduler is configured', async () => {
         const scheduler: jest.Mocked<IPostScheduler> = {
             schedulePost: jest.fn(async () => undefined),
@@ -639,5 +671,91 @@ describe('PostsService mediaTransforms', () => {
 
         expect(postRepository.createBasePost).toHaveBeenCalledTimes(1)
         expect(postRepository.deletePost).toHaveBeenCalledWith('post-1', 'user-1', 'workspace-1')
+    })
+})
+
+describe('PostsService failed target cancellation', () => {
+    let service: PostsService
+    let logger: jest.Mocked<ILogger>
+    let postRepository: jest.Mocked<IPostsRepository>
+    let mediaUploader: jest.Mocked<IMediaUploader>
+    let socialMediaPostSender: jest.Mocked<ISocialMediaPostSenderService>
+
+    beforeEach(() => {
+        logger = {
+            info: jest.fn(),
+            warn: jest.fn(),
+            error: jest.fn(),
+            debug: jest.fn(),
+        } as jest.Mocked<ILogger>
+
+        postRepository = {
+            createBasePost: jest.fn(),
+            updateBasePost: jest.fn(),
+            savePostMediaAssets: jest.fn(),
+            updateMediaAsset: jest.fn(),
+            createPostMediaAssetRelation: jest.fn(),
+            getPostMediaAsset: jest.fn(),
+            getPostMediaAssets: jest.fn(),
+            getPostCoverImageUrl: jest.fn(),
+            deletePostMediaAsset: jest.fn(),
+            createPostTargets: jest.fn(),
+            updatePostTargets: jest.fn(),
+            updatePostTarget: jest.fn(),
+            getPostDetails: jest.fn(),
+            getPosts: jest.fn(),
+            hasExistingMedia: jest.fn(),
+            deletePost: jest.fn(),
+            getPostsByDate: jest.fn(),
+            getPostsFailedCount: jest.fn(),
+            getFailedPostTargets: jest.fn(),
+            retryPostTarget: jest.fn(),
+            deletePostTarget: jest.fn(),
+            getPostsTargetedOnlyByAccount: jest.fn(),
+            deleteAllWorkspacePosts: jest.fn(),
+        } as unknown as jest.Mocked<IPostsRepository>
+
+        mediaUploader = {
+            upload: jest.fn(),
+            delete: jest.fn(),
+            listObjects: jest.fn(),
+            getSignedUrl: jest.fn(),
+            getPresignedUploadUrl: jest.fn(),
+        } as unknown as jest.Mocked<IMediaUploader>
+
+        socialMediaPostSender = {
+            sendPost: jest.fn(),
+            sendPostToAllPlatforms: jest.fn(),
+            setOnPostSuccessCallback: jest.fn(),
+            setOnPostFailureCallback: jest.fn(),
+        } as unknown as jest.Mocked<ISocialMediaPostSenderService>
+
+        const errorHandler = new SocialMediaErrorHandler(logger)
+        service = new PostsService(postRepository, mediaUploader, logger, socialMediaPostSender, errorHandler)
+
+        postRepository.deletePost.mockResolvedValue({ mediaUrls: [] })
+        postRepository.deletePostTarget.mockResolvedValue()
+    })
+
+    it('deletes the base post when removing the last failed target', async () => {
+        postRepository.getPostDetails
+            .mockResolvedValueOnce(createBasePostResponse({ status: PostStatus.FAILED, targets: [] }))
+            .mockResolvedValueOnce(createBasePostResponse({ status: PostStatus.FAILED, targets: [] }))
+
+        await service.deletePostTarget('user-1', 'workspace-1', 'post-1', 'account-1')
+
+        expect(postRepository.deletePostTarget).toHaveBeenCalledWith('user-1', 'post-1', 'account-1')
+        expect(postRepository.deletePost).toHaveBeenCalledWith('post-1', 'user-1', 'workspace-1')
+        expect(postRepository.updateBasePost).not.toHaveBeenCalled()
+    })
+
+    it('does not mark post as DONE when post has no targets', async () => {
+        postRepository.getPostDetails.mockResolvedValueOnce(
+            createBasePostResponse({ status: PostStatus.POSTING, targets: [] })
+        )
+
+        await service.checkAndUpdateBasePostStatus('user-1', 'post-1')
+
+        expect(postRepository.updateBasePost).not.toHaveBeenCalled()
     })
 })

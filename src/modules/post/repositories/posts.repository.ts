@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray, lte, ne, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -32,6 +32,14 @@ export class PostsRepository implements IPostsRepository {
     constructor(db: NodePgDatabase<typeof dbSchema>, logger: ILogger) {
         this.db = db
         this.logger = logger
+    }
+
+    private getScheduledAtUtcSql() {
+        return sql`NULLIF(${posts.scheduledAtLocal}, '')::timestamp AT TIME ZONE COALESCE(${posts.scheduledTimezone}, 'UTC')`
+    }
+
+    private getFilterDateSql() {
+        return sql`COALESCE(${this.getScheduledAtUtcSql()}, ${posts.createdAt})`
     }
 
     async createBasePost(
@@ -236,17 +244,18 @@ export class PostsRepository implements IPostsRepository {
 
         try {
             const conditions = [eq(posts.userId, userId), eq(posts.workspaceId, workspaceId)]
+            const filterDate = this.getFilterDateSql()
 
             if (filters.status) {
                 conditions.push(eq(posts.status, filters.status))
             }
 
             if (filters.fromDate) {
-                conditions.push(gte(posts.createdAt, filters.fromDate))
+                conditions.push(sql`${filterDate} >= ${filters.fromDate}`)
             }
 
             if (filters.toDate) {
-                conditions.push(lte(posts.createdAt, filters.toDate))
+                conditions.push(sql`${filterDate} <= ${filters.toDate}`)
             }
 
             if (filters.platform) {
@@ -283,7 +292,7 @@ export class PostsRepository implements IPostsRepository {
                 .select()
                 .from(posts)
                 .where(whereClause)
-                .orderBy(desc(posts.scheduledAtLocal), desc(posts.createdAt))
+                .orderBy(sql`${filterDate} DESC`)
                 .limit(limit)
                 .offset(offset)
 
@@ -641,11 +650,12 @@ export class PostsRepository implements IPostsRepository {
         toDate: Date
     ): Promise<PostsByDateResponse> {
         try {
+            const filterDate = this.getFilterDateSql()
             const conditions = [
                 eq(posts.userId, userId),
                 eq(posts.workspaceId, workspaceId),
-                gte(posts.createdAt, fromDate),
-                lte(posts.createdAt, toDate),
+                sql`${filterDate} >= ${fromDate}`,
+                sql`${filterDate} <= ${toDate}`,
                 ne(posts.status, PostStatus.DRAFT),
             ]
 
@@ -653,7 +663,7 @@ export class PostsRepository implements IPostsRepository {
                 .select()
                 .from(posts)
                 .where(and(...conditions))
-                .orderBy(desc(posts.createdAt))
+                .orderBy(sql`${filterDate} DESC`)
 
             if (postRows.length === 0) {
                 return { posts: [] }
