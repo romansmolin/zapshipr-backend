@@ -65,24 +65,58 @@ export class YourModuleRepository implements IYourModuleRepository {
 }
 ```
 
-#### Routes
+#### Routes (СТРОГО — паттерн `build<Name>Module`)
+
+См. `docs/02-architecture.md` раздел "Композиция модулей" — это обязательная схема для всех модулей.
+
 ```typescript
 // routes/your-module.routes.ts
-export const createYourModuleRouter = (
-  logger: ILogger,
-  db: NodePgDatabase<typeof schema>
-): Router => {
+import { Router as createRouter } from 'express'
+import type { Router } from 'express'
+import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
+
+import { schema as dbSchema } from '@/db/schema'
+import { bindController } from '@/shared/http/bind-controller'
+import { authMiddleware } from '@/middleware/auth.middleware'
+
+import { YourModuleRepository } from '../repositories/your-module.repository'
+import { YourModuleService } from '../services/your-module.service'
+import { YourModuleController } from '../controllers/your-module.controller'
+
+import type { ILogger } from '@/shared/logger/logger.interface'
+
+export interface YourModuleDeps {
+  db: NodePgDatabase<typeof dbSchema>
+  logger: ILogger
+  // + добавь сюда любую общую инфраструктуру, которая нужна модулю:
+  //   mediaUploader, apiClient, emailService и т.п.
+}
+
+export interface YourModule {
+  router: Router
+}
+
+export const buildYourModule = ({ db, logger }: YourModuleDeps): YourModule => {
   const router = createRouter()
-  
+
   const repository = new YourModuleRepository(db, logger)
   const service = new YourModuleService(repository, logger)
   const controller = new YourModuleController(service, logger)
-  
-  router.post('/your-module', asyncHandler(controller.create.bind(controller)))
-  
-  return router
+  const handler = bindController(controller)
+
+  router.post('/your-module', authMiddleware, handler('create'))
+
+  return { router }
 }
 ```
+
+**Чек-лист перед PR:**
+- [ ] Функция называется `build<Name>Module`, не `create<X>Router`
+- [ ] Принимает объект `{ ... }`, а не позиционные аргументы
+- [ ] Возвращает `{ router }`, а не голый `Router`
+- [ ] Используется `bindController(...)`, а не `.bind(controller)`
+- [ ] Общая инфраструктура приходит через `deps`, не создаётся внутри
+- [ ] Экспортируются интерфейсы `<Name>ModuleDeps` и `<Name>Module`
 
 #### Entity (если нужны таблицы)
 ```typescript
@@ -110,11 +144,13 @@ export const createYourModuleSchema = z.object({
 
 В `src/server.ts`:
 ```typescript
-import { createYourModuleRouter } from './modules/your-module/routes/your-module.routes'
+import { buildYourModule } from './modules/your-module/routes/your-module.routes'
 
-const yourModuleRoutes = createYourModuleRouter(logger, db)
+const { router: yourModuleRoutes } = buildYourModule({ db, logger })
 app.use(yourModuleRoutes)
 ```
+
+Если модулю нужна общая инфраструктура (`mediaUploader`, `apiClient`, `emailService` и т.п.) — она УЖЕ построена в верхнем блоке `server.ts`. Просто передай её в `buildYourModule({ ... })`.
 
 ### 4. Экспортируйте схемы (если есть таблицы)
 

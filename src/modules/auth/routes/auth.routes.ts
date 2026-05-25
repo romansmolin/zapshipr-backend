@@ -1,38 +1,50 @@
-import type { Router } from 'express'
 import { Router as createRouter } from 'express'
+import type { Router } from 'express'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 
 import { schema as dbSchema } from '@/db/schema'
 import { UserRepository } from '@/modules/user/repositories/users.repository'
-import { NodemailerEmailService } from '@/modules/email/services/email.service'
+import { bindController } from '@/shared/http/bind-controller'
+
+import type { IEmailService } from '@/modules/email/services/email.service.interface'
 import type { ILogger } from '@/shared/logger/logger.interface'
-import { asyncHandler } from '@/shared/http/async-handler'
 
 import { AuthController } from '../controllers/auth.controller'
 import { AuthService } from '../services/auth.service'
 
-export const createAuthRouter = (logger: ILogger, db: NodePgDatabase<typeof dbSchema>): Router => {
-    const router = createRouter()
+export interface AuthModuleDeps {
+    db: NodePgDatabase<typeof dbSchema>
+    logger: ILogger
+    emailService: IEmailService
+}
 
+export interface AuthModule {
+    router: Router
+}
+
+export const buildAuthModule = ({ db, logger, emailService }: AuthModuleDeps): AuthModule => {
     const userRepository = new UserRepository(db, logger)
-    const emailService = new NodemailerEmailService(logger)
     const authService = new AuthService(userRepository, emailService, logger)
     const authController = new AuthController(authService, logger)
 
-    router.post('/auth/sign-up', asyncHandler(authController.signUp.bind(authController)))
-    router.post('/auth/sign-in', asyncHandler(authController.signIn.bind(authController)))
+    const router = createRouter()
 
-    router.put('/auth/change-password', asyncHandler(authController.changePassword.bind(authController)))
-    router.post('/auth/password/reset', asyncHandler(authController.changePassword.bind(authController)))
-    router.post('/auth/password/forgot', asyncHandler(authController.forgetPassword.bind(authController)))
-    router.post('/auth/forget-password', asyncHandler(authController.forgetPassword.bind(authController)))
+    const handler = bindController(authController)
 
-    router.get('/auth/me', asyncHandler(authController.authMe.bind(authController)))
+    router.post('/auth/sign-up', handler('signUp'))
+    router.post('/auth/sign-in', handler('signIn'))
 
-    router.post('/auth/refresh', asyncHandler(authController.authRefresh.bind(authController)))
-    router.post('/auth/logout', asyncHandler(authController.logout.bind(authController)))
+    router.put('/auth/change-password', handler('changePassword'))
+    router.post('/auth/password/reset', handler('changePassword'))
+    router.post('/auth/password/forgot', handler('forgetPassword'))
+    router.post('/auth/forget-password', handler('forgetPassword'))
 
-    router.get('/auth/callback/google', asyncHandler(authController.googleCallback.bind(authController)))
+    router.get('/auth/me', handler('authMe'))
 
-    return router
+    router.post('/auth/refresh', handler('authRefresh'))
+    router.post('/auth/logout', handler('logout'))
+
+    router.get('/auth/callback/google', handler('googleCallback'))
+
+    return { router }
 }

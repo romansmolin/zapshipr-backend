@@ -3,39 +3,36 @@ import { Router as createRouter } from 'express'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 
 import { schema as dbSchema } from '@/db/schema'
-import type { ILogger } from '@/shared/logger/logger.interface'
-import { asyncHandler } from '@/shared/http/async-handler'
+import { bindController } from '@/shared/http/bind-controller'
 import { authMiddleware } from '@/middleware/auth.middleware'
 
 import { WorkspaceTagsRepository } from '../repositories/workspace-tags.repository'
 import { WorkspaceTagsService } from '../services/workspace-tags/workspace-tags.service'
 import { WorkspaceTagsController } from '../controllers/workspace-tags.controller'
 
-export const createWorkspaceTagsRouter = (logger: ILogger, db: NodePgDatabase<typeof dbSchema>): Router => {
+import type { ILogger } from '@/shared/logger/logger.interface'
+
+export interface WorkspaceTagsModuleDeps {
+    db: NodePgDatabase<typeof dbSchema>
+    logger: ILogger
+}
+
+export interface WorkspaceTagsModule {
+    router: Router
+}
+
+export const buildWorkspaceTagsModule = ({ db, logger }: WorkspaceTagsModuleDeps): WorkspaceTagsModule => {
     const router = createRouter()
 
     const repository = new WorkspaceTagsRepository(db, logger)
     const service = new WorkspaceTagsService(repository, logger)
     const controller = new WorkspaceTagsController(service, logger)
+    const handler = bindController(controller)
 
-    // Workspace Tags endpoints
-    router.get(
-        '/workspaces/:workspaceId/tags',
-        authMiddleware,
-        asyncHandler(controller.getTags.bind(controller))
-    )
-    router.post(
-        '/workspaces/:workspaceId/tags',
-        authMiddleware,
-        asyncHandler(controller.createTag.bind(controller))
-    )
-    router.put('/workspaces/:workspaceId/tags/:tagId', authMiddleware, asyncHandler(controller.updateTag.bind(controller)))
-    router.delete(
-        '/workspaces/:workspaceId/tags/:tagId',
-        authMiddleware,
-        asyncHandler(controller.deleteTag.bind(controller))
-    )
+    router.get('/workspaces/:workspaceId/tags', authMiddleware, handler('getTags'))
+    router.post('/workspaces/:workspaceId/tags', authMiddleware, handler('createTag'))
+    router.put('/workspaces/:workspaceId/tags/:tagId', authMiddleware, handler('updateTag'))
+    router.delete('/workspaces/:workspaceId/tags/:tagId', authMiddleware, handler('deleteTag'))
 
-    return router
+    return { router }
 }
-

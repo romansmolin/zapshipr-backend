@@ -4,163 +4,92 @@ import { schema as dbSchema } from '@/db/schema'
 import { authMiddleware } from '@/middleware/auth.middleware'
 import { createWorkspaceMiddleware } from '@/middleware/workspace.middleware'
 import { upload } from '@/middleware/upload.middleware'
-import { SocialMediaPublisherFactory } from '@/modules/social/factories/socia-media-publisher.factory'
-import { AccountRepository } from '@/modules/social/repositories/account.repository'
-import { SocialMediaPostSenderService } from '@/modules/social/services/social-media-post-sender.service'
 import { asyncHandler } from '@/shared/http/async-handler'
-import { AxiosHttpClient } from '@/shared/http-client'
-import { BullMqPostScheduler } from '@/shared/queue'
-import { BullMqPostPreparationScheduler } from '@/shared/queue'
-import { SocialMediaErrorHandler } from '@/shared/social-media-errors'
-import { VideoProcessor } from '@/shared/video-processor/video-processor'
-import { S3Uploader } from '@/shared/media-uploader/media-uploader'
+import { bindController } from '@/shared/http/bind-controller'
 
 import { PostsController } from '../controllers/posts.controller'
-import { PostsRepository } from '../repositories/posts.repository'
-import { PostsService } from '../services/posts.service'
-import { WorkspaceRepository } from '@/modules/workspace/repositories/workspace.repository'
-import { WorkspaceProfileSignalsRepository } from '@/modules/workspace/repositories/workspace-profile-signals.repository'
-import { WorkspaceTagsRepository } from '@/modules/inspiration/repositories/workspace-tags.repository'
-import { WorkspaceTagsService } from '@/modules/inspiration/services/workspace-tags/workspace-tags.service'
-import { WorkspaceProfileService } from '@/modules/workspace/services/workspace-profile.service'
-import { UserRepository } from '@/modules/user/repositories/users.repository'
-import { MediaRepository } from '@/modules/media/repositories/media.repository'
-import { UserService } from '@/modules/user/services/user.service'
 
+import type { IPostsService } from '../services/posts-service.interface'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import type { Router } from 'express'
 
 const mediaFields = [...Array.from({ length: 10 }, (_, i) => ({ name: `media[${i}]` })), { name: 'coverImage' }]
 
-export const createPostsRouter = (logger: ILogger, db: NodePgDatabase<typeof dbSchema>): Router => {
+export interface PostsModuleDeps {
+    db: NodePgDatabase<typeof dbSchema>
+    logger: ILogger
+    postsService: IPostsService
+}
+
+export interface PostsModule {
+    router: Router
+}
+
+export const buildPostsModule = ({ db, logger, postsService }: PostsModuleDeps): PostsModule => {
     const router = createRouter()
 
-    const postsRepository = new PostsRepository(db, logger)
-    const accountRepository = new AccountRepository(db, logger)
-    const mediaUploader = new S3Uploader(logger)
-    const apiClient = new AxiosHttpClient()
-    const socialMediaErrorHandler = new SocialMediaErrorHandler(logger)
-    const videoProcessor = new VideoProcessor(logger)
-    const socialMediaPublisherFactory = new SocialMediaPublisherFactory(
-        logger,
-        accountRepository,
-        postsRepository,
-        apiClient,
-        socialMediaErrorHandler,
-        videoProcessor,
-        mediaUploader
-    )
-    const socialMediaPostSender = new SocialMediaPostSenderService(
-        postsRepository,
-        logger,
-        socialMediaErrorHandler,
-        socialMediaPublisherFactory
-    )
-    const postScheduler = new BullMqPostScheduler()
-    const postPreparationScheduler = new BullMqPostPreparationScheduler()
-    const userRepository = new UserRepository(db, logger)
-    const mediaRepository = new MediaRepository(db, logger)
-
-    // Workspace profile services for signal recording
-    const workspaceRepository = new WorkspaceRepository(db, logger)
-    const signalsRepository = new WorkspaceProfileSignalsRepository(db, logger)
-    const tagsRepository = new WorkspaceTagsRepository(db, logger)
-    const tagsService = new WorkspaceTagsService(tagsRepository, logger)
-    const workspaceProfileService = new WorkspaceProfileService(
-        workspaceRepository,
-        signalsRepository,
-        tagsService,
-        logger
-    )
-    const userService = new UserService(
-        userRepository,
-        workspaceRepository,
-        postsRepository,
-        accountRepository,
-        mediaRepository,
-        mediaUploader,
-        db,
-        logger
-    )
-
-    const postsService = new PostsService(
-        postsRepository,
-        mediaUploader,
-        logger,
-        socialMediaPostSender,
-        socialMediaErrorHandler,
-        postScheduler,
-        postPreparationScheduler,
-        workspaceProfileService,
-        userService
-    )
     const postsController = new PostsController(postsService, logger)
     const workspaceMiddleware = createWorkspaceMiddleware(logger, db)
+    const handler = bindController(postsController)
 
     router.use('/workspaces', authMiddleware)
 
-    // Workspace-scoped routes
     router.post(
         '/workspaces/:workspaceId/post/uploads/presign',
         asyncHandler(workspaceMiddleware),
-        asyncHandler(postsController.createPresignedUploads.bind(postsController))
+        handler('createPresignedUploads')
     )
-
     router.post(
         '/workspaces/:workspaceId/post',
         asyncHandler(workspaceMiddleware),
         upload.fields(mediaFields),
-        asyncHandler(postsController.createPost.bind(postsController))
+        handler('createPost')
     )
     router.post(
         '/workspaces/:workspaceId/post/retry',
         asyncHandler(workspaceMiddleware),
-        asyncHandler(postsController.retryPostTarget.bind(postsController))
+        handler('retryPostTarget')
     )
     router.post(
         '/workspaces/:workspaceId/post/target/delete',
         asyncHandler(workspaceMiddleware),
-        asyncHandler(postsController.deletePostTarget.bind(postsController))
+        handler('deletePostTarget')
     )
 
     router.put(
         '/workspaces/:workspaceId/post/:postId',
         asyncHandler(workspaceMiddleware),
         upload.single('media'),
-        asyncHandler(postsController.editPost.bind(postsController))
+        handler('editPost')
     )
     router.delete(
         '/workspaces/:workspaceId/post/:postId',
         asyncHandler(workspaceMiddleware),
-        asyncHandler(postsController.deletePost.bind(postsController))
+        handler('deletePost')
     )
 
-    router.get(
-        '/workspaces/:workspaceId/posts',
-        asyncHandler(workspaceMiddleware),
-        asyncHandler(postsController.getPostsByFilters.bind(postsController))
-    )
+    router.get('/workspaces/:workspaceId/posts', asyncHandler(workspaceMiddleware), handler('getPostsByFilters'))
     router.get(
         '/workspaces/:workspaceId/posts/by-date',
         asyncHandler(workspaceMiddleware),
-        asyncHandler(postsController.getPostsByDate.bind(postsController))
+        handler('getPostsByDate')
     )
     router.get(
         '/workspaces/:workspaceId/posts/failed/count',
         asyncHandler(workspaceMiddleware),
-        asyncHandler(postsController.getPostsFailedCount.bind(postsController))
+        handler('getPostsFailedCount')
     )
     router.get(
         '/workspaces/:workspaceId/posts/failed',
         asyncHandler(workspaceMiddleware),
-        asyncHandler(postsController.getFailedPostTargets.bind(postsController))
+        handler('getFailedPostTargets')
     )
     router.get(
         '/workspaces/:workspaceId/posts/rate-limits',
         asyncHandler(workspaceMiddleware),
-        asyncHandler(postsController.getRateLimits.bind(postsController))
+        handler('getRateLimits')
     )
 
-    return router
+    return { router }
 }

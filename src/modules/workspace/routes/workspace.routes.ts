@@ -4,10 +4,8 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import multer from 'multer'
 
 import { schema as dbSchema } from '@/db/schema'
-import type { ILogger } from '@/shared/logger/logger.interface'
-import { asyncHandler } from '@/shared/http/async-handler'
+import { bindController } from '@/shared/http/bind-controller'
 import { authMiddleware } from '@/middleware/auth.middleware'
-import { S3Uploader } from '@/shared/media-uploader/media-uploader'
 
 import { WorkspaceRepository } from '../repositories/workspace.repository'
 import { WorkspaceProfileSignalsRepository } from '../repositories/workspace-profile-signals.repository'
@@ -22,7 +20,20 @@ import { AccountRepository } from '@/modules/social/repositories/account.reposit
 import { MediaRepository } from '@/modules/media/repositories/media.repository'
 import { UserService } from '@/modules/user/services/user.service'
 
-export const createWorkspaceRouter = (logger: ILogger, db: NodePgDatabase<typeof dbSchema>): Router => {
+import type { ILogger } from '@/shared/logger/logger.interface'
+import type { IMediaUploader } from '@/shared/media-uploader'
+
+export interface WorkspaceModuleDeps {
+    db: NodePgDatabase<typeof dbSchema>
+    logger: ILogger
+    mediaUploader: IMediaUploader
+}
+
+export interface WorkspaceModule {
+    router: Router
+}
+
+export const buildWorkspaceModule = ({ db, logger, mediaUploader }: WorkspaceModuleDeps): WorkspaceModule => {
     const router = createRouter()
     const upload = multer({
         storage: multer.memoryStorage(),
@@ -39,7 +50,6 @@ export const createWorkspaceRouter = (logger: ILogger, db: NodePgDatabase<typeof
     const signalsRepository = new WorkspaceProfileSignalsRepository(db, logger)
     const tagsRepository = new WorkspaceTagsRepository(db, logger)
     const tagsService = new WorkspaceTagsService(tagsRepository, logger)
-    const mediaUploader = new S3Uploader(logger)
     const userService = new UserService(
         userRepository,
         repository,
@@ -53,48 +63,32 @@ export const createWorkspaceRouter = (logger: ILogger, db: NodePgDatabase<typeof
     const profileService = new WorkspaceProfileService(repository, signalsRepository, tagsService, logger)
     const service = new WorkspaceService(repository, mediaUploader, profileService, userService, logger)
     const controller = new WorkspaceController(service, tagsService, profileService, logger)
+    const handler = bindController(controller)
 
-    router.post('/workspaces', authMiddleware, upload.single('avatar'), asyncHandler(controller.create.bind(controller)))
-    router.get('/workspaces', authMiddleware, asyncHandler(controller.getAll.bind(controller)))
-    router.get('/workspaces/default', authMiddleware, asyncHandler(controller.getDefault.bind(controller)))
-    router.get('/workspaces/:id', authMiddleware, asyncHandler(controller.getById.bind(controller)))
-    router.put(
-        '/workspaces/:id',
-        authMiddleware,
-        upload.single('avatar'),
-        asyncHandler(controller.update.bind(controller))
-    )
-    router.put('/workspaces/:id/default', authMiddleware, asyncHandler(controller.setAsDefault.bind(controller)))
-    router.delete('/workspaces/:id', authMiddleware, asyncHandler(controller.delete.bind(controller)))
+    router.post('/workspaces', authMiddleware, upload.single('avatar'), handler('create'))
+    router.get('/workspaces', authMiddleware, handler('getAll'))
+    router.get('/workspaces/default', authMiddleware, handler('getDefault'))
+    router.get('/workspaces/:id', authMiddleware, handler('getById'))
+    router.put('/workspaces/:id', authMiddleware, upload.single('avatar'), handler('update'))
+    router.put('/workspaces/:id/default', authMiddleware, handler('setAsDefault'))
+    router.delete('/workspaces/:id', authMiddleware, handler('delete'))
 
     // Main Prompt endpoints
-    router.get('/workspaces/:id/prompt', authMiddleware, asyncHandler(controller.getMainPrompt.bind(controller)))
-    router.put(
-        '/workspaces/:id/prompt',
-        authMiddleware,
-        asyncHandler(controller.updateMainPrompt.bind(controller))
-    )
+    router.get('/workspaces/:id/prompt', authMiddleware, handler('getMainPrompt'))
+    router.put('/workspaces/:id/prompt', authMiddleware, handler('updateMainPrompt'))
 
     // Onboarding endpoints
-    router.get(
-        '/workspaces/:id/onboarding',
-        authMiddleware,
-        asyncHandler(controller.getOnboarding.bind(controller))
-    )
-    router.put(
-        '/workspaces/:id/onboarding',
-        authMiddleware,
-        asyncHandler(controller.updateOnboarding.bind(controller))
-    )
+    router.get('/workspaces/:id/onboarding', authMiddleware, handler('getOnboarding'))
+    router.put('/workspaces/:id/onboarding', authMiddleware, handler('updateOnboarding'))
 
     // AI Context endpoint
-    router.get('/workspaces/:id/ai-context', authMiddleware, asyncHandler(controller.getAIContext.bind(controller)))
+    router.get('/workspaces/:id/ai-context', authMiddleware, handler('getAIContext'))
 
     // Tags endpoints
-    router.get('/workspaces/:id/tags', authMiddleware, asyncHandler(controller.getTags.bind(controller)))
-    router.post('/workspaces/:id/tags', authMiddleware, asyncHandler(controller.createTag.bind(controller)))
-    router.put('/workspaces/:id/tags/:tagId', authMiddleware, asyncHandler(controller.updateTag.bind(controller)))
-    router.delete('/workspaces/:id/tags/:tagId', authMiddleware, asyncHandler(controller.deleteTag.bind(controller)))
+    router.get('/workspaces/:id/tags', authMiddleware, handler('getTags'))
+    router.post('/workspaces/:id/tags', authMiddleware, handler('createTag'))
+    router.put('/workspaces/:id/tags/:tagId', authMiddleware, handler('updateTag'))
+    router.delete('/workspaces/:id/tags/:tagId', authMiddleware, handler('deleteTag'))
 
-    return router
+    return { router }
 }

@@ -4,8 +4,7 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 
 import { schema as dbSchema } from '@/db/schema'
 import { UserRepository } from '@/modules/user/repositories/users.repository'
-import type { ILogger } from '@/shared/logger/logger.interface'
-import { asyncHandler } from '@/shared/http/async-handler'
+import { bindController } from '@/shared/http/bind-controller'
 import { authMiddleware } from '@/middleware/auth.middleware'
 import { upload } from '@/middleware/upload.middleware'
 
@@ -15,9 +14,21 @@ import { WorkspaceRepository } from '@/modules/workspace/repositories/workspace.
 import { PostsRepository } from '@/modules/post/repositories/posts.repository'
 import { AccountRepository } from '@/modules/social/repositories/account.repository'
 import { MediaRepository } from '@/modules/media/repositories/media.repository'
-import { S3Uploader } from '@/shared/media-uploader/media-uploader'
 
-export const createUserRoutes = (logger: ILogger, db: NodePgDatabase<typeof dbSchema>): Router => {
+import type { ILogger } from '@/shared/logger/logger.interface'
+import type { IMediaUploader } from '@/shared/media-uploader'
+
+export interface UserModuleDeps {
+    db: NodePgDatabase<typeof dbSchema>
+    logger: ILogger
+    mediaUploader: IMediaUploader
+}
+
+export interface UserModule {
+    router: Router
+}
+
+export const buildUserModule = ({ db, logger, mediaUploader }: UserModuleDeps): UserModule => {
     const router = createRouter()
 
     const userRepository = new UserRepository(db, logger)
@@ -25,7 +36,6 @@ export const createUserRoutes = (logger: ILogger, db: NodePgDatabase<typeof dbSc
     const workspaceRepository = new WorkspaceRepository(db, logger)
     const accountRepository = new AccountRepository(db, logger)
     const mediaRepository = new MediaRepository(db, logger)
-    const mediaUploader = new S3Uploader(logger)
 
     const userService = new UserService(
         userRepository,
@@ -38,19 +48,11 @@ export const createUserRoutes = (logger: ILogger, db: NodePgDatabase<typeof dbSc
         logger
     )
     const userController = new UserController(userService, logger)
+    const handler = bindController(userController)
 
-    router.get('/user/info', authMiddleware, asyncHandler(userController.getUserInfo.bind(userController)))
-    router.put(
-        '/user/settings',
-        authMiddleware,
-        upload.single('avatar'),
-        asyncHandler(userController.updateUserSettings.bind(userController))
-    )
-    router.delete(
-        '/user/delete',
-        authMiddleware,
-        asyncHandler(userController.deleteUserAccount.bind(userController))
-    )
+    router.get('/user/info', authMiddleware, handler('getUserInfo'))
+    router.put('/user/settings', authMiddleware, upload.single('avatar'), handler('updateUserSettings'))
+    router.delete('/user/delete', authMiddleware, handler('deleteUserAccount'))
 
-    return router
+    return { router }
 }

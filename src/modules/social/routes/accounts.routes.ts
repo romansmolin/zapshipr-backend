@@ -22,9 +22,7 @@ import { UpdateAccessTokenByIdUseCase } from '@/modules/social/use-cases/update-
 import { UpdateAccessTokenUseCase } from '@/modules/social/use-cases/update-access-token.use-case'
 import { SocialMediaErrorHandler } from '@/shared/social-media-errors'
 import { asyncHandler } from '@/shared/http/async-handler'
-import { AxiosHttpClient } from '@/shared/http-client/axios-http-client'
-import type { ILogger } from '@/shared/logger/logger.interface'
-import { S3Uploader } from '@/shared/media-uploader/media-uploader'
+import { bindController } from '@/shared/http/bind-controller'
 import { getEnvVar } from '@/shared/utils/get-env-var'
 import type { ISocialMediaPostSenderService } from '@/modules/social/services/social-media-post-sender.interface'
 import type { SocilaMediaPlatform } from '@/modules/post/schemas/posts.schemas'
@@ -33,7 +31,22 @@ import { UserRepository } from '@/modules/user/repositories/users.repository'
 import { WorkspaceRepository } from '@/modules/workspace/repositories/workspace.repository'
 import { MediaRepository } from '@/modules/media/repositories/media.repository'
 
-export const createAccountsRouter = (logger: ILogger, db: NodePgDatabase<typeof dbSchema>): Router => {
+import type { IApiClient } from '@/shared/http-client'
+import type { ILogger } from '@/shared/logger/logger.interface'
+import type { IMediaUploader } from '@/shared/media-uploader'
+
+export interface AccountsModuleDeps {
+    db: NodePgDatabase<typeof dbSchema>
+    logger: ILogger
+    mediaUploader: IMediaUploader
+    apiClient: IApiClient
+}
+
+export interface AccountsModule {
+    router: Router
+}
+
+export const buildAccountsModule = ({ db, logger, mediaUploader, apiClient }: AccountsModuleDeps): AccountsModule => {
     const router = createRouter()
 
     const accountRepository = new AccountRepository(db, logger)
@@ -41,8 +54,6 @@ export const createAccountsRouter = (logger: ILogger, db: NodePgDatabase<typeof 
     const userRepository = new UserRepository(db, logger)
     const workspaceRepository = new WorkspaceRepository(db, logger)
     const mediaRepository = new MediaRepository(db, logger)
-    const mediaUploader = new S3Uploader(logger)
-    const apiClient = new AxiosHttpClient()
     const socialMediaErrorHandler = new SocialMediaErrorHandler(logger)
 
     // Account deletion only needs post cleanup methods; publishing methods are not used here.
@@ -76,12 +87,7 @@ export const createAccountsRouter = (logger: ILogger, db: NodePgDatabase<typeof 
     const connectAccountUseCase = new ConnectAccountUseCase(accountRepository, logger, userService)
     const listAccountsUseCase = new ListAccountsUseCase(accountRepository, logger)
     const getAccountByIdUseCase = new GetAccountByIdUseCase(accountRepository, logger)
-    const deleteAccountUseCase = new DeleteAccountUseCase(
-        accountRepository,
-        logger,
-        mediaUploader,
-        postsService
-    )
+    const deleteAccountUseCase = new DeleteAccountUseCase(accountRepository, logger, mediaUploader, postsService)
     const getPinterestBoardsUseCase = new GetPinterestBoardsUseCase(accountRepository, logger)
     const updateAccessTokenUseCase = new UpdateAccessTokenUseCase(accountRepository, logger)
     const updateAccessTokenByIdUseCase = new UpdateAccessTokenByIdUseCase(accountRepository, logger)
@@ -110,77 +116,48 @@ export const createAccountsRouter = (logger: ILogger, db: NodePgDatabase<typeof 
     const oauthStateService = new OAuthStateService(oauthStateSecret)
     const accountsController = new AccountsController(accountsService, connectorService, logger, oauthStateService)
     const workspaceMiddleware = createWorkspaceMiddleware(logger, db)
+    const handler = bindController(accountsController)
 
     // OAuth callbacks (no workspace scope - external providers call these)
-    router.get(
-        '/facebook/authorize',
-        authMiddleware,
-        asyncHandler(accountsController.initiateOAuth.bind(accountsController))
-    )
-    router.get(
-        '/facebook/callback',
-        asyncHandler(accountsController.connectFacebookAccount.bind(accountsController))
-    )
-    router.get(
-        '/threads/callback',
-        asyncHandler(accountsController.connectThreadsAccount.bind(accountsController))
-    )
-    router.get('/tiktok/callback', asyncHandler(accountsController.connectTikTokAccount.bind(accountsController)))
-    router.get(
-        '/youtube/callback',
-        asyncHandler(accountsController.connectYouTubeAccount.bind(accountsController))
-    )
-    router.get('/x/callback', asyncHandler(accountsController.connectXAccount.bind(accountsController)))
-    router.get(
-        '/pinterest/callback',
-        asyncHandler(accountsController.connectPinterestAccount.bind(accountsController))
-    )
-    router.get(
-        '/instagram/callback',
-        asyncHandler(accountsController.connectInstagramAccount.bind(accountsController))
-    )
-    router.get(
-        '/linkedin/callback',
-        asyncHandler(accountsController.connectLinkedinAccount.bind(accountsController))
-    )
+    router.get('/facebook/authorize', authMiddleware, handler('initiateOAuth'))
+    router.get('/facebook/callback', handler('connectFacebookAccount'))
+    router.get('/threads/callback', handler('connectThreadsAccount'))
+    router.get('/tiktok/callback', handler('connectTikTokAccount'))
+    router.get('/youtube/callback', handler('connectYouTubeAccount'))
+    router.get('/x/callback', handler('connectXAccount'))
+    router.get('/pinterest/callback', handler('connectPinterestAccount'))
+    router.get('/instagram/callback', handler('connectInstagramAccount'))
+    router.get('/linkedin/callback', handler('connectLinkedinAccount'))
 
-    // Authenticated but not workspace-scoped (OAuth state creation, Bluesky connect)
-    router.post(
-        '/oauth/state',
-        authMiddleware,
-        asyncHandler(accountsController.createOAuthState.bind(accountsController))
-    )
-    router.post(
-        '/bluesky/connect',
-        authMiddleware,
-        asyncHandler(accountsController.connectBlueskyAccount.bind(accountsController))
-    )
+    // Authenticated but not workspace-scoped
+    router.post('/oauth/state', authMiddleware, handler('createOAuthState'))
+    router.post('/bluesky/connect', authMiddleware, handler('connectBlueskyAccount'))
 
     // Workspace-scoped account routes
     router.get(
         '/workspaces/:workspaceId/accounts',
         authMiddleware,
         asyncHandler(workspaceMiddleware),
-        asyncHandler(accountsController.getAllAccounts.bind(accountsController))
+        handler('getAllAccounts')
     )
     router.delete(
         '/workspaces/:workspaceId/accounts/:accountId',
         authMiddleware,
         asyncHandler(workspaceMiddleware),
-        asyncHandler(accountsController.deleteAccount.bind(accountsController))
+        handler('deleteAccount')
     )
     router.get(
         '/workspaces/:workspaceId/accounts/:socialAccountId/pinterest-boards',
         authMiddleware,
         asyncHandler(workspaceMiddleware),
-        asyncHandler(accountsController.getPinterestBoards.bind(accountsController))
+        handler('getPinterestBoards')
     )
     router.get(
         '/workspaces/:workspaceId/accounts/:socialAccountId/tiktok/creator-info',
         authMiddleware,
         asyncHandler(workspaceMiddleware),
-        asyncHandler(accountsController.getTikTokCreatorInfo.bind(accountsController))
+        handler('getTikTokCreatorInfo')
     )
 
-    return router
+    return { router }
 }

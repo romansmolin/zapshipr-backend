@@ -5,11 +5,21 @@ import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { schema as dbSchema } from '@/db/schema'
 import { UserRepository } from '@/modules/user/repositories/users.repository'
 import { asyncHandler } from '@/shared/http/async-handler'
-import type { ILogger } from '@/shared/logger/logger.interface'
 
 import { BillingService } from '../services/billing.service'
 
-export const createBillingRouter = (logger: ILogger, db: NodePgDatabase<typeof dbSchema>): Router => {
+import type { ILogger } from '@/shared/logger/logger.interface'
+
+export interface BillingModuleDeps {
+    db: NodePgDatabase<typeof dbSchema>
+    logger: ILogger
+}
+
+export interface BillingModule {
+    router: Router
+}
+
+export const buildBillingModule = ({ db, logger }: BillingModuleDeps): BillingModule => {
     const router = createRouter()
 
     const userRepository = new UserRepository(db, logger)
@@ -31,5 +41,5 @@ export const createBillingRouter = (logger: ILogger, db: NodePgDatabase<typeof d
         })
     )
 
-    return router
+    return { router }
 }

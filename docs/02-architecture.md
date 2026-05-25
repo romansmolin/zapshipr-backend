@@ -50,14 +50,68 @@ src/
 
 ### 2. Dependency Injection через конструкторы
 
-Все зависимости передаются через конструкторы, что упрощает тестирование:
+Все зависимости передаются через конструкторы, что упрощает тестирование.
+
+### 2a. Композиция модулей (СТРОГО)
+
+Каждый модуль ОБЯЗАН экспортировать функцию `build<Name>Module(deps): { router }` из своего `*.routes.ts` файла. Эта функция — единственная точка входа в модуль и единственное место, где собираются его зависимости.
+
+**Правила:**
+
+1. **Имя функции** — `build<Name>Module` (например, `buildAuthModule`, `buildPostsModule`). Никаких `createXRouter`.
+2. **Сигнатура** — принимает один объект с именованными зависимостями, возвращает `{ router }`. Никаких позиционных аргументов.
+3. **Типы** — каждый модуль экспортирует `<Name>ModuleDeps` и `<Name>Module` интерфейсы.
+4. **Внешние зависимости** — `db` и `logger` всегда передаются. Общая инфраструктура (`mediaUploader`, `apiClient`, `emailService`, готовые сервисы вроде `aiService`) тоже передаётся снаружи — НЕ создаётся внутри модуля.
+5. **Внутренние зависимости** — репозитории и сервисы самого модуля собираются ВНУТРИ функции `build<Name>Module`. Это локальная сборка графа.
+6. **Привязка контроллера** — для каждого контроллера используется `bindController` из `@/shared/http/bind-controller`. Никаких `.bind(controller)` вручную.
+7. **Композиционный корень** — `src/server.ts` создаёт shared singletons один раз и передаёт их в каждый `build<Name>Module`. Воркеры (`src/worker.ts`) поступают аналогично для своих нужд.
+
+**Канонический пример:**
 
 ```typescript
-// Пример из auth.routes.ts
-const userRepository = new UserRepository(db, logger)
-const authService = new AuthService(userRepository, logger)
-const authController = new AuthController(authService, logger)
+// src/modules/auth/routes/auth.routes.ts
+export interface AuthModuleDeps {
+    db: NodePgDatabase<typeof dbSchema>
+    logger: ILogger
+    emailService: IEmailService
+}
+
+export interface AuthModule {
+    router: Router
+}
+
+export const buildAuthModule = ({ db, logger, emailService }: AuthModuleDeps): AuthModule => {
+    const userRepository = new UserRepository(db, logger)
+    const authService = new AuthService(userRepository, emailService, logger)
+    const authController = new AuthController(authService, logger)
+
+    const router = createRouter()
+    const handler = bindController(authController)
+
+    router.post('/auth/sign-up', handler('signUp'))
+    router.post('/auth/sign-in', handler('signIn'))
+    // ...
+
+    return { router }
+}
 ```
+
+**Использование в `server.ts`:**
+
+```typescript
+const emailService = new NodemailerEmailService(logger)
+const { router: authRoutes } = buildAuthModule({ db, logger, emailService })
+app.use(authRoutes)
+```
+
+**Что НЕЛЬЗЯ делать:**
+
+- ❌ Не создавать общую инфраструктуру (`S3Uploader`, `AxiosHttpClient`, `NodemailerEmailService`) внутри модуля — она должна приходить через `deps`.
+- ❌ Не использовать `.bind(controller)` напрямую — только через `bindController(...)`.
+- ❌ Не делать сигнатуру с позиционными аргументами `(logger, db, ...)` — только объект `{ ... }`.
+- ❌ Не возвращать голый `Router` — только `{ router }` (это оставляет место для будущего экспорта внутренних сервисов).
+
+**При добавлении нового модуля:** строго следуй этой схеме. Никаких исключений.
 
 ### 3. Интерфейсы для всех сервисов и репозиториев
 
