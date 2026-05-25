@@ -42,5 +42,11 @@ export interface ITranscriptRepository {
      * Delete transcript by inspiration ID
      */
     deleteByInspirationId(inspirationId: string): Promise<boolean>
+
+    /**
+     * Delete all transcripts older than the given date (YouTube ToS compliance: 30-day retention)
+     * Returns the number of deleted records
+     */
+    deleteExpiredTranscripts(olderThan: Date): Promise<number>
 }
 

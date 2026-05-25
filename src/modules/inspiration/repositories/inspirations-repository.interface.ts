@@ -21,4 +21,10 @@ export interface IInspirationsRepository {
     update(id: string, data: Partial<InsertRawInspiration>): Promise<RawInspiration | undefined>
     delete(id: string): Promise<boolean>
     checkDuplicateUrl(workspaceId: string, url: string): Promise<boolean>
+    /**
+     * Clears parsedContent for YouTube-sourced inspirations older than the given date.
+     * YouTube ToS compliance: statistics embedded in parsedContent must not be stored > 30 days.
+     * Returns number of updated records.
+     */
+    clearExpiredYoutubeStats(olderThan: Date): Promise<number>
 }

@@ -1,4 +1,4 @@
-import { eq, and, sql, count, desc } from 'drizzle-orm'
+import { eq, and, sql, count, desc, lt, isNotNull } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 
 import { schema as dbSchema } from '@/db/schema'
@@ -244,6 +244,38 @@ export class InspirationsRepository implements IInspirationsRepository {
                 operation: 'InspirationsRepository.checkDuplicateUrl',
                 entity: 'raw_inspirations',
                 workspaceId,
+                error: formatError(error),
+            })
+            throw error
+        }
+    }
+
+    async clearExpiredYoutubeStats(olderThan: Date): Promise<number> {
+        try {
+            const result = await this.db
+                .update(rawInspirations)
+                .set({ parsedContent: null })
+                .where(
+                    and(
+                        eq(rawInspirations.type, 'link'),
+                        lt(rawInspirations.createdAt, olderThan),
+                        isNotNull(rawInspirations.parsedContent)
+                    )
+                )
+                .returning({ id: rawInspirations.id })
+
+            this.logger.info('Cleared parsedContent from expired YouTube inspirations', {
+                operation: 'InspirationsRepository.clearExpiredYoutubeStats',
+                entity: 'raw_inspirations',
+                count: result.length,
+                olderThan: olderThan.toISOString(),
+            })
+
+            return result.length
+        } catch (error) {
+            this.logger.error('Failed to clear expired YouTube stats', {
+                operation: 'InspirationsRepository.clearExpiredYoutubeStats',
+                entity: 'raw_inspirations',
                 error: formatError(error),
             })
             throw error

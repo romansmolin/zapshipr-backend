@@ -12,8 +12,7 @@ export const createAiRouter = (logger: ILogger, aiService: IAiService): Router =
     const router = createRouter()
     const controller = new AiController(aiService, logger)
 
-    router.use(authMiddleware)
-    router.post('/ai/content', asyncHandler(controller.generateIntroductoryCopy.bind(controller)))
+    router.post('/ai/content', authMiddleware, asyncHandler(controller.generateIntroductoryCopy.bind(controller)))
 
     return router
 }

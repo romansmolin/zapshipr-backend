@@ -28,12 +28,19 @@ import { S3Uploader } from '@/shared/media-uploader/media-uploader'
 import { getEnvVar } from '@/shared/utils/get-env-var'
 import type { ISocialMediaPostSenderService } from '@/modules/social/services/social-media-post-sender.interface'
 import type { SocilaMediaPlatform } from '@/modules/post/schemas/posts.schemas'
+import { UserService } from '@/modules/user/services/user.service'
+import { UserRepository } from '@/modules/user/repositories/users.repository'
+import { WorkspaceRepository } from '@/modules/workspace/repositories/workspace.repository'
+import { MediaRepository } from '@/modules/media/repositories/media.repository'
 
 export const createAccountsRouter = (logger: ILogger, db: NodePgDatabase<typeof dbSchema>): Router => {
     const router = createRouter()
 
     const accountRepository = new AccountRepository(db, logger)
     const postsRepository = new PostsRepository(db, logger)
+    const userRepository = new UserRepository(db, logger)
+    const workspaceRepository = new WorkspaceRepository(db, logger)
+    const mediaRepository = new MediaRepository(db, logger)
     const mediaUploader = new S3Uploader(logger)
     const apiClient = new AxiosHttpClient()
     const socialMediaErrorHandler = new SocialMediaErrorHandler(logger)
@@ -55,15 +62,24 @@ export const createAccountsRouter = (logger: ILogger, db: NodePgDatabase<typeof 
     }
 
     const postsService = new PostsService(postsRepository, mediaUploader, logger, noopPostSender, socialMediaErrorHandler)
+    const userService = new UserService(
+        userRepository,
+        workspaceRepository,
+        postsRepository,
+        accountRepository,
+        mediaRepository,
+        mediaUploader,
+        db,
+        logger
+    )
 
-    const connectAccountUseCase = new ConnectAccountUseCase(accountRepository, logger)
+    const connectAccountUseCase = new ConnectAccountUseCase(accountRepository, logger, userService)
     const listAccountsUseCase = new ListAccountsUseCase(accountRepository, logger)
     const getAccountByIdUseCase = new GetAccountByIdUseCase(accountRepository, logger)
     const deleteAccountUseCase = new DeleteAccountUseCase(
         accountRepository,
         logger,
         mediaUploader,
-        undefined,
         postsService
     )
     const getPinterestBoardsUseCase = new GetPinterestBoardsUseCase(accountRepository, logger)

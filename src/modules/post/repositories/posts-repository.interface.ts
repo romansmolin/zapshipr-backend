@@ -33,7 +33,7 @@ export interface IPostsRepository {
         scheduledTimezone?: string | null
     ): Promise<void>
 
-    savePostMediaAssets(data: { userId: string; url: string; type: string }): Promise<{ mediaId: string }>
+    savePostMediaAssets(data: { userId: string; url: string; type: string; sizeBytes?: number | null }): Promise<{ mediaId: string }>
 
     updateMediaAsset(mediaId: string, data: { url: string; type: string }): Promise<void>
 

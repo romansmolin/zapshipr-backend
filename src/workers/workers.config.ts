@@ -7,6 +7,8 @@ import {
     BullMqTokenRefreshScheduler,
     BullMqInspirationWorker,
     BullMqPostPreparationWorker,
+    BullMqYoutubeCleanupScheduler,
+    BullMqYoutubeCleanupWorker,
 } from '@/shared/queue'
 import { schema } from '@/db/schema'
 
@@ -33,6 +35,8 @@ export interface Workers {
     postWorkers: BullMqPostWorker[]
     postPreparationWorker: BullMqPostPreparationWorker
     inspirationWorker: BullMqInspirationWorker
+    youtubeCleanupScheduler: BullMqYoutubeCleanupScheduler
+    youtubeCleanupWorker: BullMqYoutubeCleanupWorker
 }
 
 export async function initializeWorkers(
@@ -95,11 +99,19 @@ export async function initializeWorkers(
 
     inspirationWorker.start()
 
+    const youtubeCleanupScheduler = new BullMqYoutubeCleanupScheduler()
+    await youtubeCleanupScheduler.scheduleYoutubeDataCleanup()
+
+    const youtubeCleanupWorker = new BullMqYoutubeCleanupWorker(logger, transcriptRepository, inspirationsRepository)
+    youtubeCleanupWorker.start()
+
     return {
         accessTokensRefreshScheduler,
         accessTokensRefreshWorker,
         postWorkers,
         postPreparationWorker,
         inspirationWorker,
+        youtubeCleanupScheduler,
+        youtubeCleanupWorker,
     }
 }

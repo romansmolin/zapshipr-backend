@@ -6,5 +6,7 @@ declare module 'express-serve-static-core' {
             id: string
             email?: string
         }
+        workspaceId?: string
+        rawBody?: Buffer
     }
 }

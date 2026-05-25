@@ -1,4 +1,4 @@
-import { eq, and, desc } from 'drizzle-orm'
+import { eq, and, desc, lt } from 'drizzle-orm'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 
 import { schema } from '@/db/schema'
@@ -191,6 +191,31 @@ export class TranscriptRepository implements ITranscriptRepository {
                 operation: 'TranscriptRepository.delete',
                 entity: 'transcripts',
                 transcriptId: id,
+                error: formatError(error),
+            })
+            throw error
+        }
+    }
+
+    async deleteExpiredTranscripts(olderThan: Date): Promise<number> {
+        try {
+            const result = await this.db
+                .delete(transcripts)
+                .where(lt(transcripts.createdAt, olderThan))
+                .returning({ id: transcripts.id })
+
+            this.logger.info('Deleted expired YouTube transcripts', {
+                operation: 'TranscriptRepository.deleteExpiredTranscripts',
+                entity: 'transcripts',
+                count: result.length,
+                olderThan: olderThan.toISOString(),
+            })
+
+            return result.length
+        } catch (error) {
+            this.logger.error('Failed to delete expired transcripts', {
+                operation: 'TranscriptRepository.deleteExpiredTranscripts',
+                entity: 'transcripts',
                 error: formatError(error),
             })
             throw error

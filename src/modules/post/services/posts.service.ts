@@ -36,6 +36,7 @@ import type { IMediaUploader } from '@/shared/media-uploader'
 import type { IPostPreparationScheduler, IPostScheduler } from '@/shared/queue'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import type { IWorkspaceProfileService } from '@/modules/workspace/services/workspace-profile.service'
+import type { IUserService } from '@/modules/user/services/user.service.interface'
 import type {
     CreatePostResponse,
     PostFilters,
@@ -55,6 +56,7 @@ export class PostsService implements IPostsService {
     private postScheduler?: IPostScheduler
     private postPreparationScheduler?: IPostPreparationScheduler
     private workspaceProfileService?: IWorkspaceProfileService
+    private userService?: IUserService
 
     constructor(
         postRepository: IPostsRepository,
@@ -64,7 +66,8 @@ export class PostsService implements IPostsService {
         errorHandler: SocialMediaErrorHandler,
         postScheduler?: IPostScheduler,
         postPreparationScheduler?: IPostPreparationScheduler,
-        workspaceProfileService?: IWorkspaceProfileService
+        workspaceProfileService?: IWorkspaceProfileService,
+        userService?: IUserService
     ) {
         this.postRepository = postRepository
         this.logger = logger
@@ -75,6 +78,7 @@ export class PostsService implements IPostsService {
         this.postScheduler = postScheduler
         this.postPreparationScheduler = postPreparationScheduler
         this.workspaceProfileService = workspaceProfileService
+        this.userService = userService
 
         this.socialMediaPostSender.setOnPostSuccessCallback(this.checkAndUpdateBasePostStatus.bind(this))
         this.socialMediaPostSender.setOnPostFailureCallback(this.checkAndUpdateBasePostStatus.bind(this))
@@ -118,6 +122,17 @@ export class PostsService implements IPostsService {
 
     private isAsyncPostNowEnabled(): boolean {
         return (process.env.POST_NOW_ASYNC_ENABLED ?? 'false').toLowerCase() === 'true'
+    }
+
+    private async assertPostMediaUploadAllowed(
+        userId: string,
+        files: Array<{ sizeBytes: number }>
+    ): Promise<void> {
+        if (!this.userService) {
+            return
+        }
+
+        await this.userService.assertPostMediaUploadAllowed(userId, files)
     }
 
     private sanitizeExtension(value?: string | null): string | null {
@@ -833,6 +848,7 @@ export class PostsService implements IPostsService {
                         userId,
                         url: mediaUrl,
                         type: mimeType,
+                        sizeBytes: buffer.length,
                     })
 
                     await this.postRepository.createPostMediaAssetRelation(postId, mediaId, order)
@@ -863,6 +879,7 @@ export class PostsService implements IPostsService {
                         userId,
                         url: copyUrl,
                         type: mimeType,
+                        sizeBytes: 0,
                     })
                     await this.postRepository.createPostMediaAssetRelation(postId, mediaId, order)
                 }
@@ -943,6 +960,7 @@ export class PostsService implements IPostsService {
                     userId,
                     url: mediaUrl,
                     type: contentType,
+                    sizeBytes: processedBuffer.length,
                 })
 
                 await this.postRepository.createPostMediaAssetRelation(postId, mediaId, orderCounter++)
@@ -973,6 +991,7 @@ export class PostsService implements IPostsService {
                 userId,
                 url: mediaUrl,
                 type: media.type,
+                sizeBytes: media.size ?? 0,
             })
 
             await this.postRepository.createPostMediaAssetRelation(postId, mediaId, orderCounter++)
@@ -997,6 +1016,7 @@ export class PostsService implements IPostsService {
                 userId,
                 url: copyUrl,
                 type: mimeType,
+                sizeBytes: 0,
             })
             await this.postRepository.createPostMediaAssetRelation(postId, mediaId, orderCounter++)
         }
@@ -1029,6 +1049,7 @@ export class PostsService implements IPostsService {
                 userId,
                 url: mediaUrl,
                 type: file.mimetype,
+                sizeBytes: file.buffer.length,
             })
 
             await this.postRepository.createPostMediaAssetRelation(postId, mediaId, orderCounter++)
@@ -1436,6 +1457,10 @@ export class PostsService implements IPostsService {
         files: PresignUploadFileRequest[]
     ): Promise<PresignedUploadResponseItem[]> {
         const expiresIn = 15 * 60
+        await this.assertPostMediaUploadAllowed(
+            userId,
+            files.map((file) => ({ sizeBytes: file.size }))
+        )
 
         return Promise.all(
             files.map(async (file, index) => {
@@ -1519,6 +1544,19 @@ export class PostsService implements IPostsService {
                 createPostsRequest.postType === 'media'
                     ? uploadedMediaFiles.length + copyMediaCount + uploadedMediaCount
                     : 0
+
+            if (createPostsRequest.postType === 'media') {
+                const projectedUploads = [
+                    ...uploadedMediaFiles.map((file) => ({ sizeBytes: file.size })),
+                    ...(createPostsRequest.uploadedMedia ?? []).map((media) => ({
+                        sizeBytes: Math.max(0, media.size ?? 0),
+                    })),
+                    ...(createPostsRequest.copyDataUrls ?? []).map(() => ({ sizeBytes: 0 })),
+                ]
+
+                await this.assertPostMediaUploadAllowed(userId, projectedUploads)
+            }
+
             const normalizedCreatePostsRequest: CreatePostsRequest = {
                 ...createPostsRequest,
                 posts: this.normalizePostTargetsMediaIndices(createPostsRequest, mediaPoolCount),
@@ -1750,6 +1788,9 @@ export class PostsService implements IPostsService {
                 ...updatePostRequest,
                 posts: this.normalizePostTargetsMediaIndices(updatePostRequest, mediaPoolCount),
             }
+            if (file && normalizedUpdatePostRequest.postType === 'media') {
+                await this.assertPostMediaUploadAllowed(userId, [{ sizeBytes: file.size }])
+            }
             const selectedMediaIndices = this.collectSelectedMediaIndices(normalizedUpdatePostRequest.posts)
             const editMediaTransform = this.getSingleEditTransform(normalizedUpdatePostRequest, selectedMediaIndices, file)
 
@@ -1849,6 +1890,7 @@ export class PostsService implements IPostsService {
                         userId,
                         url: mediaUrl,
                         type: contentType,
+                        sizeBytes: processedBuffer.length,
                     })
 
                     await this.postRepository.createPostMediaAssetRelation(postId, mediaId, 1)

@@ -1,11 +1,16 @@
+import { randomUUID } from 'crypto'
 import path from 'path'
 import bcrypt from 'bcryptjs'
 
 import type { IUserRepository } from '../repositories/user-repository.interface'
 import { AppError, ErrorMessageCode } from '@/shared/errors/app-error'
+import { PLAN_CRITICAL_THRESHOLD, PLAN_LIMITS, PLAN_WARNING_THRESHOLD } from '@/shared/consts/plan-limits.const'
+import { UserPlans, normalizeUserPlan } from '@/shared/consts/plans'
+import { ErrorCode } from '@/shared/consts/error-codes.const'
+import { BaseAppError } from '@/shared/errors/base-error'
 import type { ILogger } from '@/shared/logger/logger.interface'
 
-import type { IUserService, UsageQuota, UserPlanSnapshot } from './user.service.interface'
+import type { IUserService, PlanWarning, UsageQuota, UserPlanSnapshot } from './user.service.interface'
 import { IWorkspaceRepository } from '@/modules/workspace/repositories/workspace-repository.interface'
 import { IPostsRepository } from '@/modules/post/repositories/posts-repository.interface'
 import { IAccountRepository } from '@/modules/social/repositories/account-repository.interface'
@@ -13,7 +18,7 @@ import { IMediaRepository } from '@/modules/media/repositories/media-repository.
 import { IMediaUploader } from '@/shared/media-uploader/media-uploader.interface'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import { schema as dbSchema } from '@/db/schema'
-import { eq, sql } from 'drizzle-orm'
+import { sql } from 'drizzle-orm'
 import type { User } from '../entity/user.schema'
 import type { UpdateUserSettingsInput } from '../validation/user.schemas'
 
@@ -63,43 +68,332 @@ export class UserService implements IUserService {
         }
 
         const userWorkspaces = await this.workspaceRepository.findByUserId(userId)
+        const plan = await this.getUserPlan(userId)
+
+        let usage: UsageQuota | null = null
+        let warnings: PlanWarning[] = []
+
+        if (plan?.isActive) {
+            usage = await this.getUsageQuota(userId)
+            warnings = await this.getUsageWarnings(userId)
+        }
 
         this.logger.info('User info retrieved', {
             operation: 'UserService.getUserInfo',
             userId,
-            userWorkspaces,
+            workspaceCount: userWorkspaces.length,
+            planName: plan?.planName ?? null,
         })
 
         return {
             user,
             userWorkspaces,
-            planName: null,
+            planName: plan?.planName ?? null,
+            plan,
+            usage,
+            warnings,
         }
     }
 
     async getUsageQuota(userId: string): Promise<UsageQuota> {
-        // TODO: Implement usage quota logic
-        throw new Error('Not implemented')
-    }
+        const plan = await this.requireUserPlan(userId)
+        const normalizedPlan = normalizeUserPlan(plan.planName)
+        const limits = PLAN_LIMITS[normalizedPlan]
 
-    async incrementConnectedAccountsUsage(userId: string): Promise<void> {
-        // TODO: Implement increment logic
-        throw new Error('Not implemented')
-    }
+        const [workspacesUsed, accounts, aiActionsUsed, postMediaUsage] = await Promise.all([
+            this.workspaceRepository.countByUserId(userId),
+            this.accountRepository.findByUserId(userId),
+            this.getAiUsageCountForPlan(userId, plan),
+            this.getPostMediaUsage(userId),
+        ])
 
-    async decrementConnectedAccountsUsage(userId: string): Promise<void> {
-        // TODO: Implement decrement logic
-        throw new Error('Not implemented')
+        return {
+            workspaces: this.toQuotaMetric(workspacesUsed, limits.workspaceLimit),
+            connectedAccounts: this.toQuotaMetric(accounts.length, limits.connectedAccountsLimit),
+            aiActions: this.toQuotaMetric(aiActionsUsed, limits.aiActionsPerMonth),
+            storageBytes: this.toQuotaMetric(postMediaUsage.storageBytes, limits.storageBytesLimit),
+            files: this.toQuotaMetric(postMediaUsage.files, limits.filesLimit),
+            maxFileSizeBytes: limits.maxFileSizeBytes,
+        }
     }
 
     async getUserPlan(userId: string): Promise<UserPlanSnapshot | null> {
-        // TODO: Implement get user plan logic
-        throw new Error('Not implemented')
+        const activePlan = await this.userRepository.findActivePlan(userId)
+
+        if (!activePlan) {
+            const lastPlan = await this.userRepository.findLastPlan(userId)
+
+            if (!lastPlan) {
+                return null
+            }
+
+            const normalizedPlanName = normalizeUserPlan(lastPlan.planName)
+            return {
+                id: lastPlan.id,
+                planName: normalizedPlanName,
+                billingStatus: 'inactive',
+                isActive: false,
+                periodStart: lastPlan.startDate,
+                periodEnd: lastPlan.currentPeriodEnd ?? lastPlan.endDate,
+                priceMonthlyEur: PLAN_LIMITS[normalizedPlanName].priceMonthlyEur,
+                trialEndsAt: null,
+                trialDaysRemaining: null,
+                planType: lastPlan.planType,
+            }
+        }
+
+        const normalizedPlanName = normalizeUserPlan(activePlan.planName)
+        const billingStatus = activePlan.billingStatus ?? 'active'
+        const trialEndsAt =
+            billingStatus === 'trialing' ? (activePlan.currentPeriodEnd ?? activePlan.endDate) : null
+        const trialDaysRemaining = trialEndsAt
+            ? Math.max(0, Math.ceil((trialEndsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+            : null
+
+        return {
+            id: activePlan.id,
+            planName: normalizedPlanName,
+            billingStatus,
+            isActive: true,
+            periodStart: activePlan.startDate,
+            periodEnd: activePlan.currentPeriodEnd ?? activePlan.endDate,
+            priceMonthlyEur: PLAN_LIMITS[normalizedPlanName].priceMonthlyEur,
+            planType: activePlan.planType,
+            trialEndsAt,
+            trialDaysRemaining,
+        }
     }
 
     async incrementAiUsage(userId: string): Promise<void> {
-        // TODO: Implement increment AI usage logic
-        throw new Error('Not implemented')
+        const plan = await this.requireUserPlan(userId)
+        const normalizedPlan = normalizeUserPlan(plan.planName)
+        const limits = PLAN_LIMITS[normalizedPlan]
+        const period = this.resolveUsagePeriod(plan)
+
+        await this.db.transaction(async (tx) => {
+            const existingUsageResult = await tx.execute(sql`
+                SELECT id, used_count, limit_count
+                FROM user_plan_usage
+                WHERE user_id = ${userId}
+                  AND plan_id = ${plan.id}
+                  AND usage_type = 'ai'
+                  AND period_start = ${period.start}
+                  AND period_end = ${period.end}
+                LIMIT 1
+                FOR UPDATE
+            `)
+
+            const existingUsageRow = existingUsageResult.rows[0] as
+                | { id: string; used_count: number | string; limit_count: number | string }
+                | undefined
+
+            let usageId = existingUsageRow?.id
+            let usedCount = Number(existingUsageRow?.used_count ?? 0)
+            let limitCount = Number(existingUsageRow?.limit_count ?? limits.aiActionsPerMonth)
+
+            if (!usageId) {
+                usageId = randomUUID()
+                usedCount = 0
+                limitCount = limits.aiActionsPerMonth
+
+                await tx.execute(sql`
+                    INSERT INTO user_plan_usage (
+                        id,
+                        user_id,
+                        plan_id,
+                        usage_type,
+                        period_start,
+                        period_end,
+                        used_count,
+                        limit_count,
+                        created_at,
+                        updated_at
+                    ) VALUES (
+                        ${usageId},
+                        ${userId},
+                        ${plan.id},
+                        'ai',
+                        ${period.start},
+                        ${period.end},
+                        0,
+                        ${limitCount},
+                        now(),
+                        now()
+                    )
+                `)
+            }
+
+            if (usedCount >= limitCount) {
+                throw new BaseAppError(
+                    'AI actions limit reached for your current plan',
+                    ErrorCode.PLAN_LIMIT_REACHED,
+                    403
+                )
+            }
+
+            await tx.execute(sql`
+                UPDATE user_plan_usage
+                SET used_count = used_count + 1,
+                    updated_at = now()
+                WHERE id = ${usageId}
+            `)
+        })
+    }
+
+    async getUsageWarnings(userId: string): Promise<PlanWarning[]> {
+        const usage = await this.getUsageQuota(userId)
+        const warnings: PlanWarning[] = []
+
+        warnings.push(
+            ...this.buildWarnings('workspaces', usage.workspaces.used, usage.workspaces.limit, 'Workspace limit')
+        )
+        warnings.push(
+            ...this.buildWarnings(
+                'connectedAccounts',
+                usage.connectedAccounts.used,
+                usage.connectedAccounts.limit,
+                'Connected accounts limit'
+            )
+        )
+        warnings.push(
+            ...this.buildWarnings('aiActions', usage.aiActions.used, usage.aiActions.limit, 'AI actions limit')
+        )
+        warnings.push(
+            ...this.buildWarnings(
+                'storageBytes',
+                usage.storageBytes.used,
+                usage.storageBytes.limit,
+                'Storage limit'
+            )
+        )
+        warnings.push(...this.buildWarnings('files', usage.files.used, usage.files.limit, 'Files limit'))
+
+        return warnings
+    }
+
+    async assertCanCreateWorkspace(userId: string): Promise<void> {
+        const usage = await this.getUsageQuota(userId)
+        if (usage.workspaces.used >= usage.workspaces.limit) {
+            throw new BaseAppError(
+                'Workspace limit reached for your current plan',
+                ErrorCode.PLAN_LIMIT_REACHED,
+                403
+            )
+        }
+    }
+
+    async assertCanConnectAccount(userId: string): Promise<void> {
+        const usage = await this.getUsageQuota(userId)
+        if (usage.connectedAccounts.used >= usage.connectedAccounts.limit) {
+            throw new BaseAppError(
+                'Connected accounts limit reached for your current plan',
+                ErrorCode.PLAN_LIMIT_REACHED,
+                403
+            )
+        }
+    }
+
+    async assertCanUpdateAiCustomInstructions(userId: string): Promise<void> {
+        const plan = await this.requireUserPlan(userId)
+        const normalizedPlan = normalizeUserPlan(plan.planName)
+
+        if (normalizedPlan !== UserPlans.PRO) {
+            throw new BaseAppError(
+                'AI custom instructions are available only on the Pro plan',
+                ErrorCode.PLAN_LIMIT_REACHED,
+                403
+            )
+        }
+    }
+
+    async assertPostMediaUploadAllowed(userId: string, files: Array<{ sizeBytes: number }>): Promise<void> {
+        if (files.length === 0) {
+            return
+        }
+
+        const usage = await this.getUsageQuota(userId)
+        const additionalFilesCount = files.length
+        const additionalStorageBytes = files.reduce((sum, file) => sum + Math.max(0, file.sizeBytes), 0)
+
+        const oversizeFile = files.find((file) => file.sizeBytes > usage.maxFileSizeBytes)
+        if (oversizeFile) {
+            throw new BaseAppError(
+                `File size exceeds plan limit (${usage.maxFileSizeBytes} bytes)`,
+                ErrorCode.PLAN_LIMIT_REACHED,
+                403
+            )
+        }
+
+        if (usage.files.used + additionalFilesCount > usage.files.limit) {
+            throw new BaseAppError('Files limit reached for your current plan', ErrorCode.PLAN_LIMIT_REACHED, 403)
+        }
+
+        if (usage.storageBytes.used + additionalStorageBytes > usage.storageBytes.limit) {
+            throw new BaseAppError(
+                'Storage limit reached for your current plan',
+                ErrorCode.PLAN_LIMIT_REACHED,
+                403
+            )
+        }
+    }
+
+    private buildWarnings(key: PlanWarning['key'], used: number, limit: number, label: string): PlanWarning[] {
+        if (limit <= 0) return []
+
+        const ratio = used / limit
+        if (ratio < PLAN_WARNING_THRESHOLD) return []
+
+        return [
+            {
+                key,
+                level: ratio >= PLAN_CRITICAL_THRESHOLD ? 'critical' : 'warning',
+                used,
+                limit,
+                ratio,
+                message: `${label} is ${(ratio * 100).toFixed(0)}% used`,
+            },
+        ]
+    }
+
+    private toQuotaMetric(used: number, limit: number) {
+        return {
+            used,
+            limit,
+            remaining: Math.max(0, limit - used),
+        }
+    }
+
+    private resolveUsagePeriod(plan: UserPlanSnapshot): { start: Date; end: Date } {
+        const now = new Date()
+
+        if (plan.periodEnd && plan.periodEnd.getTime() > now.getTime() && plan.periodStart < plan.periodEnd) {
+            return {
+                start: plan.periodStart,
+                end: plan.periodEnd,
+            }
+        }
+
+        const start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1, 0, 0, 0, 0))
+        const end = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0))
+        return { start, end }
+    }
+
+    private async getAiUsageCountForPlan(userId: string, plan: UserPlanSnapshot): Promise<number> {
+        const period = this.resolveUsagePeriod(plan)
+        return this.userRepository.getAiUsageCount(userId, plan.id, period.start, period.end)
+    }
+
+    private async getPostMediaUsage(userId: string): Promise<{ files: number; storageBytes: number }> {
+        return this.userRepository.getPostMediaUsage(userId)
+    }
+
+    private async requireUserPlan(userId: string): Promise<UserPlanSnapshot> {
+        const plan = await this.getUserPlan(userId)
+        if (!plan) {
+            throw new BaseAppError('Unable to resolve user plan', ErrorCode.UNKNOWN_ERROR, 500)
+        }
+
+        return plan
     }
 
     async updateUserSettings(
@@ -232,6 +526,24 @@ export class UserService implements IUserService {
             operation: 'UserService.deleteUserAccount',
             userId,
         })
+
+        const user = await this.userRepository.findById(userId)
+
+        if (user?.avatar) {
+            try {
+                await this.mediaUploader.delete(user.avatar)
+                const avatarKey = this.extractKeyFromUrl(user.avatar)
+                if (avatarKey) {
+                    await this.mediaRepository.deleteByKey(avatarKey)
+                }
+            } catch (error) {
+                this.logger.warn('Failed to delete user avatar from S3', {
+                    operation: 'UserService.deleteUserAccount',
+                    userId,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                })
+            }
+        }
 
         const userWorkspaces = await this.workspaceRepository.findByUserId(userId)
 

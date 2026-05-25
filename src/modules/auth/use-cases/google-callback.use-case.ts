@@ -66,6 +66,7 @@ export class GoogleCallbackUseCase {
         }
 
         let user = await this.userRepository.findByEmail(payload.email)
+        let wasCreated = false
 
         if (!user) {
             const name = payload.given_name || payload.name || payload.email
@@ -80,6 +81,7 @@ export class GoogleCallbackUseCase {
                     googleAuth: true,
                     avatar,
                 })
+                wasCreated = true
             } catch (error) {
                 if (error instanceof AppError && error.errorMessageCode === ErrorMessageCode.USER_ALREADY_EXISTS) {
                     user = await this.userRepository.findByEmail(payload.email)

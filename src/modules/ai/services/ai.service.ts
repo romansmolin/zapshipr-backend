@@ -4,7 +4,6 @@ import { AiOutput, AiOutputSchema, AiRequest } from '@/modules/ai/validation/ai.
 import { PostPlatform, SocilaMediaPlatform } from '@/modules/post/schemas/posts.schemas'
 import { BaseAppError } from '@/shared/errors/base-error'
 import { ErrorCode } from '@/shared/consts/error-codes.const'
-import { UserPlans } from '@/shared/consts/plans'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import type { IApiClient } from '@/shared/http-client'
 import type { IUserService } from '@/modules/user/services/user.service.interface'
@@ -288,17 +287,10 @@ export class AiService implements IAiService {
 
     private async ensureUserHasAiAccess(userId: string): Promise<void> {
         try {
-            const plan = await this.userService.getUserPlan(userId)
-            const normalizedPlanName = plan?.planName?.toUpperCase() as UserPlans | undefined
-
-            if (normalizedPlanName !== UserPlans.PRO) {
-                throw new BaseAppError('AI features are available only on the Pro plan', ErrorCode.FORBIDDEN, 403)
-            }
-
             await this.userService.incrementAiUsage(userId)
         } catch (error) {
-            if (error instanceof BaseAppError && error.code === ErrorCode.BAD_REQUEST) {
-                throw new BaseAppError('AI features are available only on the Pro plan', ErrorCode.FORBIDDEN, 403)
+            if (error instanceof BaseAppError && error.code === ErrorCode.PLAN_LIMIT_REACHED) {
+                throw error
             }
 
             throw error

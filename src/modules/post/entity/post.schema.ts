@@ -1,4 +1,4 @@
-import { boolean, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+import { bigint, boolean, integer, jsonb, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 
 import { socialAccounts, socialPlatformEnum } from '@/modules/social/entity/social-account.schema'
 import { users } from '@/modules/user/entity/user.schema'
@@ -31,6 +31,7 @@ export const mediaAssets = pgTable('media_assets', {
         .references(() => users.id, { onDelete: 'cascade' }),
     url: text('url').notNull(),
     type: text('type').notNull(),
+    sizeBytes: bigint('size_bytes', { mode: 'number' }),
     uploadedAt: timestamp('uploaded_at', { withTimezone: true }).defaultNow().notNull(),
 })
 

@@ -16,6 +16,11 @@ import { WorkspaceProfileService } from '../services/workspace-profile.service'
 import { WorkspaceController } from '../controllers/workspace.controller'
 import { WorkspaceTagsRepository } from '@/modules/inspiration/repositories/workspace-tags.repository'
 import { WorkspaceTagsService } from '@/modules/inspiration/services/workspace-tags/workspace-tags.service'
+import { UserRepository } from '@/modules/user/repositories/users.repository'
+import { PostsRepository } from '@/modules/post/repositories/posts.repository'
+import { AccountRepository } from '@/modules/social/repositories/account.repository'
+import { MediaRepository } from '@/modules/media/repositories/media.repository'
+import { UserService } from '@/modules/user/services/user.service'
 
 export const createWorkspaceRouter = (logger: ILogger, db: NodePgDatabase<typeof dbSchema>): Router => {
     const router = createRouter()
@@ -27,12 +32,26 @@ export const createWorkspaceRouter = (logger: ILogger, db: NodePgDatabase<typeof
     })
 
     const repository = new WorkspaceRepository(db, logger)
+    const userRepository = new UserRepository(db, logger)
+    const postsRepository = new PostsRepository(db, logger)
+    const accountRepository = new AccountRepository(db, logger)
+    const mediaRepository = new MediaRepository(db, logger)
     const signalsRepository = new WorkspaceProfileSignalsRepository(db, logger)
     const tagsRepository = new WorkspaceTagsRepository(db, logger)
     const tagsService = new WorkspaceTagsService(tagsRepository, logger)
     const mediaUploader = new S3Uploader(logger)
+    const userService = new UserService(
+        userRepository,
+        repository,
+        postsRepository,
+        accountRepository,
+        mediaRepository,
+        mediaUploader,
+        db,
+        logger
+    )
     const profileService = new WorkspaceProfileService(repository, signalsRepository, tagsService, logger)
-    const service = new WorkspaceService(repository, mediaUploader, profileService, logger)
+    const service = new WorkspaceService(repository, mediaUploader, profileService, userService, logger)
     const controller = new WorkspaceController(service, tagsService, profileService, logger)
 
     router.post('/workspaces', authMiddleware, upload.single('avatar'), asyncHandler(controller.create.bind(controller)))

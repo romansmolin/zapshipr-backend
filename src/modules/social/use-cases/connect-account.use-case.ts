@@ -76,23 +76,10 @@ export class ConnectAccountUseCase {
         }
 
         if (this.userService) {
-            const usage = await this.userService.getUsageQuota(account.userId)
-            const { used, limit } = usage.connectedAccounts
-
-            if (used >= limit) {
-                throw new BaseAppError(
-                    'Account limit reached for the current plan',
-                    ErrorCode.PLAN_LIMIT_REACHED,
-                    403
-                )
-            }
+            await this.userService.assertCanConnectAccount(account.userId)
         }
 
         const created = await this.repo.save(account)
-
-        if (this.userService) {
-            await this.userService.incrementConnectedAccountsUsage(account.userId)
-        }
 
         this.logger.info('Social account connected', {
             operation: 'ConnectAccountUseCase.execute',

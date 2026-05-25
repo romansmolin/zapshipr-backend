@@ -18,17 +18,22 @@ import type { IWorkspaceService } from './workspace-service.interface'
 import { normalizeOnboarding, validateOnboardingInput } from '../utils/onboarding-normalizer'
 import type { IWorkspaceProfileService } from './workspace-profile.service'
 import type { WorkspaceAIContext } from '../entity/workspace-profile.types'
+import type { IUserService } from '@/modules/user/services/user.service.interface'
 
 export class WorkspaceService implements IWorkspaceService {
     constructor(
         private repository: IWorkspaceRepository,
         private mediaUploader: IMediaUploader,
         private profileService: IWorkspaceProfileService,
+        private userService: IUserService | undefined,
         private logger: ILogger
     ) {}
 
     async create(userId: string, data: CreateWorkspaceInput, file?: Express.Multer.File): Promise<WorkspaceDto> {
         this.logger.info('Creating workspace', { userId, name: data.name })
+        if (this.userService) {
+            await this.userService.assertCanCreateWorkspace(userId)
+        }
 
         validateOnboardingInput(data.onboarding)
 
@@ -211,6 +216,9 @@ export class WorkspaceService implements IWorkspaceService {
 
     async updateMainPrompt(workspaceId: string, userId: string, data: UpdateMainPrompt): Promise<MainPrompt> {
         this.logger.info('Updating main prompt', { workspaceId, userId })
+        if (this.userService) {
+            await this.userService.assertCanUpdateAiCustomInstructions(userId)
+        }
 
         const workspace = await this.repository.findById(workspaceId)
 
@@ -332,6 +340,9 @@ export class WorkspaceService implements IWorkspaceService {
 
     async updateOnboarding(workspaceId: string, userId: string, data: UpdateOnboardingInput): Promise<Onboarding> {
         this.logger.info('Updating onboarding', { workspaceId, userId })
+        if (this.userService) {
+            await this.userService.assertCanUpdateAiCustomInstructions(userId)
+        }
 
         // Validate that client didn't send forbidden server-side fields
         validateOnboardingInput(data)

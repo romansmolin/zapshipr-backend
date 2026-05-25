@@ -167,14 +167,13 @@ export class ContentParserService implements IContentParserService {
             this.logger.debug('WE ARE ABOUT TO USE YOUTUBE')
 
             try {
-                const apiUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics,contentDetails&id=${videoId}&key=${apiKey}`
+                const apiUrl = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&id=${videoId}&key=${apiKey}`
 
                 const response = await axios.get(apiUrl, { timeout: this.TIMEOUT })
                 const video = response.data.items?.[0]
 
                 if (video) {
                     const snippet = video.snippet
-                    const stats = video.statistics || {}
                     const duration = video.contentDetails?.duration || ''
 
                     // Build rich content from video details
@@ -183,8 +182,6 @@ export class ContentParserService implements IContentParserService {
                         description: snippet.description || '',
                         channelTitle: snippet.channelTitle,
                         tags: snippet.tags || [],
-                        viewCount: stats.viewCount,
-                        likeCount: stats.likeCount,
                         duration,
                         publishedAt: snippet.publishedAt,
                     })
@@ -318,22 +315,12 @@ Analyze this video content and extract key insights, main topics, and actionable
         description: string
         channelTitle: string
         tags: string[]
-        viewCount?: string
-        likeCount?: string
         duration?: string
         publishedAt?: string
     }): string {
         let content = `YouTube Video: ${data.title}
 Channel: ${data.channelTitle}
 `
-
-        if (data.viewCount) {
-            content += `Views: ${parseInt(data.viewCount).toLocaleString()}\n`
-        }
-
-        if (data.likeCount) {
-            content += `Likes: ${parseInt(data.likeCount).toLocaleString()}\n`
-        }
 
         if (data.duration) {
             content += `Duration: ${this.formatDuration(data.duration)}\n`

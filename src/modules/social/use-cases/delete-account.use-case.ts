@@ -6,7 +6,6 @@ import { BaseAppError } from '@/shared/errors/base-error'
 import { ErrorCode } from '@/shared/consts/error-codes.const'
 
 import type { IAccountRepository } from '@/modules/social/repositories/account-repository.interface'
-import type { IUserService } from '@/modules/user/services/user.service.interface'
 import type { IPostsService } from '@/modules/post/services/posts-service.interface'
 
 export interface DeleteAccountInput {
@@ -23,20 +22,17 @@ export class DeleteAccountUseCase {
     private readonly repo: IAccountRepository
     private readonly logger: ILogger
     private readonly mediaUploader: IMediaUploader
-    private readonly userService?: IUserService
     private readonly postsService?: IPostsService
 
     constructor(
         repo: IAccountRepository,
         logger: ILogger,
         mediaUploader: IMediaUploader,
-        userService?: IUserService,
         postsService?: IPostsService
     ) {
         this.repo = repo
         this.logger = logger
         this.mediaUploader = mediaUploader
-        this.userService = userService
         this.postsService = postsService
     }
 
@@ -92,10 +88,6 @@ export class DeleteAccountUseCase {
             }
 
             const success = await this.repo.deleteAccount(userId, accountId)
-
-            if (success && this.userService) {
-                await this.userService.decrementConnectedAccountsUsage(userId)
-            }
 
             if (success) {
                 this.logger.info('Successfully deleted account', {

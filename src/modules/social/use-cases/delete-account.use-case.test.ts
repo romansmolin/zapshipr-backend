@@ -89,7 +89,7 @@ describe('DeleteAccountUseCase', () => {
     })
 
     it('cleans orphaned account posts via postsService during account deletion', async () => {
-        const useCase = new DeleteAccountUseCase(accountRepository, logger, mediaUploader, undefined, postsService)
+        const useCase = new DeleteAccountUseCase(accountRepository, logger, mediaUploader, postsService)
 
         const result = await useCase.execute({
             userId: 'user-1',
@@ -120,7 +120,7 @@ describe('DeleteAccountUseCase', () => {
             workspaceId: 'workspace-1',
         } as any)
 
-        const useCase = new DeleteAccountUseCase(accountRepository, logger, mediaUploader, undefined, postsService)
+        const useCase = new DeleteAccountUseCase(accountRepository, logger, mediaUploader, postsService)
 
         await useCase.execute({
             userId: 'user-1',

@@ -19,7 +19,16 @@ export const createApp = () => {
         }
     }
 
-    app.use(express.json())
+    app.use(
+        express.json({
+            verify: (req, _res, buf) => {
+                const expressReq = req as unknown as { originalUrl?: string; rawBody?: Buffer }
+                if (expressReq.originalUrl?.startsWith('/billing/stripe/webhook')) {
+                    expressReq.rawBody = Buffer.from(buf)
+                }
+            },
+        })
+    )
     app.use(bodyParser.urlencoded({ extended: true }))
 
     app.use(cookieParser())

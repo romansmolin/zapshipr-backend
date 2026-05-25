@@ -80,7 +80,7 @@ export class PostsRepository implements IPostsRepository {
         }
     }
 
-    async savePostMediaAssets(data: { userId: string; url: string; type: string }): Promise<{ mediaId: string }> {
+    async savePostMediaAssets(data: { userId: string; url: string; type: string; sizeBytes?: number | null }): Promise<{ mediaId: string }> {
         try {
             const mediaId = uuidv4()
 
@@ -89,6 +89,7 @@ export class PostsRepository implements IPostsRepository {
                 userId: data.userId,
                 url: data.url,
                 type: data.type,
+                sizeBytes: data.sizeBytes ?? null,
             })
 
             return { mediaId }

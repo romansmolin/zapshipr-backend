@@ -375,6 +375,13 @@ export class PostsController {
     }
 
     async getRateLimits(_req: Request, res: Response, _next: NextFunction): Promise<void> {
-        res.json({ limits: null })
+        res.json({
+            limits: {
+                posting: {
+                    policy: 'api_only',
+                    message: 'Posting limits are defined by social platform APIs',
+                },
+            },
+        })
     }
 }

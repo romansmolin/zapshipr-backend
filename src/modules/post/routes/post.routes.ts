@@ -23,6 +23,9 @@ import { WorkspaceProfileSignalsRepository } from '@/modules/workspace/repositor
 import { WorkspaceTagsRepository } from '@/modules/inspiration/repositories/workspace-tags.repository'
 import { WorkspaceTagsService } from '@/modules/inspiration/services/workspace-tags/workspace-tags.service'
 import { WorkspaceProfileService } from '@/modules/workspace/services/workspace-profile.service'
+import { UserRepository } from '@/modules/user/repositories/users.repository'
+import { MediaRepository } from '@/modules/media/repositories/media.repository'
+import { UserService } from '@/modules/user/services/user.service'
 
 import type { ILogger } from '@/shared/logger/logger.interface'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
@@ -56,6 +59,8 @@ export const createPostsRouter = (logger: ILogger, db: NodePgDatabase<typeof dbS
     )
     const postScheduler = new BullMqPostScheduler()
     const postPreparationScheduler = new BullMqPostPreparationScheduler()
+    const userRepository = new UserRepository(db, logger)
+    const mediaRepository = new MediaRepository(db, logger)
 
     // Workspace profile services for signal recording
     const workspaceRepository = new WorkspaceRepository(db, logger)
@@ -68,6 +73,16 @@ export const createPostsRouter = (logger: ILogger, db: NodePgDatabase<typeof dbS
         tagsService,
         logger
     )
+    const userService = new UserService(
+        userRepository,
+        workspaceRepository,
+        postsRepository,
+        accountRepository,
+        mediaRepository,
+        mediaUploader,
+        db,
+        logger
+    )
 
     const postsService = new PostsService(
         postsRepository,
@@ -77,7 +92,8 @@ export const createPostsRouter = (logger: ILogger, db: NodePgDatabase<typeof dbS
         socialMediaErrorHandler,
         postScheduler,
         postPreparationScheduler,
-        workspaceProfileService
+        workspaceProfileService,
+        userService
     )
     const postsController = new PostsController(postsService, logger)
     const workspaceMiddleware = createWorkspaceMiddleware(logger, db)

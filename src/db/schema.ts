@@ -13,6 +13,8 @@ import { workspaceTags, tagCategory } from '@/modules/inspiration/entity/workspa
 import { transcripts, transcriptSource, transcriptFormat } from '@/modules/inspiration/entity/transcript.schema'
 import { userMedia } from '@/modules/media/entity/user-media.schema'
 import { workspaceProfileSignals } from '@/modules/workspace/entity/workspace-profile-signal.schema'
+import { userPlans } from '@/modules/billing/entity/user-plan.schema'
+import { userPlanUsage } from '@/modules/billing/entity/user-plan-usage.schema'
 
 export const schema = {
     users,
@@ -30,6 +32,8 @@ export const schema = {
     transcripts,
     userMedia,
     workspaceProfileSignals,
+    userPlans,
+    userPlanUsage,
 }
 
 export type DBSchema = typeof schema
@@ -49,3 +53,5 @@ export { workspaceTags, tagCategory } from '@/modules/inspiration/entity/workspa
 export { transcripts, transcriptSource, transcriptFormat } from '@/modules/inspiration/entity/transcript.schema'
 export { userMedia } from '@/modules/media/entity/user-media.schema'
 export { workspaceProfileSignals } from '@/modules/workspace/entity/workspace-profile-signal.schema'
+export { userPlans } from '@/modules/billing/entity/user-plan.schema'
+export { userPlanUsage } from '@/modules/billing/entity/user-plan-usage.schema'
