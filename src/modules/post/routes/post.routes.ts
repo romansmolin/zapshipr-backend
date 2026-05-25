@@ -10,6 +10,8 @@ import { bindController } from '@/shared/http/bind-controller'
 import { PostsController } from '../controllers/posts.controller'
 
 import type { IPostsService } from '../services/posts-service.interface'
+import type { IUserService } from '@/modules/user/services/user.service.interface'
+import type { IWorkspaceProfileService } from '@/modules/workspace/services/workspace-profile.service'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import type { Router } from 'express'
@@ -20,16 +22,24 @@ export interface PostsModuleDeps {
     db: NodePgDatabase<typeof dbSchema>
     logger: ILogger
     postsService: IPostsService
+    userService: IUserService
+    workspaceProfileService: IWorkspaceProfileService
 }
 
 export interface PostsModule {
     router: Router
 }
 
-export const buildPostsModule = ({ db, logger, postsService }: PostsModuleDeps): PostsModule => {
+export const buildPostsModule = ({
+    db,
+    logger,
+    postsService,
+    userService,
+    workspaceProfileService,
+}: PostsModuleDeps): PostsModule => {
     const router = createRouter()
 
-    const postsController = new PostsController(postsService, logger)
+    const postsController = new PostsController(postsService, userService, workspaceProfileService, logger)
     const workspaceMiddleware = createWorkspaceMiddleware(logger, db)
     const handler = bindController(postsController)
 

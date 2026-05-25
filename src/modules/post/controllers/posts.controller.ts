@@ -1,6 +1,6 @@
 import { BaseAppError } from '@/shared/errors/base-error'
 import { ErrorCode } from '@/shared/consts/error-codes.const'
-import { workspaceIdParamSchema } from '@/modules/workspace/validation/workspace.schemas'
+import { PostStatus } from '@/modules/post/types/posts.types'
 
 import type {
     IPostsService,
@@ -8,6 +8,8 @@ import type {
     PostCreateQueuedResponse,
 } from '@/modules/post/services/posts-service.interface'
 import type { CreatePostsRequest } from '@/modules/post/schemas/posts.schemas'
+import type { IUserService } from '@/modules/user/services/user.service.interface'
+import type { IWorkspaceProfileService } from '@/modules/workspace/services/workspace-profile.service'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import type { PostFilters } from '@/modules/post/types/posts.types'
 import type { NextFunction, Request, Response } from 'express'
@@ -55,7 +57,6 @@ const parseDate = (value: unknown, timeZone?: string | null): Date | null => {
         }
     }
     if (typeof value === 'string' && value.trim() !== '') {
-        // Try parsing as a numeric timestamp first (milliseconds since epoch)
         const numericValue = Number(value)
         if (!Number.isNaN(numericValue) && numericValue > 0) {
             const parsed = new Date(numericValue)
@@ -71,7 +72,6 @@ const parseDate = (value: unknown, timeZone?: string | null): Date | null => {
                 return parsed
             }
         } else {
-            // Fallback to standard date string parsing
             const parsed = new Date(trimmed)
             if (!Number.isNaN(parsed.getTime())) {
                 return parsed
@@ -95,8 +95,6 @@ const parseFilterDate = (value: unknown): Date | null => {
 
     const trimmed = value.trim()
 
-    // Normalize ISO date-time with explicit offset to UTC wall-clock.
-    // Example: 2026-02-14T00:00:00+07:00 => 2026-02-14T00:00:00Z
     const tzMatch = trimmed.match(
         /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?)(?:Z|[+-]\d{2}:\d{2})$/
     )
@@ -159,12 +157,52 @@ const isQueuedResponse = (value: unknown): value is PostCreateQueuedResponse => 
     )
 }
 
+const extractMediaFileSizes = (
+    files: Request['files'],
+    payload: CreatePostsRequest
+): Array<{ sizeBytes: number }> => {
+    let mediaFiles: Express.Multer.File[] = []
+
+    if (files) {
+        if (Array.isArray(files)) {
+            mediaFiles = files
+        } else {
+            mediaFiles = Object.entries(files)
+                .filter(([fieldName]) => fieldName !== 'coverImage')
+                .flatMap(([, fs]) => fs)
+        }
+    }
+
+    return [
+        ...mediaFiles.map((file) => ({ sizeBytes: file.size })),
+        ...(payload.uploadedMedia ?? []).map((media) => ({
+            sizeBytes: Math.max(0, media.size ?? 0),
+        })),
+        ...(payload.copyDataUrls ?? []).map(() => ({ sizeBytes: 0 })),
+    ]
+}
+
+const computeIsScheduled = (payload: CreatePostsRequest): boolean => {
+    if (payload.postStatus === PostStatus.DRAFT) return false
+    if (payload.postNow === true) return false
+    return !!payload.scheduledAtLocal && !!payload.timezone
+}
+
 export class PostsController {
     private readonly postsService: IPostsService
+    private readonly userService: IUserService
+    private readonly workspaceProfileService: IWorkspaceProfileService
     private readonly logger: ILogger
 
-    constructor(postsService: IPostsService, logger: ILogger) {
+    constructor(
+        postsService: IPostsService,
+        userService: IUserService,
+        workspaceProfileService: IWorkspaceProfileService,
+        logger: ILogger
+    ) {
         this.postsService = postsService
+        this.userService = userService
+        this.workspaceProfileService = workspaceProfileService
         this.logger = logger
     }
 
@@ -174,6 +212,51 @@ export class PostsController {
             throw new BaseAppError('Workspace ID is required', ErrorCode.BAD_REQUEST, 400)
         }
         return workspaceId
+    }
+
+    private async recordCreateSignals(
+        workspaceId: string,
+        postId: string,
+        payload: CreatePostsRequest,
+        isScheduled: boolean
+    ): Promise<void> {
+        if (payload.posts.length === 0) return
+
+        try {
+            const tasks = payload.posts.flatMap((target) => [
+                this.workspaceProfileService.recordSignal(workspaceId, {
+                    type: 'content_published',
+                    source: 'post_service',
+                    data: {
+                        platform: target.platform,
+                        contentLength: target.text?.length || 0,
+                        hasMedia: payload.postType === 'media',
+                        isScheduled,
+                    },
+                }),
+                this.workspaceProfileService.recordSignal(workspaceId, {
+                    type: 'platform_used',
+                    source: 'post_service',
+                    data: { platform: target.platform },
+                }),
+            ])
+
+            await Promise.all(tasks)
+
+            this.logger.info('Post signals recorded', {
+                operation: 'PostsController.recordCreateSignals',
+                postId,
+                workspaceId,
+                signalCount: payload.posts.length * 2,
+            })
+        } catch (error) {
+            this.logger.warn('Failed to record post signals', {
+                operation: 'PostsController.recordCreateSignals',
+                postId,
+                workspaceId,
+                error: error instanceof Error ? error.message : String(error),
+            })
+        }
     }
 
     async createPost(req: Request, res: Response, _next: NextFunction): Promise<void> {
@@ -186,12 +269,20 @@ export class PostsController {
         const payload = createPostsSchema.parse(parseCreatePostsRequest(req.body))
         const medias = req.files as { [fieldname: string]: Express.Multer.File[] } | Express.Multer.File[]
 
+        if (payload.postType === 'media') {
+            const projectedUploads = extractMediaFileSizes(req.files, payload)
+            await this.userService.assertPostMediaUploadAllowed(userId, projectedUploads)
+        }
+
         const result = await this.postsService.createPost(payload, medias, userId, workspaceId)
 
         if (isCompatibilityError(result)) {
             res.status(result.status).json(result)
             return
         }
+
+        const isScheduled = isQueuedResponse(result) ? false : computeIsScheduled(payload)
+        await this.recordCreateSignals(workspaceId, result.postId, payload, isScheduled)
 
         if (isQueuedResponse(result)) {
             this.logger.info('Post accepted for async processing', {
@@ -223,6 +314,12 @@ export class PostsController {
 
         const workspaceId = this.getWorkspaceId(req)
         const payload = presignPostUploadsSchema.parse(req.body)
+
+        await this.userService.assertPostMediaUploadAllowed(
+            userId,
+            payload.files.map((file) => ({ sizeBytes: file.size }))
+        )
+
         const urls = await this.postsService.createPresignedUploadUrls(userId, workspaceId, payload.files)
 
         res.status(201).json({ items: urls })
@@ -242,6 +339,10 @@ export class PostsController {
 
         const payload = createPostsSchema.parse(parseCreatePostsRequest(req.body))
         const file = req.file
+
+        if (file && payload.postType === 'media') {
+            await this.userService.assertPostMediaUploadAllowed(userId, [{ sizeBytes: file.size }])
+        }
 
         await this.postsService.editPost(postId, payload, file, userId, workspaceId)
 
@@ -321,7 +422,6 @@ export class PostsController {
         const workspaceId = this.getWorkspaceId(req)
         const count = await this.postsService.getPostsFailedCount(userId, workspaceId)
 
-        // Keep legacy `count` for backward compatibility and expose explicit `failedCount` for frontend.
         res.json({ failedCount: count, count })
     }
 

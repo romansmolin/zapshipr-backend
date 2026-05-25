@@ -32,37 +32,54 @@ const startServer = async () => {
         oauthStateService: deps.oauthStateService,
     })
 
-    const { router: postsRoutes } = buildPostsModule({ db, logger, postsService: deps.postsService })
+    const { router: postsRoutes } = buildPostsModule({
+        db,
+        logger,
+        postsService: deps.postsService,
+        userService: deps.userService,
+        workspaceProfileService: deps.workspaceProfileService,
+    })
+
     const { router: waitlistRoutes } = buildWaitlistModule({ logger, waitlistService: deps.waitlistService })
+
     const { router: userRoutes } = buildUserModule({ logger, userService: deps.userService })
+
     const { router: workspaceRoutes } = buildWorkspaceModule({
         logger,
         workspaceService: deps.workspaceService,
         workspaceProfileService: deps.workspaceProfileService,
         workspaceTagsService: deps.workspaceTagsService,
     })
+
     const { router: inspirationsRoutes } = buildInspirationsModule({
         db,
         logger,
         inspirationsService: deps.inspirationsService,
     })
+
     const { router: workspaceTagsRoutes } = buildWorkspaceTagsModule({
         logger,
         workspaceTagsService: deps.workspaceTagsService,
     })
+
     const { router: mediaRoutes } = buildMediaModule({ logger, mediaService: deps.mediaService })
+
     const { router: billingRoutes } = buildBillingModule({ logger, billingService: deps.billingService })
+
     const { router: aiRoutes } = buildAiModule({ logger, aiService: deps.aiService })
 
     app.use(authRoutes)
     app.use(accountsRoutes)
     app.use(postsRoutes)
     app.use(aiRoutes)
+
     app.use(waitlistRoutes)
     app.use(userRoutes)
     app.use(workspaceRoutes)
+
     app.use(inspirationsRoutes)
     app.use(workspaceTagsRoutes)
+
     app.use(mediaRoutes)
     app.use(billingRoutes)
 

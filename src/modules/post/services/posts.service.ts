@@ -35,8 +35,6 @@ import type {
 import type { IMediaUploader } from '@/shared/media-uploader'
 import type { IPostPreparationScheduler, IPostScheduler } from '@/shared/queue'
 import type { ILogger } from '@/shared/logger/logger.interface'
-import type { IWorkspaceProfileService } from '@/modules/workspace/services/workspace-profile.service'
-import type { IUserService } from '@/modules/user/services/user.service.interface'
 import type {
     CreatePostResponse,
     PostFilters,
@@ -55,8 +53,6 @@ export class PostsService implements IPostsService {
     private errorHandler: SocialMediaErrorHandler
     private postScheduler?: IPostScheduler
     private postPreparationScheduler?: IPostPreparationScheduler
-    private workspaceProfileService?: IWorkspaceProfileService
-    private userService?: IUserService
 
     constructor(
         postRepository: IPostsRepository,
@@ -65,9 +61,7 @@ export class PostsService implements IPostsService {
         socialMediaPostSender: ISocialMediaPostSenderService,
         errorHandler: SocialMediaErrorHandler,
         postScheduler?: IPostScheduler,
-        postPreparationScheduler?: IPostPreparationScheduler,
-        workspaceProfileService?: IWorkspaceProfileService,
-        userService?: IUserService
+        postPreparationScheduler?: IPostPreparationScheduler
     ) {
         this.postRepository = postRepository
         this.logger = logger
@@ -77,8 +71,6 @@ export class PostsService implements IPostsService {
         this.errorHandler = errorHandler
         this.postScheduler = postScheduler
         this.postPreparationScheduler = postPreparationScheduler
-        this.workspaceProfileService = workspaceProfileService
-        this.userService = userService
 
         this.socialMediaPostSender.setOnPostSuccessCallback(this.checkAndUpdateBasePostStatus.bind(this))
         this.socialMediaPostSender.setOnPostFailureCallback(this.checkAndUpdateBasePostStatus.bind(this))
@@ -122,17 +114,6 @@ export class PostsService implements IPostsService {
 
     private isAsyncPostNowEnabled(): boolean {
         return (process.env.POST_NOW_ASYNC_ENABLED ?? 'false').toLowerCase() === 'true'
-    }
-
-    private async assertPostMediaUploadAllowed(
-        userId: string,
-        files: Array<{ sizeBytes: number }>
-    ): Promise<void> {
-        if (!this.userService) {
-            return
-        }
-
-        await this.userService.assertPostMediaUploadAllowed(userId, files)
     }
 
     private sanitizeExtension(value?: string | null): string | null {
@@ -1400,67 +1381,12 @@ export class PostsService implements IPostsService {
         }
     }
 
-    private async recordPostSignals(
-        workspaceId: string,
-        postId: string,
-        postTargets: PostTarget[],
-        createPostsRequest: CreatePostsRequest,
-        isScheduled: boolean
-    ): Promise<void> {
-        if (!this.workspaceProfileService || postTargets.length === 0) {
-            return
-        }
-
-        try {
-            const profileService = this.workspaceProfileService
-            const signalTasks = postTargets.flatMap((target) => [
-                profileService.recordSignal(workspaceId, {
-                    type: 'content_published',
-                    source: 'post_service',
-                    data: {
-                        platform: target.platform,
-                        contentLength: target.text?.length || 0,
-                        hasMedia: createPostsRequest.postType === 'media',
-                        isScheduled,
-                    },
-                }),
-                profileService.recordSignal(workspaceId, {
-                    type: 'platform_used',
-                    source: 'post_service',
-                    data: {
-                        platform: target.platform,
-                    },
-                }),
-            ])
-
-            await Promise.all(signalTasks)
-
-            this.logger.info('Post signals recorded', {
-                operation: 'recordPostSignals',
-                postId,
-                workspaceId,
-                signalCount: postTargets.length * 2,
-            })
-        } catch (error) {
-            this.logger.warn('Failed to record post signals', {
-                operation: 'recordPostSignals',
-                postId,
-                workspaceId,
-                error: error instanceof Error ? error.message : String(error),
-            })
-        }
-    }
-
     async createPresignedUploadUrls(
         userId: string,
         workspaceId: string,
         files: PresignUploadFileRequest[]
     ): Promise<PresignedUploadResponseItem[]> {
         const expiresIn = 15 * 60
-        await this.assertPostMediaUploadAllowed(
-            userId,
-            files.map((file) => ({ sizeBytes: file.size }))
-        )
 
         return Promise.all(
             files.map(async (file, index) => {
@@ -1544,18 +1470,6 @@ export class PostsService implements IPostsService {
                 createPostsRequest.postType === 'media'
                     ? uploadedMediaFiles.length + copyMediaCount + uploadedMediaCount
                     : 0
-
-            if (createPostsRequest.postType === 'media') {
-                const projectedUploads = [
-                    ...uploadedMediaFiles.map((file) => ({ sizeBytes: file.size })),
-                    ...(createPostsRequest.uploadedMedia ?? []).map((media) => ({
-                        sizeBytes: Math.max(0, media.size ?? 0),
-                    })),
-                    ...(createPostsRequest.copyDataUrls ?? []).map(() => ({ sizeBytes: 0 })),
-                ]
-
-                await this.assertPostMediaUploadAllowed(userId, projectedUploads)
-            }
 
             const normalizedCreatePostsRequest: CreatePostsRequest = {
                 ...createPostsRequest,
@@ -1716,14 +1630,6 @@ export class PostsService implements IPostsService {
                         selectedMediaIndices: Array.from(selectedMediaIndices),
                     })
 
-                    await this.recordPostSignals(
-                        workspaceId,
-                        postId,
-                        postTargets,
-                        normalizedCreatePostsRequest,
-                        false
-                    )
-
                     this.logger.info('post_create_ack_ms', {
                         operation: 'createPost',
                         postId,
@@ -1755,8 +1661,6 @@ export class PostsService implements IPostsService {
                 }
             }
 
-            await this.recordPostSignals(workspaceId, postId, postTargets, normalizedCreatePostsRequest, !!isScheduled)
-
             return await this.postRepository.getPostDetails(postId, userId)
         } catch (error: unknown) {
             if (createdPostId) {
@@ -1787,9 +1691,6 @@ export class PostsService implements IPostsService {
             const normalizedUpdatePostRequest: CreatePostsRequest = {
                 ...updatePostRequest,
                 posts: this.normalizePostTargetsMediaIndices(updatePostRequest, mediaPoolCount),
-            }
-            if (file && normalizedUpdatePostRequest.postType === 'media') {
-                await this.assertPostMediaUploadAllowed(userId, [{ sizeBytes: file.size }])
             }
             const selectedMediaIndices = this.collectSelectedMediaIndices(normalizedUpdatePostRequest.posts)
             const editMediaTransform = this.getSingleEditTransform(normalizedUpdatePostRequest, selectedMediaIndices, file)

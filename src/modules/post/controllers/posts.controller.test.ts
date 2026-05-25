@@ -7,6 +7,8 @@ import { PostTargetEntity } from '@/modules/post/entity/post-target'
 import { PostsController } from './posts.controller'
 
 import type { IPostsService } from '@/modules/post/services/posts-service.interface'
+import type { IUserService } from '@/modules/user/services/user.service.interface'
+import type { IWorkspaceProfileService } from '@/modules/workspace/services/workspace-profile.service'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import type { Request, Response } from 'express'
 
@@ -41,7 +43,10 @@ describe('PostsController failed endpoints', () => {
             debug: jest.fn(),
         } as jest.Mocked<ILogger>
 
-        controller = new PostsController(postsService, logger)
+        const userService = {} as jest.Mocked<IUserService>
+        const workspaceProfileService = {} as jest.Mocked<IWorkspaceProfileService>
+
+        controller = new PostsController(postsService, userService, workspaceProfileService, logger)
     })
 
     it('returns failedCount and count for failed-count endpoint', async () => {

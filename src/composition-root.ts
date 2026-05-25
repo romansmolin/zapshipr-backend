@@ -42,6 +42,7 @@ import { WorkspaceTagsService } from '@/modules/inspiration/services/workspace-t
 import { WorkspaceService } from '@/modules/workspace/services/workspace.service'
 import { SocialMediaPublisherFactory } from '@/modules/social/factories/socia-media-publisher.factory'
 import { SocialMediaPostSenderService } from '@/modules/social/services/social-media-post-sender.service'
+import { SocialMediaTokenRefresherService } from '@/modules/social/services/social-media-token-refresher.service'
 import { PostsService } from '@/modules/post/services/posts.service'
 import { InspirationsService } from '@/modules/inspiration/services/inspirations.service'
 import { ContentParserService } from '@/modules/inspiration/services/content-parser/content-parser.service'
@@ -87,6 +88,7 @@ import type { IWorkspaceProfileService } from '@/modules/workspace/services/work
 import type { IWorkspaceService } from '@/modules/workspace/services/workspace-service.interface'
 import type { IPostsService } from '@/modules/post/services/posts-service.interface'
 import type { ISocialMediaPostSenderService } from '@/modules/social/services/social-media-post-sender.interface'
+import type { ISocialMediaTokenRefresherService } from '@/modules/social/services/social-media-token-refresher.interface'
 import type { IInspirationsService } from '@/modules/inspiration/services/inspirations-service.interface'
 import type { IMediaService } from '@/modules/media/services/media-service.interface'
 import type { IWaitlistService } from '@/modules/waitlist/services/waitlist.service.interface'
@@ -120,6 +122,7 @@ export interface AppDeps {
     workspaceProfileService: IWorkspaceProfileService
     workspaceTagsService: WorkspaceTagsService
     socialMediaPostSender: ISocialMediaPostSenderService
+    socialMediaTokenRefresher: ISocialMediaTokenRefresherService
 
     // Module-level services
     authService: IAuthService
@@ -198,6 +201,7 @@ export const buildAppDeps = ({ db, logger }: AppDepsInput): AppDeps => {
         socialMediaErrorHandler,
         socialMediaPublisherFactory
     )
+    const socialMediaTokenRefresher = new SocialMediaTokenRefresherService(logger, accountRepository)
 
     // ----- Posts -----
     const postsService = new PostsService(
@@ -207,9 +211,7 @@ export const buildAppDeps = ({ db, logger }: AppDepsInput): AppDeps => {
         socialMediaPostSender,
         socialMediaErrorHandler,
         postScheduler,
-        postPreparationScheduler,
-        workspaceProfileService,
-        userService
+        postPreparationScheduler
     )
 
     // ----- Social accounts (use cases + service) -----
@@ -293,6 +295,7 @@ export const buildAppDeps = ({ db, logger }: AppDepsInput): AppDeps => {
         workspaceProfileService,
         workspaceTagsService,
         socialMediaPostSender,
+        socialMediaTokenRefresher,
         authService,
         accountsService,
         socialMediaConnectorService,
