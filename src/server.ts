@@ -1,71 +1,54 @@
 import { createApp } from './app'
 import { db } from './db/client'
-import { createAuthRouter } from './modules/auth/routes/auth.routes'
-import { createAccountsRouter } from './modules/social/routes/accounts.routes'
-import { createPostsRouter } from './modules/post/routes/post.routes'
-import { createWaitlistRouter } from './modules/waitlist/routes/waitlist.routes'
-import { createUserRoutes } from './modules/user/routes/user.routes'
-import { createWorkspaceRouter } from './modules/workspace/routes/workspace.routes'
-import { createInspirationsRouter } from './modules/inspiration/routes/inspirations.routes'
-import { createWorkspaceTagsRouter } from './modules/inspiration/routes/workspace-tags.routes'
-import { createMediaRouter } from './modules/media/routes/media.routes'
-import { createBillingRouter } from './modules/billing/routes/billing.routes'
-import { createAiRouter } from './modules/ai/routes/ai.routes'
+import { buildAppDeps } from './composition-root'
+import { buildAuthModule } from './modules/auth/routes/auth.routes'
+import { buildAccountsModule } from './modules/social/routes/accounts.routes'
+import { buildPostsModule } from './modules/post/routes/post.routes'
+import { buildWaitlistModule } from './modules/waitlist/routes/waitlist.routes'
+import { buildUserModule } from './modules/user/routes/user.routes'
+import { buildWorkspaceModule } from './modules/workspace/routes/workspace.routes'
+import { buildInspirationsModule } from './modules/inspiration/routes/inspirations.routes'
+import { buildWorkspaceTagsModule } from './modules/inspiration/routes/workspace-tags.routes'
+import { buildMediaModule } from './modules/media/routes/media.routes'
+import { buildBillingModule } from './modules/billing/routes/billing.routes'
+import { buildAiModule } from './modules/ai/routes/ai.routes'
 import { AiService } from './modules/ai/services/ai.service'
 import { AxiosHttpClient } from './shared/http-client'
-import { UserRepository } from './modules/user/repositories/users.repository'
-import { WorkspaceRepository } from './modules/workspace/repositories/workspace.repository'
-import { PostsRepository } from './modules/post/repositories/posts.repository'
-import { AccountRepository } from './modules/social/repositories/account.repository'
-import { MediaRepository } from './modules/media/repositories/media.repository'
-import { S3Uploader } from './shared/media-uploader/media-uploader'
-import { UserService } from './modules/user/services/user.service'
-import { WorkspaceProfileSignalsRepository } from './modules/workspace/repositories/workspace-profile-signals.repository'
-import { WorkspaceTagsRepository } from './modules/inspiration/repositories/workspace-tags.repository'
-import { WorkspaceTagsService } from './modules/inspiration/services/workspace-tags/workspace-tags.service'
-import { WorkspaceProfileService } from './modules/workspace/services/workspace-profile.service'
 import { createErrorHandler } from './shared/http/error-handler'
 import { ConsoleLogger } from './shared/logger/console-logger'
 
 const startServer = async () => {
     const app = createApp()
-
     const logger = new ConsoleLogger()
 
-    const authRoutes = createAuthRouter(logger, db)
-    const accountsRoutes = createAccountsRouter(logger, db)
-    const postsRoutes = createPostsRouter(logger, db)
-    const waitlistRoutes = createWaitlistRouter(logger, db)
-    const userRoutes = createUserRoutes(logger, db)
-    const workspaceRoutes = createWorkspaceRouter(logger, db)
-    const inspirationsRoutes = createInspirationsRouter(logger, db)
-    const workspaceTagsRoutes = createWorkspaceTagsRouter(logger, db)
-    const mediaRoutes = createMediaRouter(logger, db)
-    const billingRoutes = createBillingRouter(logger, db)
+    // Composition root — every shared singleton constructed once here.
+    const deps = buildAppDeps({ db, logger })
 
-    const userRepository = new UserRepository(db, logger)
-    const workspaceRepository = new WorkspaceRepository(db, logger)
-    const postsRepository = new PostsRepository(db, logger)
-    const accountRepository = new AccountRepository(db, logger)
-    const mediaRepository = new MediaRepository(db, logger)
-    const mediaUploader = new S3Uploader(logger)
-    const userService = new UserService(
-        userRepository,
-        workspaceRepository,
-        postsRepository,
-        accountRepository,
-        mediaRepository,
-        mediaUploader,
+    // AI service has its own OpenAI-targeted http client and consumes cross-cutting services.
+    const openaiApiClient = new AxiosHttpClient('https://api.openai.com/v1')
+    const aiService = new AiService(openaiApiClient, logger, deps.userService, deps.workspaceProfileService)
+
+    // Build modules. Post module now takes the fully-wired postsService from deps.
+    const { router: authRoutes } = buildAuthModule({ db, logger, emailService: deps.emailService })
+    const { router: accountsRoutes } = buildAccountsModule({
         db,
-        logger
-    )
-    const signalsRepository = new WorkspaceProfileSignalsRepository(db, logger)
-    const tagsRepository = new WorkspaceTagsRepository(db, logger)
-    const tagsService = new WorkspaceTagsService(tagsRepository, logger)
-    const workspaceProfileService = new WorkspaceProfileService(workspaceRepository, signalsRepository, tagsService, logger)
-    const apiClient = new AxiosHttpClient('https://api.openai.com/v1')
-    const aiService = new AiService(apiClient, logger, userService, workspaceProfileService)
-    const aiRoutes = createAiRouter(logger, aiService)
+        logger,
+        mediaUploader: deps.mediaUploader,
+        apiClient: deps.apiClient,
+    })
+    const { router: postsRoutes } = buildPostsModule({ db, logger, postsService: deps.postsService })
+    const { router: waitlistRoutes } = buildWaitlistModule({ db, logger, emailService: deps.emailService })
+    const { router: userRoutes } = buildUserModule({ db, logger, mediaUploader: deps.mediaUploader })
+    const { router: workspaceRoutes } = buildWorkspaceModule({ db, logger, mediaUploader: deps.mediaUploader })
+    const { router: inspirationsRoutes } = buildInspirationsModule({
+        db,
+        logger,
+        mediaUploader: deps.mediaUploader,
+    })
+    const { router: workspaceTagsRoutes } = buildWorkspaceTagsModule({ db, logger })
+    const { router: mediaRoutes } = buildMediaModule({ db, logger, mediaUploader: deps.mediaUploader })
+    const { router: billingRoutes } = buildBillingModule({ db, logger })
+    const { router: aiRoutes } = buildAiModule({ logger, aiService })
 
     app.use(authRoutes)
     app.use(accountsRoutes)
