@@ -1,34 +1,25 @@
-import { Router as createRouter } from 'express'
 import type { Router } from 'express'
-import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
+import { Router as createRouter } from 'express'
 
-import { schema as dbSchema } from '@/db/schema'
-import { UserRepository } from '@/modules/user/repositories/users.repository'
 import { bindController } from '@/shared/http/bind-controller'
 
-import type { IEmailService } from '@/modules/email/services/email.service.interface'
+import { AuthController } from '../controllers/auth.controller'
+
+import type { IAuthService } from '../services/auth-service.interface'
 import type { ILogger } from '@/shared/logger/logger.interface'
 
-import { AuthController } from '../controllers/auth.controller'
-import { AuthService } from '../services/auth.service'
-
 export interface AuthModuleDeps {
-    db: NodePgDatabase<typeof dbSchema>
     logger: ILogger
-    emailService: IEmailService
+    authService: IAuthService
 }
 
 export interface AuthModule {
     router: Router
 }
 
-export const buildAuthModule = ({ db, logger, emailService }: AuthModuleDeps): AuthModule => {
-    const userRepository = new UserRepository(db, logger)
-    const authService = new AuthService(userRepository, emailService, logger)
+export const buildAuthModule = ({ logger, authService }: AuthModuleDeps): AuthModule => {
     const authController = new AuthController(authService, logger)
-
     const router = createRouter()
-
     const handler = bindController(authController)
 
     router.post('/auth/sign-up', handler('signUp'))

@@ -8,15 +8,11 @@ import { asyncHandler } from '@/shared/http/async-handler'
 import { bindController } from '@/shared/http/bind-controller'
 import { authMiddleware } from '@/middleware/auth.middleware'
 import { createWorkspaceMiddleware } from '@/middleware/workspace.middleware'
-import { BullMqInspirationScheduler } from '@/shared/queue'
 
-import { InspirationsRepository } from '../repositories/inspirations.repository'
-import { InspirationsService } from '../services/inspirations.service'
 import { InspirationsController } from '../controllers/inspirations.controller'
-import { ContentParserService } from '../services/content-parser/content-parser.service'
 
+import type { IInspirationsService } from '../services/inspirations-service.interface'
 import type { ILogger } from '@/shared/logger/logger.interface'
-import type { IMediaUploader } from '@/shared/media-uploader'
 
 const upload = multer({
     storage: multer.memoryStorage(),
@@ -28,21 +24,20 @@ const upload = multer({
 export interface InspirationsModuleDeps {
     db: NodePgDatabase<typeof dbSchema>
     logger: ILogger
-    mediaUploader: IMediaUploader
+    inspirationsService: IInspirationsService
 }
 
 export interface InspirationsModule {
     router: Router
 }
 
-export const buildInspirationsModule = ({ db, logger, mediaUploader }: InspirationsModuleDeps): InspirationsModule => {
+export const buildInspirationsModule = ({
+    db,
+    logger,
+    inspirationsService,
+}: InspirationsModuleDeps): InspirationsModule => {
     const router = createRouter()
-
-    const repository = new InspirationsRepository(db, logger)
-    const scheduler = new BullMqInspirationScheduler()
-    const contentParser = new ContentParserService(logger)
-    const service = new InspirationsService(repository, mediaUploader, scheduler, contentParser, logger)
-    const controller = new InspirationsController(service, logger)
+    const controller = new InspirationsController(inspirationsService, logger)
     const workspaceMiddleware = createWorkspaceMiddleware(logger, db)
     const handler = bindController(controller)
 

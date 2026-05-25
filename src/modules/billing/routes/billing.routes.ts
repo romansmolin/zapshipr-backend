@@ -1,29 +1,22 @@
 import { Router as createRouter } from 'express'
 import type { Router } from 'express'
-import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 
-import { schema as dbSchema } from '@/db/schema'
-import { UserRepository } from '@/modules/user/repositories/users.repository'
 import { asyncHandler } from '@/shared/http/async-handler'
 
-import { BillingService } from '../services/billing.service'
-
+import type { BillingService } from '../services/billing.service'
 import type { ILogger } from '@/shared/logger/logger.interface'
 
 export interface BillingModuleDeps {
-    db: NodePgDatabase<typeof dbSchema>
     logger: ILogger
+    billingService: BillingService
 }
 
 export interface BillingModule {
     router: Router
 }
 
-export const buildBillingModule = ({ db, logger }: BillingModuleDeps): BillingModule => {
+export const buildBillingModule = ({ billingService }: BillingModuleDeps): BillingModule => {
     const router = createRouter()
-
-    const userRepository = new UserRepository(db, logger)
-    const billingService = new BillingService(db, userRepository, logger)
 
     router.post(
         '/billing/stripe/webhook',
