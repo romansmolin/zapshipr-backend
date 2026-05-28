@@ -12,73 +12,60 @@ import type {
     SignUpInput,
 } from './auth-service.interface'
 import { TokenService } from './token.service'
-import { SignUpUseCase } from '../use-cases/sign-up.use-case'
-import { SignInUseCase } from '../use-cases/sign-in.use-case'
-import { RefreshTokenUseCase } from '../use-cases/refresh-token.use-case'
-import { GetSessionUseCase } from '../use-cases/get-session.use-case'
-import { GoogleCallbackUseCase } from '../use-cases/google-callback.use-case'
-import { LogoutUseCase } from '../use-cases/logout.use-case'
-import { ChangePasswordUseCase } from '../use-cases/change-password.use-case'
-import { ForgetPasswordUseCase } from '../use-cases/forget-password.use-case'
 
-/**
- * AuthService acts as a proxy/facade that delegates to individual use cases.
- * Each authentication operation is handled by a dedicated use case class.
- */
+import { signUp as signUpUseCase } from '../use-cases/sign-up.use-case'
+import { signIn as signInUseCase } from '../use-cases/sign-in.use-case'
+import { refreshToken as refreshTokenUseCase } from '../use-cases/refresh-token.use-case'
+import { getSession as getSessionUseCase } from '../use-cases/get-session.use-case'
+import { googleCallback as googleCallbackUseCase } from '../use-cases/google-callback.use-case'
+import { logout as logoutUseCase } from '../use-cases/logout.use-case'
+import { changePassword as changePasswordUseCase } from '../use-cases/change-password.use-case'
+import { forgetPassword as forgetPasswordUseCase } from '../use-cases/forget-password.use-case'
+
+type AuthDeps = {
+    users: IUserRepository
+    tokens: TokenService
+    emailService: IEmailService
+    logger: ILogger
+}
+
 export class AuthService implements IAuthService {
-    private readonly tokenService: TokenService
-    private readonly signUpUseCase: SignUpUseCase
-    private readonly signInUseCase: SignInUseCase
-    private readonly refreshTokenUseCase: RefreshTokenUseCase
-    private readonly getSessionUseCase: GetSessionUseCase
-    private readonly googleCallbackUseCase: GoogleCallbackUseCase
-    private readonly logoutUseCase: LogoutUseCase
-    private readonly changePasswordUseCase: ChangePasswordUseCase
-    private readonly forgetPasswordUseCase: ForgetPasswordUseCase
+    private readonly deps: AuthDeps
 
     constructor(userRepository: IUserRepository, emailService: IEmailService, logger: ILogger) {
-        this.tokenService = new TokenService(userRepository, logger)
-
-        // Initialize use cases
-        this.signUpUseCase = new SignUpUseCase(userRepository, this.tokenService, logger)
-        this.signInUseCase = new SignInUseCase(userRepository, this.tokenService, logger)
-        this.refreshTokenUseCase = new RefreshTokenUseCase(this.tokenService, logger)
-        this.getSessionUseCase = new GetSessionUseCase(this.tokenService, logger)
-        this.googleCallbackUseCase = new GoogleCallbackUseCase(userRepository, this.tokenService, logger)
-        this.logoutUseCase = new LogoutUseCase(logger)
-        this.changePasswordUseCase = new ChangePasswordUseCase(userRepository, this.tokenService, logger)
-        this.forgetPasswordUseCase = new ForgetPasswordUseCase(userRepository, this.tokenService, emailService, logger)
+        const tokens = new TokenService(userRepository, logger)
+        this.deps = { users: userRepository, tokens, emailService, logger }
     }
 
-    async signUp(payload: SignUpInput): Promise<AuthResult> {
-        return this.signUpUseCase.execute(payload)
+    signUp(payload: SignUpInput): Promise<AuthResult> {
+        return signUpUseCase(this.deps, payload)
     }
 
-    async signIn(payload: SignInInput): Promise<AuthResult> {
-        return this.signInUseCase.execute(payload)
+    signIn(payload: SignInInput): Promise<AuthResult> {
+        return signInUseCase(this.deps, payload)
     }
 
-    async changePassword(payload: ResetPasswordInput): Promise<void> {
-        return this.changePasswordUseCase.execute(payload)
+    changePassword(payload: ResetPasswordInput): Promise<void> {
+        return changePasswordUseCase(this.deps, payload)
     }
 
-    async forgetPassword(payload: ForgotPasswordInput): Promise<void> {
-        return this.forgetPasswordUseCase.execute(payload)
+    forgetPassword(payload: ForgotPasswordInput): Promise<void> {
+        return forgetPasswordUseCase(this.deps, payload)
     }
 
-    async getSession(refreshToken?: string): Promise<AuthResult> {
-        return this.getSessionUseCase.execute(refreshToken)
+    getSession(refreshToken?: string): Promise<AuthResult> {
+        return getSessionUseCase(this.deps, refreshToken)
     }
 
-    async refresh(refreshToken?: string): Promise<RefreshResult> {
-        return this.refreshTokenUseCase.execute(refreshToken)
+    refresh(refreshToken?: string): Promise<RefreshResult> {
+        return refreshTokenUseCase(this.deps, refreshToken)
     }
 
-    async logout(): Promise<void> {
-        return this.logoutUseCase.execute()
+    logout(): Promise<void> {
+        return logoutUseCase(this.deps)
     }
 
-    async googleCallback(code: string): Promise<AuthResult> {
-        return this.googleCallbackUseCase.execute(code)
+    googleCallback(code: string): Promise<AuthResult> {
+        return googleCallbackUseCase(this.deps, code)
     }
 }

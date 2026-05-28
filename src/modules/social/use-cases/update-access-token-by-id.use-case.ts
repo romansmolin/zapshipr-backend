@@ -10,33 +10,25 @@ export interface UpdateAccessTokenByIdInput {
     refreshTokenExpiresIn: Date | null
 }
 
-export class UpdateAccessTokenByIdUseCase {
-    private readonly repo: IAccountRepository
-    private readonly logger: ILogger
+export type UpdateAccessTokenByIdDeps = {
+    accounts: IAccountRepository
+    logger: ILogger
+}
 
-    constructor(repo: IAccountRepository, logger: ILogger) {
-        this.repo = repo
-        this.logger = logger
-    }
-
-    async execute({
+export const updateAccessTokenById = async (
+    { accounts, logger }: UpdateAccessTokenByIdDeps,
+    { accountId, accessToken, refreshToken, expiresIn, refreshTokenExpiresIn }: UpdateAccessTokenByIdInput
+): Promise<void> => {
+    await accounts.updateAccessTokenByAccountId(
         accountId,
+        expiresIn,
         accessToken,
         refreshToken,
-        expiresIn,
-        refreshTokenExpiresIn,
-    }: UpdateAccessTokenByIdInput): Promise<void> {
-        await this.repo.updateAccessTokenByAccountId(
-            accountId,
-            expiresIn,
-            accessToken,
-            refreshToken,
-            refreshTokenExpiresIn
-        )
+        refreshTokenExpiresIn
+    )
 
-        this.logger.info('Updated social access token by account', {
-            operation: 'UpdateAccessTokenByIdUseCase.execute',
-            accountId,
-        })
-    }
+    logger.info('Updated social access token by account', {
+        operation: 'updateAccessTokenById',
+        accountId,
+    })
 }

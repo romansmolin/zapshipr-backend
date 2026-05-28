@@ -3,9 +3,9 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 import { SocilaMediaPlatform } from '@/modules/post/schemas/posts.schemas'
 import { ErrorCode } from '@/shared/consts/error-codes.const'
 
-import { ConnectAccountUseCase } from './connect-account.use-case'
+import { connectAccount } from './connect-account.use-case'
 
-describe('ConnectAccountUseCase plan limits', () => {
+describe('connectAccount plan limits', () => {
     const account = {
         id: 'acc-1',
         userId: 'user-1',
@@ -44,9 +44,7 @@ describe('ConnectAccountUseCase plan limits', () => {
     })
 
     it('checks plan limit before creating a new social account', async () => {
-        const useCase = new ConnectAccountUseCase(repository, logger, userService)
-
-        await useCase.execute({ account })
+        await connectAccount({ accounts: repository, userService, logger }, { account })
 
         expect(userService.assertCanConnectAccount).toHaveBeenCalledWith('user-1')
         expect(repository.save).toHaveBeenCalledTimes(1)
@@ -58,9 +56,9 @@ describe('ConnectAccountUseCase plan limits', () => {
             httpCode: 403,
         })
 
-        const useCase = new ConnectAccountUseCase(repository, logger, userService)
-
-        await expect(useCase.execute({ account })).rejects.toMatchObject({
+        await expect(
+            connectAccount({ accounts: repository, userService, logger }, { account })
+        ).rejects.toMatchObject({
             code: ErrorCode.PLAN_LIMIT_REACHED,
             httpCode: 403,
         })

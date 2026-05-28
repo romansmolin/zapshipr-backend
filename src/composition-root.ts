@@ -54,21 +54,10 @@ import { MediaService } from '@/modules/media/services/media.service'
 import { BillingService } from '@/modules/billing/services/billing.service'
 import { AuthService } from '@/modules/auth/services/auth.service'
 import { WaitlistService } from '@/modules/waitlist/services/waitlist.service'
-import { JoinWaitlistUseCase } from '@/modules/waitlist/use-cases/join-waitlist.use-case'
 import { AccountsService } from '@/modules/social/services/accounts.service'
 import { SocilaMediaConnectorService } from '@/modules/social/services/social-media-connector.service'
 import { OAuthStateService } from '@/modules/social/services/oauth-state.service'
 import { AiService } from '@/modules/ai/services/ai.service'
-
-// Social use cases (feed into AccountsService)
-import { ConnectAccountUseCase } from '@/modules/social/use-cases/connect-account.use-case'
-import { DeleteAccountUseCase } from '@/modules/social/use-cases/delete-account.use-case'
-import { FindExpiringAccountsUseCase } from '@/modules/social/use-cases/find-expiring-accounts.use-case'
-import { GetAccountByIdUseCase } from '@/modules/social/use-cases/get-account-by-id.use-case'
-import { GetPinterestBoardsUseCase } from '@/modules/social/use-cases/get-pinterest-boards.use-case'
-import { ListAccountsUseCase } from '@/modules/social/use-cases/list-accounts.use-case'
-import { UpdateAccessTokenByIdUseCase } from '@/modules/social/use-cases/update-access-token-by-id.use-case'
-import { UpdateAccessTokenUseCase } from '@/modules/social/use-cases/update-access-token.use-case'
 
 import type { IApiClient } from '@/shared/http-client'
 import type { ILogger } from '@/shared/logger/logger.interface'
@@ -236,24 +225,13 @@ export const buildAppDeps = ({ db, logger }: AppDepsInput): AppDeps => {
         postSchedulingService
     )
 
-    // ----- Social accounts (use cases + service) -----
-    const connectAccountUseCase = new ConnectAccountUseCase(accountRepository, logger, userService)
-    const listAccountsUseCase = new ListAccountsUseCase(accountRepository, logger)
-    const getAccountByIdUseCase = new GetAccountByIdUseCase(accountRepository, logger)
-    const deleteAccountUseCase = new DeleteAccountUseCase(accountRepository, logger, mediaUploader, postsService)
-    const getPinterestBoardsUseCase = new GetPinterestBoardsUseCase(accountRepository, logger)
-    const updateAccessTokenUseCase = new UpdateAccessTokenUseCase(accountRepository, logger)
-    const updateAccessTokenByIdUseCase = new UpdateAccessTokenByIdUseCase(accountRepository, logger)
-    const findExpiringAccountsUseCase = new FindExpiringAccountsUseCase(accountRepository, logger)
+    // ----- Social accounts -----
     const accountsService = new AccountsService(
-        connectAccountUseCase,
-        listAccountsUseCase,
-        getAccountByIdUseCase,
-        deleteAccountUseCase,
-        getPinterestBoardsUseCase,
-        updateAccessTokenUseCase,
-        updateAccessTokenByIdUseCase,
-        findExpiringAccountsUseCase
+        accountRepository,
+        mediaUploader,
+        postsService,
+        userService,
+        logger
     )
     const socialMediaConnectorService = new SocilaMediaConnectorService(
         logger,
@@ -293,8 +271,7 @@ export const buildAppDeps = ({ db, logger }: AppDepsInput): AppDeps => {
     const authService = new AuthService(userRepository, emailService, logger)
 
     // ----- Waitlist -----
-    const joinWaitlistUseCase = new JoinWaitlistUseCase(waitlistRepository, emailService, logger)
-    const waitlistService = new WaitlistService(joinWaitlistUseCase)
+    const waitlistService = new WaitlistService(waitlistRepository, emailService, logger)
 
     // ----- AI -----
     const aiService = new AiService(openaiApiClient, logger, userService, workspaceProfileService)

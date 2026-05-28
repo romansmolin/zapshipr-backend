@@ -3,23 +3,21 @@ import type { ILogger } from '@/shared/logger/logger.interface'
 import type { SocialTokenSnapshot } from '@/modules/social/entity/social-account.types'
 import type { IAccountRepository } from '@/modules/social/repositories/account-repository.interface'
 
-export class FindExpiringAccountsUseCase {
-    private readonly repo: IAccountRepository
-    private readonly logger: ILogger
+export type FindExpiringAccountsDeps = {
+    accounts: IAccountRepository
+    logger: ILogger
+}
 
-    constructor(repo: IAccountRepository, logger: ILogger) {
-        this.repo = repo
-        this.logger = logger
-    }
+export const findExpiringAccounts = async ({
+    accounts,
+    logger,
+}: FindExpiringAccountsDeps): Promise<SocialTokenSnapshot[]> => {
+    const { accountsSnapshots } = await accounts.findAccountsWithExpiringAccessTokens()
 
-    async execute(): Promise<SocialTokenSnapshot[]> {
-        const { accountsSnapshots } = await this.repo.findAccountsWithExpiringAccessTokens()
+    logger.info('Fetched accounts with expiring tokens', {
+        operation: 'findExpiringAccounts',
+        count: accountsSnapshots.length,
+    })
 
-        this.logger.info('Fetched accounts with expiring tokens', {
-            operation: 'FindExpiringAccountsUseCase.execute',
-            count: accountsSnapshots.length,
-        })
-
-        return accountsSnapshots
-    }
+    return accountsSnapshots
 }

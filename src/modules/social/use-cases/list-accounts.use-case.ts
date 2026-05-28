@@ -8,27 +8,25 @@ export interface ListAccountsInput {
     workspaceId?: string
 }
 
-export class ListAccountsUseCase {
-    private readonly repo: IAccountRepository
-    private readonly logger: ILogger
+export type ListAccountsDeps = {
+    accounts: IAccountRepository
+    logger: ILogger
+}
 
-    constructor(repo: IAccountRepository, logger: ILogger) {
-        this.repo = repo
-        this.logger = logger
-    }
+export const listAccounts = async (
+    { accounts, logger }: ListAccountsDeps,
+    { userId, workspaceId }: ListAccountsInput
+): Promise<SocialAccountResponse[]> => {
+    const items = workspaceId
+        ? await accounts.getAllAccounts(userId, workspaceId)
+        : await accounts.findByUserId(userId)
 
-    async execute({ userId, workspaceId }: ListAccountsInput): Promise<SocialAccountResponse[]> {
-        const accounts = workspaceId
-            ? await this.repo.getAllAccounts(userId, workspaceId)
-            : await this.repo.findByUserId(userId)
+    logger.info('Fetched social accounts', {
+        operation: 'listAccounts',
+        userId,
+        workspaceId: workspaceId ?? 'all',
+        count: items.length,
+    })
 
-        this.logger.info('Fetched social accounts', {
-            operation: 'ListAccountsUseCase.execute',
-            userId,
-            workspaceId: workspaceId ?? 'all',
-            count: accounts.length,
-        })
-
-        return accounts.map((account) => toAccountResponse(account as any))
-    }
+    return items.map((account) => toAccountResponse(account as any))
 }

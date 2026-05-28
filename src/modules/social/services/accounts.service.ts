@@ -1,79 +1,77 @@
+import type { ILogger } from '@/shared/logger/logger.interface'
+import type { IMediaUploader } from '@/shared/media-uploader/media-uploader.interface'
+
+import type { IUserService } from '@/modules/user/services/user.service.interface'
+import type { IPostsService } from '@/modules/post/services/posts-service.interface'
+
 import type { Account } from '@/modules/social/entity/account'
 import type { PinterestBoard } from '@/modules/social/entity/pinterest-board'
 import type { SocialAccountResponse } from '@/modules/social/entity/social-account.dto'
 import type { SocialTokenSnapshot } from '@/modules/social/entity/social-account.types'
+import type { IAccountRepository } from '@/modules/social/repositories/account-repository.interface'
 
-import type { ConnectAccountUseCase } from '@/modules/social/use-cases/connect-account.use-case'
-import type { DeleteAccountUseCase } from '@/modules/social/use-cases/delete-account.use-case'
-import type { FindExpiringAccountsUseCase } from '@/modules/social/use-cases/find-expiring-accounts.use-case'
-import type { GetAccountByIdUseCase } from '@/modules/social/use-cases/get-account-by-id.use-case'
-import type { GetPinterestBoardsUseCase } from '@/modules/social/use-cases/get-pinterest-boards.use-case'
-import type { ListAccountsUseCase } from '@/modules/social/use-cases/list-accounts.use-case'
-import type { UpdateAccessTokenByIdUseCase } from '@/modules/social/use-cases/update-access-token-by-id.use-case'
-import type { UpdateAccessTokenUseCase } from '@/modules/social/use-cases/update-access-token.use-case'
+import { connectAccount as connectAccountUseCase } from '@/modules/social/use-cases/connect-account.use-case'
+import { listAccounts as listAccountsUseCase } from '@/modules/social/use-cases/list-accounts.use-case'
+import { getAccountById as getAccountByIdUseCase } from '@/modules/social/use-cases/get-account-by-id.use-case'
+import { deleteAccount as deleteAccountUseCase } from '@/modules/social/use-cases/delete-account.use-case'
+import { getPinterestBoards as getPinterestBoardsUseCase } from '@/modules/social/use-cases/get-pinterest-boards.use-case'
+import { updateAccessToken as updateAccessTokenUseCase } from '@/modules/social/use-cases/update-access-token.use-case'
+import { updateAccessTokenById as updateAccessTokenByIdUseCase } from '@/modules/social/use-cases/update-access-token-by-id.use-case'
+import { findExpiringAccounts as findExpiringAccountsUseCase } from '@/modules/social/use-cases/find-expiring-accounts.use-case'
 
 import type { AccountTokenPayload, ConnectAccountResult, IAccountsService } from './accounts.service.interface'
 
+type AccountsDeps = {
+    accounts: IAccountRepository
+    mediaUploader: IMediaUploader
+    postsService: IPostsService
+    userService: IUserService
+    logger: ILogger
+}
+
 export class AccountsService implements IAccountsService {
-    private readonly connectAccountUseCase: ConnectAccountUseCase
-    private readonly listAccountsUseCase: ListAccountsUseCase
-    private readonly getAccountByIdUseCase: GetAccountByIdUseCase
-    private readonly deleteAccountUseCase: DeleteAccountUseCase
-    private readonly getPinterestBoardsUseCase: GetPinterestBoardsUseCase
-    private readonly updateAccessTokenUseCase: UpdateAccessTokenUseCase
-    private readonly updateAccessTokenByIdUseCase: UpdateAccessTokenByIdUseCase
-    private readonly findExpiringAccountsUseCase: FindExpiringAccountsUseCase
+    private readonly deps: AccountsDeps
 
     constructor(
-        connectAccountUseCase: ConnectAccountUseCase,
-        listAccountsUseCase: ListAccountsUseCase,
-        getAccountByIdUseCase: GetAccountByIdUseCase,
-        deleteAccountUseCase: DeleteAccountUseCase,
-        getPinterestBoardsUseCase: GetPinterestBoardsUseCase,
-        updateAccessTokenUseCase: UpdateAccessTokenUseCase,
-        updateAccessTokenByIdUseCase: UpdateAccessTokenByIdUseCase,
-        findExpiringAccountsUseCase: FindExpiringAccountsUseCase
+        accountRepository: IAccountRepository,
+        mediaUploader: IMediaUploader,
+        postsService: IPostsService,
+        userService: IUserService,
+        logger: ILogger
     ) {
-        this.connectAccountUseCase = connectAccountUseCase
-        this.listAccountsUseCase = listAccountsUseCase
-        this.getAccountByIdUseCase = getAccountByIdUseCase
-        this.deleteAccountUseCase = deleteAccountUseCase
-        this.getPinterestBoardsUseCase = getPinterestBoardsUseCase
-        this.updateAccessTokenUseCase = updateAccessTokenUseCase
-        this.updateAccessTokenByIdUseCase = updateAccessTokenByIdUseCase
-        this.findExpiringAccountsUseCase = findExpiringAccountsUseCase
+        this.deps = { accounts: accountRepository, mediaUploader, postsService, userService, logger }
     }
 
-    async connectAccount(account: Account): Promise<ConnectAccountResult> {
-        return this.connectAccountUseCase.execute({ account })
+    connectAccount(account: Account): Promise<ConnectAccountResult> {
+        return connectAccountUseCase(this.deps, { account })
     }
 
-    async listAccounts(userId: string): Promise<SocialAccountResponse[]> {
-        return this.listAccountsUseCase.execute({ userId })
+    listAccounts(userId: string): Promise<SocialAccountResponse[]> {
+        return listAccountsUseCase(this.deps, { userId })
     }
 
-    async getAllAccounts(userId: string, workspaceId: string): Promise<SocialAccountResponse[]> {
-        return this.listAccountsUseCase.execute({ userId, workspaceId })
+    getAllAccounts(userId: string, workspaceId: string): Promise<SocialAccountResponse[]> {
+        return listAccountsUseCase(this.deps, { userId, workspaceId })
     }
 
-    async getAccountById(userId: string, accountId: string): Promise<SocialAccountResponse> {
-        return this.getAccountByIdUseCase.execute({ userId, accountId })
+    getAccountById(userId: string, accountId: string): Promise<SocialAccountResponse> {
+        return getAccountByIdUseCase(this.deps, { userId, accountId })
     }
 
-    async deleteAccount(userId: string, workspaceId: string, accountId: string): Promise<{ success: boolean }> {
-        return this.deleteAccountUseCase.execute({ userId, workspaceId, accountId })
+    deleteAccount(userId: string, workspaceId: string, accountId: string): Promise<{ success: boolean }> {
+        return deleteAccountUseCase(this.deps, { userId, workspaceId, accountId })
     }
 
-    async getPinterestBoards(userId: string, workspaceId: string, socialAccountId: string): Promise<PinterestBoard[]> {
-        return this.getPinterestBoardsUseCase.execute({ userId, workspaceId, socialAccountId })
+    getPinterestBoards(userId: string, workspaceId: string, socialAccountId: string): Promise<PinterestBoard[]> {
+        return getPinterestBoardsUseCase(this.deps, { userId, workspaceId, socialAccountId })
     }
 
-    async updateAccessToken(userId: string, pageId: string, accessToken: string): Promise<void> {
-        await this.updateAccessTokenUseCase.execute({ userId, pageId, accessToken })
+    updateAccessToken(userId: string, pageId: string, accessToken: string): Promise<void> {
+        return updateAccessTokenUseCase(this.deps, { userId, pageId, accessToken })
     }
 
-    async updateAccessTokenByAccountId(accountId: string, payload: AccountTokenPayload): Promise<void> {
-        await this.updateAccessTokenByIdUseCase.execute({
+    updateAccessTokenByAccountId(accountId: string, payload: AccountTokenPayload): Promise<void> {
+        return updateAccessTokenByIdUseCase(this.deps, {
             accountId,
             accessToken: payload.accessToken,
             refreshToken: payload.refreshToken,
@@ -82,7 +80,7 @@ export class AccountsService implements IAccountsService {
         })
     }
 
-    async findAccountsWithExpiringAccessTokens(): Promise<SocialTokenSnapshot[]> {
-        return this.findExpiringAccountsUseCase.execute()
+    findAccountsWithExpiringAccessTokens(): Promise<SocialTokenSnapshot[]> {
+        return findExpiringAccountsUseCase(this.deps)
     }
 }

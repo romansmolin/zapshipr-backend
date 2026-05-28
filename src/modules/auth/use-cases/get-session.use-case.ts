@@ -1,21 +1,23 @@
 import type { ILogger } from '@/shared/logger/logger.interface'
+
 import type { AuthResult } from '../services/auth-service.interface'
-import { TokenService } from '../services/token.service'
+import type { TokenService } from '../services/token.service'
 
-export class GetSessionUseCase {
-    constructor(
-        private readonly tokenService: TokenService,
-        private readonly logger: ILogger
-    ) {}
+export type GetSessionDeps = {
+    tokens: TokenService
+    logger: ILogger
+}
 
-    async execute(refreshToken?: string): Promise<AuthResult> {
-        const user = await this.tokenService.validateRefreshToken(refreshToken)
+export const getSession = async (
+    { tokens, logger }: GetSessionDeps,
+    refreshToken?: string
+): Promise<AuthResult> => {
+    const user = await tokens.validateRefreshToken(refreshToken)
 
-        const nextRefreshToken = this.tokenService.issueRefreshToken(user.id, user.email)
-        const accessToken = this.tokenService.issueAccessToken(user.id, user.email)
+    const nextRefreshToken = tokens.issueRefreshToken(user.id, user.email)
+    const accessToken = tokens.issueAccessToken(user.id, user.email)
 
-        this.logger.info('Session retrieved', { operation: 'GetSessionUseCase.execute', userId: user.id })
+    logger.info('Session retrieved', { operation: 'getSession', userId: user.id })
 
-        return { user, refreshToken: nextRefreshToken, accessToken }
-    }
+    return { user, refreshToken: nextRefreshToken, accessToken }
 }

@@ -9,26 +9,24 @@ export interface GetPinterestBoardsInput {
     socialAccountId: string
 }
 
-export class GetPinterestBoardsUseCase {
-    private readonly repo: IAccountRepository
-    private readonly logger: ILogger
+export type GetPinterestBoardsDeps = {
+    accounts: IAccountRepository
+    logger: ILogger
+}
 
-    constructor(repo: IAccountRepository, logger: ILogger) {
-        this.repo = repo
-        this.logger = logger
-    }
+export const getPinterestBoards = async (
+    { accounts, logger }: GetPinterestBoardsDeps,
+    { userId, workspaceId, socialAccountId }: GetPinterestBoardsInput
+): Promise<PinterestBoard[]> => {
+    const boards = await accounts.getPinterestBoards(userId, workspaceId, socialAccountId)
 
-    async execute({ userId, workspaceId, socialAccountId }: GetPinterestBoardsInput): Promise<PinterestBoard[]> {
-        const boards = await this.repo.getPinterestBoards(userId, workspaceId, socialAccountId)
+    logger.info('Fetched Pinterest boards', {
+        operation: 'getPinterestBoards',
+        userId,
+        workspaceId,
+        socialAccountId,
+        count: boards.length,
+    })
 
-        this.logger.info('Fetched Pinterest boards', {
-            operation: 'GetPinterestBoardsUseCase.execute',
-            userId,
-            workspaceId,
-            socialAccountId,
-            count: boards.length,
-        })
-
-        return boards
-    }
+    return boards
 }

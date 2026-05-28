@@ -15,125 +15,128 @@ export interface JoinWaitlistInput {
     referrerWaitlistId?: string
 }
 
-export class JoinWaitlistUseCase {
-    constructor(
-        private readonly repository: IWaitlistRepository,
-        private readonly emailService: IEmailService,
-        private readonly logger: ILogger
-    ) {}
+export type JoinWaitlistDeps = {
+    waitlist: IWaitlistRepository
+    emailService: IEmailService
+    logger: ILogger
+}
 
-    private buildReferralLink(referralCode: string): string {
-        const frontendUrl = (process.env.FRONTEND_URL || '').trim()
-        const normalizedBase = frontendUrl ? frontendUrl.replace(/\/$/, '') : 'http://localhost:3000'
-        return `${normalizedBase}/?ref=${encodeURIComponent(referralCode)}`
+const buildReferralLink = (referralCode: string): string => {
+    const frontendUrl = (process.env.FRONTEND_URL || '').trim()
+    const normalizedBase = frontendUrl ? frontendUrl.replace(/\/$/, '') : 'http://localhost:3000'
+    return `${normalizedBase}/?ref=${encodeURIComponent(referralCode)}`
+}
+
+const applyReferralIfEligible = async (
+    deps: JoinWaitlistDeps,
+    waitlistEntry: WaitlistEntry,
+    referralCode?: string,
+    referrerWaitlistId?: string
+): Promise<void> => {
+    const { waitlist, logger } = deps
+    const trimmedReferralCode = referralCode?.trim()
+    const trimmedReferrerId = referrerWaitlistId?.trim()
+
+    if (!trimmedReferralCode && !trimmedReferrerId) {
+        return
     }
 
-    async execute(payload: JoinWaitlistInput): Promise<WaitlistJoinResult> {
-        const normalizedEmail = payload.email.trim().toLowerCase()
+    let referrer: WaitlistEntry | null = null
 
-        if (!normalizedEmail) {
-            throw new BaseAppError('Email is required', ErrorCode.BAD_REQUEST, 400)
-        }
-
-        const entryDraft = new WaitlistEntry(
-            uuidv4(),
-            payload.email.trim(),
-            normalizedEmail,
-            'ACTIVE',
-            uuidv4(),
-            null,
-            null,
-            new Date(),
-            new Date()
-        )
-
-        let waitlistEntry = await this.repository.createEntry(entryDraft)
-        let created = true
-
-        if (!waitlistEntry) {
-            created = false
-            waitlistEntry = await this.repository.findByEmailNormalized(normalizedEmail)
-        }
-
-        if (!waitlistEntry) {
-            throw new BaseAppError('Failed to join waitlist', ErrorCode.UNKNOWN_ERROR, 500)
-        }
-
-        const referralLink = this.buildReferralLink(waitlistEntry.referralCode)
-        const referralCount = await this.repository.countReferrals(waitlistEntry.id)
-
-        if (created) {
-            await this.applyReferralIfEligible(waitlistEntry, payload.referralCode, payload.referrerWaitlistId)
-
-            await this.emailService.sendWaitlistConfirmationEmail({
-                to: waitlistEntry.email,
-                referralLink,
-            })
-
-            this.logger.info('Waitlist confirmation email sent', {
-                operation: 'waitlist_join',
-                email: waitlistEntry.email,
-                waitlistEntryId: waitlistEntry.id,
-            })
-        }
-
-        return {
-            status: created ? 'joined' : 'already_joined',
-            referralCode: waitlistEntry.referralCode,
-            referralLink,
-            referralCount,
-        }
+    if (trimmedReferralCode) {
+        referrer = await waitlist.findByReferralCode(trimmedReferralCode)
+    } else if (trimmedReferrerId) {
+        referrer = await waitlist.findById(trimmedReferrerId)
     }
 
-    private async applyReferralIfEligible(
-        waitlistEntry: WaitlistEntry,
-        referralCode?: string,
-        referrerWaitlistId?: string
-    ): Promise<void> {
-        const trimmedReferralCode = referralCode?.trim()
-        const trimmedReferrerId = referrerWaitlistId?.trim()
+    if (!referrer) {
+        logger.warn('Waitlist referral ignored due to missing referrer', {
+            operation: 'waitlist_referral',
+            referralCode: trimmedReferralCode,
+            referrerWaitlistId: trimmedReferrerId,
+        })
+        return
+    }
 
-        if (!trimmedReferralCode && !trimmedReferrerId) {
-            return
-        }
+    if (referrer.id === waitlistEntry.id) {
+        logger.warn('Waitlist referral ignored because referrer matches entry', {
+            operation: 'waitlist_referral',
+            waitlistEntryId: waitlistEntry.id,
+        })
+        return
+    }
 
-        let referrer: WaitlistEntry | null = null
+    const applied = await waitlist.applyReferral({
+        referrerId: referrer.id,
+        referredEntryId: waitlistEntry.id,
+    })
 
-        if (trimmedReferralCode) {
-            referrer = await this.repository.findByReferralCode(trimmedReferralCode)
-        } else if (trimmedReferrerId) {
-            referrer = await this.repository.findById(trimmedReferrerId)
-        }
-
-        if (!referrer) {
-            this.logger.warn('Waitlist referral ignored due to missing referrer', {
-                operation: 'waitlist_referral',
-                referralCode: trimmedReferralCode,
-                referrerWaitlistId: trimmedReferrerId,
-            })
-            return
-        }
-
-        if (referrer.id === waitlistEntry.id) {
-            this.logger.warn('Waitlist referral ignored because referrer matches entry', {
-                operation: 'waitlist_referral',
-                waitlistEntryId: waitlistEntry.id,
-            })
-            return
-        }
-
-        const applied = await this.repository.applyReferral({
+    if (!applied) {
+        logger.info('Waitlist referral was not applied', {
+            operation: 'waitlist_referral',
+            waitlistEntryId: waitlistEntry.id,
             referrerId: referrer.id,
-            referredEntryId: waitlistEntry.id,
+        })
+    }
+}
+
+export const joinWaitlist = async (
+    deps: JoinWaitlistDeps,
+    payload: JoinWaitlistInput
+): Promise<WaitlistJoinResult> => {
+    const { waitlist, emailService, logger } = deps
+    const normalizedEmail = payload.email.trim().toLowerCase()
+
+    if (!normalizedEmail) {
+        throw new BaseAppError('Email is required', ErrorCode.BAD_REQUEST, 400)
+    }
+
+    const entryDraft = new WaitlistEntry(
+        uuidv4(),
+        payload.email.trim(),
+        normalizedEmail,
+        'ACTIVE',
+        uuidv4(),
+        null,
+        null,
+        new Date(),
+        new Date()
+    )
+
+    let waitlistEntry = await waitlist.createEntry(entryDraft)
+    let created = true
+
+    if (!waitlistEntry) {
+        created = false
+        waitlistEntry = await waitlist.findByEmailNormalized(normalizedEmail)
+    }
+
+    if (!waitlistEntry) {
+        throw new BaseAppError('Failed to join waitlist', ErrorCode.UNKNOWN_ERROR, 500)
+    }
+
+    const referralLink = buildReferralLink(waitlistEntry.referralCode)
+    const referralCount = await waitlist.countReferrals(waitlistEntry.id)
+
+    if (created) {
+        await applyReferralIfEligible(deps, waitlistEntry, payload.referralCode, payload.referrerWaitlistId)
+
+        await emailService.sendWaitlistConfirmationEmail({
+            to: waitlistEntry.email,
+            referralLink,
         })
 
-        if (!applied) {
-            this.logger.info('Waitlist referral was not applied', {
-                operation: 'waitlist_referral',
-                waitlistEntryId: waitlistEntry.id,
-                referrerId: referrer.id,
-            })
-            return
-        }
+        logger.info('Waitlist confirmation email sent', {
+            operation: 'waitlist_join',
+            email: waitlistEntry.email,
+            waitlistEntryId: waitlistEntry.id,
+        })
+    }
+
+    return {
+        status: created ? 'joined' : 'already_joined',
+        referralCode: waitlistEntry.referralCode,
+        referralLink,
+        referralCount,
     }
 }

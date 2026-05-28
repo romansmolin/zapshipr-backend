@@ -10,28 +10,26 @@ export interface GetAccountByIdInput {
     accountId: string
 }
 
-export class GetAccountByIdUseCase {
-    private readonly repo: IAccountRepository
-    private readonly logger: ILogger
+export type GetAccountByIdDeps = {
+    accounts: IAccountRepository
+    logger: ILogger
+}
 
-    constructor(repo: IAccountRepository, logger: ILogger) {
-        this.repo = repo
-        this.logger = logger
+export const getAccountById = async (
+    { accounts, logger }: GetAccountByIdDeps,
+    { userId, accountId }: GetAccountByIdInput
+): Promise<SocialAccountResponse> => {
+    const account = await accounts.getAccountById(userId, accountId)
+
+    if (!account) {
+        throw new BaseAppError('Social account not found', ErrorCode.NOT_FOUND, 404)
     }
 
-    async execute({ userId, accountId }: GetAccountByIdInput): Promise<SocialAccountResponse> {
-        const account = await this.repo.getAccountById(userId, accountId)
+    logger.info('Fetched social account', {
+        operation: 'getAccountById',
+        userId,
+        accountId,
+    })
 
-        if (!account) {
-            throw new BaseAppError('Social account not found', ErrorCode.NOT_FOUND, 404)
-        }
-
-        this.logger.info('Fetched social account', {
-            operation: 'GetAccountByIdUseCase.execute',
-            userId,
-            accountId,
-        })
-
-        return toAccountResponse(account as any)
-    }
+    return toAccountResponse(account as any)
 }

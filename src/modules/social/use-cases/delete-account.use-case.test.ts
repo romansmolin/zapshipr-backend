@@ -2,14 +2,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, jest } from '@je
 
 import { SocilaMediaPlatform } from '@/modules/post/schemas/posts.schemas'
 
-import { DeleteAccountUseCase } from './delete-account.use-case'
+import { deleteAccount } from './delete-account.use-case'
 
 import type { IAccountRepository } from '@/modules/social/repositories/account-repository.interface'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import type { IMediaUploader } from '@/shared/media-uploader/media-uploader.interface'
 import type { IPostsService } from '@/modules/post/services/posts-service.interface'
 
-describe('DeleteAccountUseCase', () => {
+describe('deleteAccount', () => {
     let accountRepository: jest.Mocked<IAccountRepository>
     let logger: jest.Mocked<ILogger>
     let mediaUploader: jest.Mocked<IMediaUploader>
@@ -89,13 +89,10 @@ describe('DeleteAccountUseCase', () => {
     })
 
     it('cleans orphaned account posts via postsService during account deletion', async () => {
-        const useCase = new DeleteAccountUseCase(accountRepository, logger, mediaUploader, postsService)
-
-        const result = await useCase.execute({
-            userId: 'user-1',
-            workspaceId: 'workspace-1',
-            accountId: 'account-1',
-        })
+        const result = await deleteAccount(
+            { accounts: accountRepository, logger, mediaUploader, postsService },
+            { userId: 'user-1', workspaceId: 'workspace-1', accountId: 'account-1' }
+        )
 
         expect(result).toEqual({ success: true })
         expect(postsService.deletePostsOrphanedByAccount).toHaveBeenCalledWith('user-1', 'account-1')
@@ -120,13 +117,10 @@ describe('DeleteAccountUseCase', () => {
             workspaceId: 'workspace-1',
         } as any)
 
-        const useCase = new DeleteAccountUseCase(accountRepository, logger, mediaUploader, postsService)
-
-        await useCase.execute({
-            userId: 'user-1',
-            workspaceId: 'workspace-1',
-            accountId: 'account-1',
-        })
+        await deleteAccount(
+            { accounts: accountRepository, logger, mediaUploader, postsService },
+            { userId: 'user-1', workspaceId: 'workspace-1', accountId: 'account-1' }
+        )
 
         expect(mediaUploader.delete).toHaveBeenCalledWith(
             'https://s3.us-east-1.amazonaws.com/easy-post/user-1/accounts/avatar-path-style.jpg'

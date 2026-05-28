@@ -18,120 +18,109 @@ export interface DeleteAccountResult {
     success: boolean
 }
 
-export class DeleteAccountUseCase {
-    private readonly repo: IAccountRepository
-    private readonly logger: ILogger
-    private readonly mediaUploader: IMediaUploader
-    private readonly postsService?: IPostsService
+export type DeleteAccountDeps = {
+    accounts: IAccountRepository
+    mediaUploader: IMediaUploader
+    postsService: IPostsService
+    logger: ILogger
+}
 
-    constructor(
-        repo: IAccountRepository,
-        logger: ILogger,
-        mediaUploader: IMediaUploader,
-        postsService?: IPostsService
-    ) {
-        this.repo = repo
-        this.logger = logger
-        this.mediaUploader = mediaUploader
-        this.postsService = postsService
-    }
+const isS3Url = (url: string): boolean => {
+    try {
+        const parsedUrl = new URL(url)
+        const hostname = parsedUrl.hostname.toLowerCase()
+        const pathname = decodeURIComponent(parsedUrl.pathname).replace(/^\/+/, '')
+        const bucket = process.env.AWS_S3_BUCKET?.trim().toLowerCase()
 
-    async execute({ userId, workspaceId, accountId }: DeleteAccountInput): Promise<DeleteAccountResult> {
-        try {
-            const account = await this.repo.getAccountById(userId, accountId)
-
-            if (!account) {
-                this.logger.warn('Account not found for deletion', {
-                    operation: 'DeleteAccountUseCase.execute',
-                    userId,
-                    workspaceId,
-                    accountId,
-                })
-                return { success: false }
-            }
-
-            if (account.picture && this.isS3Url(account.picture)) {
-                try {
-                    await this.mediaUploader.delete(account.picture)
-                } catch (error) {
-                    this.logger.warn('Failed to delete account image from S3', {
-                        operation: 'DeleteAccountUseCase.execute',
-                        userId,
-                        accountId,
-                        error: {
-                            name: error instanceof Error ? error.name : 'UnknownError',
-                            stack: error instanceof Error ? error.stack : undefined,
-                        },
-                    })
-                }
-            }
-
-            if (account.platform === SocilaMediaPlatform.PINTEREST) {
-                try {
-                    await this.repo.deletePinterestBoardsByAccountId(userId, accountId)
-                } catch (error) {
-                    this.logger.error('Failed to delete Pinterest boards', {
-                        operation: 'DeleteAccountUseCase.execute',
-                        userId,
-                        accountId,
-                        error: {
-                            name: error instanceof Error ? error.name : 'UnknownError',
-                            code: error instanceof BaseAppError ? error.code : ErrorCode.UNKNOWN_ERROR,
-                            stack: error instanceof Error ? error.stack : undefined,
-                        },
-                    })
-                }
-            }
-
-            if (this.postsService) {
-                await this.postsService.deletePostsOrphanedByAccount(userId, accountId)
-            }
-
-            const success = await this.repo.deleteAccount(userId, accountId)
-
-            if (success) {
-                this.logger.info('Successfully deleted account', {
-                    operation: 'DeleteAccountUseCase.execute',
-                    userId,
-                    accountId,
-                })
-            } else {
-                this.logger.warn('Account not found for deletion', {
-                    operation: 'DeleteAccountUseCase.execute',
-                    userId,
-                    accountId,
-                })
-            }
-
-            return { success }
-        } catch (error) {
-            if (error instanceof BaseAppError) throw error
-            throw new BaseAppError('Failed to delete account', ErrorCode.UNKNOWN_ERROR, 500)
+        if (!bucket) {
+            return hostname.includes('amazonaws.com')
         }
-    }
 
-    private isS3Url(url: string): boolean {
-        try {
-            const parsedUrl = new URL(url)
-            const hostname = parsedUrl.hostname.toLowerCase()
-            const pathname = decodeURIComponent(parsedUrl.pathname).replace(/^\/+/, '')
-            const bucket = process.env.AWS_S3_BUCKET?.trim().toLowerCase()
-
-            if (!bucket) {
-                return hostname.includes('amazonaws.com')
-            }
-
-            if (hostname === `${bucket}.s3.amazonaws.com` || hostname.startsWith(`${bucket}.s3.`)) {
-                return true
-            }
-
-            if (hostname === 's3.amazonaws.com' || hostname.startsWith('s3.')) {
-                return pathname.startsWith(`${bucket}/`)
-            }
-
-            return false
-        } catch {
-            return false
+        if (hostname === `${bucket}.s3.amazonaws.com` || hostname.startsWith(`${bucket}.s3.`)) {
+            return true
         }
+
+        if (hostname === 's3.amazonaws.com' || hostname.startsWith('s3.')) {
+            return pathname.startsWith(`${bucket}/`)
+        }
+
+        return false
+    } catch {
+        return false
+    }
+}
+
+export const deleteAccount = async (
+    { accounts, mediaUploader, postsService, logger }: DeleteAccountDeps,
+    { userId, workspaceId, accountId }: DeleteAccountInput
+): Promise<DeleteAccountResult> => {
+    try {
+        const account = await accounts.getAccountById(userId, accountId)
+
+        if (!account) {
+            logger.warn('Account not found for deletion', {
+                operation: 'deleteAccount',
+                userId,
+                workspaceId,
+                accountId,
+            })
+            return { success: false }
+        }
+
+        if (account.picture && isS3Url(account.picture)) {
+            try {
+                await mediaUploader.delete(account.picture)
+            } catch (error) {
+                logger.warn('Failed to delete account image from S3', {
+                    operation: 'deleteAccount',
+                    userId,
+                    accountId,
+                    error: {
+                        name: error instanceof Error ? error.name : 'UnknownError',
+                        stack: error instanceof Error ? error.stack : undefined,
+                    },
+                })
+            }
+        }
+
+        if (account.platform === SocilaMediaPlatform.PINTEREST) {
+            try {
+                await accounts.deletePinterestBoardsByAccountId(userId, accountId)
+            } catch (error) {
+                logger.error('Failed to delete Pinterest boards', {
+                    operation: 'deleteAccount',
+                    userId,
+                    accountId,
+                    error: {
+                        name: error instanceof Error ? error.name : 'UnknownError',
+                        code: error instanceof BaseAppError ? error.code : ErrorCode.UNKNOWN_ERROR,
+                        stack: error instanceof Error ? error.stack : undefined,
+                    },
+                })
+            }
+        }
+
+        await postsService.deletePostsOrphanedByAccount(userId, accountId)
+
+        const success = await accounts.deleteAccount(userId, accountId)
+
+        if (success) {
+            logger.info('Successfully deleted account', {
+                operation: 'deleteAccount',
+                userId,
+                accountId,
+            })
+        } else {
+            logger.warn('Account not found for deletion', {
+                operation: 'deleteAccount',
+                userId,
+                accountId,
+            })
+        }
+
+        return { success }
+    } catch (error) {
+        if (error instanceof BaseAppError) throw error
+        throw new BaseAppError('Failed to delete account', ErrorCode.UNKNOWN_ERROR, 500)
     }
 }

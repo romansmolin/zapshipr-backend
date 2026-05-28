@@ -16,81 +16,75 @@ export interface ConnectAccountResult {
     account: SocialAccountResponse
 }
 
-export class ConnectAccountUseCase {
-    private readonly repo: IAccountRepository
-    private readonly logger: ILogger
-    private readonly userService?: IUserService
+export type ConnectAccountDeps = {
+    accounts: IAccountRepository
+    userService: IUserService
+    logger: ILogger
+}
 
-    constructor(repo: IAccountRepository, logger: ILogger, userService?: IUserService) {
-        this.repo = repo
-        this.logger = logger
-        this.userService = userService
-    }
+export const connectAccount = async (
+    { accounts, userService, logger }: ConnectAccountDeps,
+    { account }: ConnectAccountInput
+): Promise<ConnectAccountResult> => {
+    const existing = await accounts.findByTenantPlatformAndPage(
+        account.userId,
+        account.platform,
+        account.pageId
+    )
 
-    async execute({ account }: ConnectAccountInput): Promise<ConnectAccountResult> {
-        const existing = await this.repo.findByTenantPlatformAndPage(
-            account.userId,
-            account.platform,
-            account.pageId
-        )
-
-        if (existing) {
-            // Check workspace mismatch: if the account already exists in a different workspace, reject
-            if (existing.workspaceId && account.workspaceId && existing.workspaceId !== account.workspaceId) {
-                this.logger.warn('Account already connected to a different workspace', {
-                    operation: 'ConnectAccountUseCase.execute',
-                    userId: account.userId,
-                    platform: account.platform,
-                    pageId: account.pageId,
-                    existingWorkspaceId: existing.workspaceId,
-                    requestedWorkspaceId: account.workspaceId,
-                })
-
-                throw new BaseAppError(
-                    'This social account is already connected to a different workspace',
-                    ErrorCode.WORKSPACE_MISMATCH,
-                    409
-                )
-            }
-
-            const updated = await this.repo.updateAccountByTenantPlatformAndPage({
+    if (existing) {
+        if (existing.workspaceId && account.workspaceId && existing.workspaceId !== account.workspaceId) {
+            logger.warn('Account already connected to a different workspace', {
+                operation: 'connectAccount',
                 userId: account.userId,
-                workspaceId: account.workspaceId,
                 platform: account.platform,
                 pageId: account.pageId,
-                username: account.username,
-                accessToken: account.accessToken,
-                connectedAt: account.connectedAt ?? new Date(),
-                picture: account.picture ?? null,
-                refreshToken: account.refreshToken ?? null,
-                expiresIn: account.expiresIn ?? null,
-                refreshExpiresIn: account.refreshExpiresIn ?? null,
-                maxVideoPostDurationSec: account.maxVideoPostDurationSec ?? null,
-                privacyLevelOptions: account.privacyLevelOptions ?? null,
+                existingWorkspaceId: existing.workspaceId,
+                requestedWorkspaceId: account.workspaceId,
             })
 
-            return {
-                isNew: false,
-                account: toAccountResponse(updated as any),
-            }
+            throw new BaseAppError(
+                'This social account is already connected to a different workspace',
+                ErrorCode.WORKSPACE_MISMATCH,
+                409
+            )
         }
 
-        if (this.userService) {
-            await this.userService.assertCanConnectAccount(account.userId)
-        }
-
-        const created = await this.repo.save(account)
-
-        this.logger.info('Social account connected', {
-            operation: 'ConnectAccountUseCase.execute',
+        const updated = await accounts.updateAccountByTenantPlatformAndPage({
             userId: account.userId,
+            workspaceId: account.workspaceId,
             platform: account.platform,
             pageId: account.pageId,
+            username: account.username,
+            accessToken: account.accessToken,
+            connectedAt: account.connectedAt ?? new Date(),
+            picture: account.picture ?? null,
+            refreshToken: account.refreshToken ?? null,
+            expiresIn: account.expiresIn ?? null,
+            refreshExpiresIn: account.refreshExpiresIn ?? null,
+            maxVideoPostDurationSec: account.maxVideoPostDurationSec ?? null,
+            privacyLevelOptions: account.privacyLevelOptions ?? null,
         })
 
         return {
-            isNew: true,
-            account: toAccountResponse(created as any),
+            isNew: false,
+            account: toAccountResponse(updated as any),
         }
+    }
+
+    await userService.assertCanConnectAccount(account.userId)
+
+    const created = await accounts.save(account)
+
+    logger.info('Social account connected', {
+        operation: 'connectAccount',
+        userId: account.userId,
+        platform: account.platform,
+        pageId: account.pageId,
+    })
+
+    return {
+        isNew: true,
+        account: toAccountResponse(created as any),
     }
 }

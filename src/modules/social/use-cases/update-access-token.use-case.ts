@@ -8,22 +8,20 @@ export interface UpdateAccessTokenInput {
     accessToken: string
 }
 
-export class UpdateAccessTokenUseCase {
-    private readonly repo: IAccountRepository
-    private readonly logger: ILogger
+export type UpdateAccessTokenDeps = {
+    accounts: IAccountRepository
+    logger: ILogger
+}
 
-    constructor(repo: IAccountRepository, logger: ILogger) {
-        this.repo = repo
-        this.logger = logger
-    }
+export const updateAccessToken = async (
+    { accounts, logger }: UpdateAccessTokenDeps,
+    { userId, pageId, accessToken }: UpdateAccessTokenInput
+): Promise<void> => {
+    await accounts.updateAccessToken(userId, pageId, accessToken)
 
-    async execute({ userId, pageId, accessToken }: UpdateAccessTokenInput): Promise<void> {
-        await this.repo.updateAccessToken(userId, pageId, accessToken)
-
-        this.logger.info('Updated social access token', {
-            operation: 'UpdateAccessTokenUseCase.execute',
-            userId,
-            pageId,
-        })
-    }
+    logger.info('Updated social access token', {
+        operation: 'updateAccessToken',
+        userId,
+        pageId,
+    })
 }

@@ -2,59 +2,59 @@ import type { IEmailService } from '@/modules/email/services/email.service.inter
 import type { IUserRepository } from '@/modules/user/repositories/user-repository.interface'
 import type { ILogger } from '@/shared/logger/logger.interface'
 
-import { TokenService } from '../services/token.service'
+import type { TokenService } from '../services/token.service'
 
 export interface ForgetPasswordInput {
     email: string
 }
 
-export class ForgetPasswordUseCase {
-    constructor(
-        private readonly userRepository: IUserRepository,
-        private readonly tokenService: TokenService,
-        private readonly emailService: IEmailService,
-        private readonly logger: ILogger
-    ) {}
+export type ForgetPasswordDeps = {
+    users: IUserRepository
+    tokens: TokenService
+    emailService: IEmailService
+    logger: ILogger
+}
 
-    private buildResetLink(token: string): string {
-        const baseUrl = (process.env.PASSWORD_RESET_URL_BASE ?? process.env.FRONTEND_URL ?? '').trim()
+const buildResetLink = (token: string): string => {
+    const baseUrl = (process.env.PASSWORD_RESET_URL_BASE ?? process.env.FRONTEND_URL ?? '').trim()
 
-        if (!baseUrl) {
-            throw new Error('PASSWORD_RESET_URL_BASE or FRONTEND_URL must be set')
-        }
-
-        const resetUrl = new URL('/reset-password', baseUrl)
-        resetUrl.searchParams.set('token', token)
-        return resetUrl.toString()
+    if (!baseUrl) {
+        throw new Error('PASSWORD_RESET_URL_BASE or FRONTEND_URL must be set')
     }
 
-    async execute(payload: ForgetPasswordInput): Promise<void> {
-        const email = payload.email.trim().toLowerCase()
-        const user = await this.userRepository.findByEmail(email)
+    const resetUrl = new URL('/reset-password', baseUrl)
+    resetUrl.searchParams.set('token', token)
+    return resetUrl.toString()
+}
 
-        // Do not reveal whether the email exists.
-        if (!user) {
-            this.logger.info('Password reset requested for non-existing email', {
-                operation: 'ForgetPasswordUseCase.execute',
-                email,
-            })
-            return
-        }
+export const forgetPassword = async (
+    { users, tokens, emailService, logger }: ForgetPasswordDeps,
+    payload: ForgetPasswordInput
+): Promise<void> => {
+    const email = payload.email.trim().toLowerCase()
+    const user = await users.findByEmail(email)
 
-        const token = this.tokenService.issuePasswordResetToken(user.id, user.email)
-        const resetLink = this.buildResetLink(token)
-
-        await this.emailService.sendPasswordResetEmail({
-            to: user.email,
-            name: user.name,
-            resetLink,
-            token,
+    if (!user) {
+        logger.info('Password reset requested for non-existing email', {
+            operation: 'forgetPassword',
+            email,
         })
-
-        this.logger.info('Password reset email queued', {
-            operation: 'ForgetPasswordUseCase.execute',
-            userId: user.id,
-            email: user.email,
-        })
+        return
     }
+
+    const token = tokens.issuePasswordResetToken(user.id, user.email)
+    const resetLink = buildResetLink(token)
+
+    await emailService.sendPasswordResetEmail({
+        to: user.email,
+        name: user.name,
+        resetLink,
+        token,
+    })
+
+    logger.info('Password reset email queued', {
+        operation: 'forgetPassword',
+        userId: user.id,
+        email: user.email,
+    })
 }
