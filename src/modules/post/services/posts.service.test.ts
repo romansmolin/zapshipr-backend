@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, jest } from '@jest/globals'
 
 import { ErrorCode } from '@/shared/consts/error-codes.const'
 import { ErrorMessageCode } from '@/shared/errors/app-error'
+import { ImageProcessor } from '@/shared/image-processor/image-processor'
 import { SocialMediaErrorHandler } from '@/shared/social-media-errors'
 import { PostStatus } from '@/modules/post/types/posts.types'
 import { SocilaMediaPlatform } from '@/modules/post/schemas/posts.schemas'
@@ -12,9 +13,48 @@ import type { ISocialMediaPostSenderService } from '@/modules/social/services/so
 import type { IMediaUploader } from '@/shared/media-uploader'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import type { CreatePostResponse } from '@/modules/post/types/posts.types'
-import type { IPostScheduler } from '@/shared/queue'
+import type { IPostScheduler, IPostPreparationScheduler } from '@/shared/queue'
+import type { VideoConverter } from '@/shared/video-processor/video-converter'
+import type { IVideoProcessor } from '@/shared/video-processor/video-processor.interface'
 
 import { PostsService } from './posts.service'
+import { PostMediaService } from './post-media.service'
+import { PostSchedulingService } from './post-scheduling.service'
+import type { VideoConverter as VideoConverterType } from '@/shared/video-processor/video-converter'
+import type { IVideoProcessor as IVideoProcessorType } from '@/shared/video-processor/video-processor.interface'
+
+const createNoopScheduler = (): jest.Mocked<IPostScheduler> =>
+    ({
+        schedulePost: jest.fn(),
+        cleanupJobsForDeletedPost: jest.fn(async () => undefined),
+    } as unknown as jest.Mocked<IPostScheduler>)
+
+const createNoopPreparationScheduler = (): jest.Mocked<IPostPreparationScheduler> =>
+    ({
+        schedulePostPreparation: jest.fn(),
+    } as unknown as jest.Mocked<IPostPreparationScheduler>)
+
+const createNoopVideoConverter = (): jest.Mocked<VideoConverter> =>
+    ({
+        needsConversion: jest.fn(() => false),
+        convertVideo: jest.fn(),
+        getMimeTypeForFormat: jest.fn(),
+    } as unknown as jest.Mocked<VideoConverter>)
+
+const createNoopVideoProcessor = (): jest.Mocked<IVideoProcessor> =>
+    ({
+        processVideoWithCover: jest.fn(),
+        processVideoForPlatform: jest.fn(),
+        getDurationFromBuffer: jest.fn(async () => 10),
+    } as unknown as jest.Mocked<IVideoProcessor>)
+
+const createNoopImageProcessor = (): jest.Mocked<ImageProcessor> =>
+    ({
+        processImageForPlatform: jest.fn(),
+        getPlatformRequirements: jest.fn(),
+        validateImageForPlatform: jest.fn(),
+        transformImage: jest.fn(),
+    } as unknown as jest.Mocked<ImageProcessor>)
 
 const createMockFile = (overrides: Partial<Express.Multer.File> = {}): Express.Multer.File =>
     ({
@@ -65,6 +105,7 @@ describe('PostsService mediaTransforms', () => {
     let postRepository: jest.Mocked<IPostsRepository>
     let mediaUploader: jest.Mocked<IMediaUploader>
     let socialMediaPostSender: jest.Mocked<ISocialMediaPostSenderService>
+    let imageProcessor: jest.Mocked<ImageProcessor>
 
     beforeEach(() => {
         logger = {
@@ -116,8 +157,34 @@ describe('PostsService mediaTransforms', () => {
         } as unknown as jest.Mocked<ISocialMediaPostSenderService>
 
         const errorHandler = new SocialMediaErrorHandler(logger)
+        imageProcessor = createNoopImageProcessor()
+        const videoConverter = createNoopVideoConverter()
+        const videoProcessor = createNoopVideoProcessor()
+        const postMediaService = new PostMediaService(
+            postRepository,
+            mediaUploader,
+            imageProcessor,
+            videoConverter as unknown as VideoConverterType,
+            videoProcessor as unknown as IVideoProcessorType,
+            logger
+        )
+        const postSchedulingService = new PostSchedulingService(
+            postRepository,
+            createNoopScheduler(),
+            createNoopPreparationScheduler(),
+            logger
+        )
 
-        service = new PostsService(postRepository, mediaUploader, logger, socialMediaPostSender, errorHandler)
+        service = new PostsService(
+            postRepository,
+            mediaUploader,
+            logger,
+            socialMediaPostSender,
+            errorHandler,
+            imageProcessor,
+            postMediaService,
+            postSchedulingService
+        )
 
         postRepository.createBasePost.mockResolvedValue({ postId: 'post-1' })
         postRepository.savePostMediaAssets.mockResolvedValue({ mediaId: 'media-1' })
@@ -135,13 +202,12 @@ describe('PostsService mediaTransforms', () => {
     })
 
     it('computes crop rectangle using actual image dimensions instead of frontend preview dimensions', () => {
-        const cropRect = (service as any).computeCropRect(
+        const realImageProcessor = new ImageProcessor(logger)
+        const cropRect = (realImageProcessor as any).computeCropRect(
             {
-                mediaIndex: 0,
                 ratio: '1:1',
                 crop: { x: 0.5, y: 0.1, scale: 2 },
                 source: { width: 120, height: 240 },
-                version: 1,
             },
             240,
             480
@@ -156,25 +222,22 @@ describe('PostsService mediaTransforms', () => {
     })
 
     it('maps center-offset coordinates to crop rectangle edges', () => {
-        const leftEdge = (service as any).computeCropRect(
+        const realImageProcessor = new ImageProcessor(logger)
+        const leftEdge = (realImageProcessor as any).computeCropRect(
             {
-                mediaIndex: 0,
                 ratio: '1:1',
                 crop: { x: 1, y: 1, scale: 1 },
                 source: { width: 100, height: 100 },
-                version: 1,
             },
             200,
             100
         )
 
-        const rightEdge = (service as any).computeCropRect(
+        const rightEdge = (realImageProcessor as any).computeCropRect(
             {
-                mediaIndex: 0,
                 ratio: '1:1',
                 crop: { x: -1, y: -1, scale: 1 },
                 source: { width: 100, height: 100 },
-                version: 1,
             },
             200,
             100
@@ -186,9 +249,11 @@ describe('PostsService mediaTransforms', () => {
 
     it('applies media transform for uploaded image in create flow', async () => {
         const transformedBuffer = Buffer.from('transformed-image')
-        const transformSpy = jest
-            .spyOn(service as any, 'transformImageWithFFmpeg')
-            .mockResolvedValue({ buffer: transformedBuffer, contentType: 'image/jpeg' })
+        imageProcessor.transformImage.mockResolvedValue({
+            buffer: transformedBuffer,
+            contentType: 'image/jpeg',
+        })
+        const transformSpy = imageProcessor.transformImage
 
         await service.createPost(
             createBaseRequest({
@@ -315,7 +380,7 @@ describe('PostsService mediaTransforms', () => {
     })
 
     it('skips create media transform when transformed index is not selected by any target', async () => {
-        const transformSpy = jest.spyOn(service as any, 'transformImageWithFFmpeg')
+        const transformSpy = imageProcessor.transformImage
 
         await service.createPost(
             createBaseRequest({
@@ -386,9 +451,11 @@ describe('PostsService mediaTransforms', () => {
     it('applies media transform for mediaIndex 0 in edit flow', async () => {
         postRepository.getPostMediaAssets.mockResolvedValue([createMockMediaAsset(0)])
         const transformedBuffer = Buffer.from('transformed-edit-image')
-        const transformSpy = jest
-            .spyOn(service as any, 'transformImageWithFFmpeg')
-            .mockResolvedValue({ buffer: transformedBuffer, contentType: 'image/jpeg' })
+        imageProcessor.transformImage.mockResolvedValue({
+            buffer: transformedBuffer,
+            contentType: 'image/jpeg',
+        })
+        const transformSpy = imageProcessor.transformImage
 
         await service.editPost(
             'post-1',
@@ -579,13 +646,30 @@ describe('PostsService mediaTransforms', () => {
         }
 
         const errorHandler = new SocialMediaErrorHandler(logger)
+        const localImageProcessor = createNoopImageProcessor()
+        const localPostMediaService = new PostMediaService(
+            postRepository,
+            mediaUploader,
+            localImageProcessor,
+            createNoopVideoConverter() as unknown as VideoConverterType,
+            createNoopVideoProcessor() as unknown as IVideoProcessorType,
+            logger
+        )
+        const localPostSchedulingService = new PostSchedulingService(
+            postRepository,
+            scheduler,
+            createNoopPreparationScheduler(),
+            logger
+        )
         const serviceWithScheduler = new PostsService(
             postRepository,
             mediaUploader,
             logger,
             socialMediaPostSender,
             errorHandler,
-            scheduler
+            localImageProcessor,
+            localPostMediaService,
+            localPostSchedulingService
         )
 
         await serviceWithScheduler.createPost(
@@ -614,33 +698,6 @@ describe('PostsService mediaTransforms', () => {
             expect.any(Date),
             'account-1'
         )
-        expect(socialMediaPostSender.sendPost).not.toHaveBeenCalled()
-    })
-
-    it('returns INTERNAL_SERVER_ERROR when postNow scheduler is missing', async () => {
-        await expect(
-            service.createPost(
-                createBaseRequest({
-                    postType: 'text',
-                    postStatus: PostStatus.PENDING,
-                    postNow: true,
-                    posts: [
-                        {
-                            account: 'account-1',
-                            platform: SocilaMediaPlatform.INSTAGRAM,
-                            text: 'hello',
-                        },
-                    ],
-                }),
-                undefined,
-                'user-1',
-                'workspace-1'
-            )
-        ).rejects.toMatchObject({
-            code: ErrorCode.UNKNOWN_ERROR,
-            httpCode: 500,
-        })
-
         expect(socialMediaPostSender.sendPost).not.toHaveBeenCalled()
     })
 
@@ -731,7 +788,31 @@ describe('PostsService failed target cancellation', () => {
         } as unknown as jest.Mocked<ISocialMediaPostSenderService>
 
         const errorHandler = new SocialMediaErrorHandler(logger)
-        service = new PostsService(postRepository, mediaUploader, logger, socialMediaPostSender, errorHandler)
+        const localImageProcessor = createNoopImageProcessor()
+        const localPostMediaService = new PostMediaService(
+            postRepository,
+            mediaUploader,
+            localImageProcessor,
+            createNoopVideoConverter() as unknown as VideoConverterType,
+            createNoopVideoProcessor() as unknown as IVideoProcessorType,
+            logger
+        )
+        const localPostSchedulingService = new PostSchedulingService(
+            postRepository,
+            createNoopScheduler(),
+            createNoopPreparationScheduler(),
+            logger
+        )
+        service = new PostsService(
+            postRepository,
+            mediaUploader,
+            logger,
+            socialMediaPostSender,
+            errorHandler,
+            localImageProcessor,
+            localPostMediaService,
+            localPostSchedulingService
+        )
 
         postRepository.deletePost.mockResolvedValue({ mediaUrls: [] })
         postRepository.deletePostTarget.mockResolvedValue()

@@ -142,6 +142,21 @@ export class VideoProcessor implements IVideoProcessor {
         })
     }
 
+    async getDurationFromBuffer(buffer: Buffer, fileExtension = 'mp4'): Promise<number> {
+        const sanitizedExt = fileExtension.replace(/^\./, '').replace(/[^a-zA-Z0-9]/g, '') || 'mp4'
+        const tempDir = join(this.TEMP_DIR, `duration-${Date.now()}`)
+        await mkdir(tempDir, { recursive: true })
+        const tempFilePath = join(tempDir, `temp.${sanitizedExt}`)
+
+        try {
+            await this.writeBufferToFile(buffer, tempFilePath)
+            const info = await this.getVideoInfo(tempFilePath)
+            return info.duration
+        } finally {
+            await this.cleanupTempFiles([tempFilePath], tempDir)
+        }
+    }
+
     private async cleanupTempFiles(filePaths: string[], dir?: string): Promise<void> {
         for (const filePath of filePaths) {
             try {

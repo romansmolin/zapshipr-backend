@@ -1,5 +1,8 @@
 import sharp from 'sharp'
 
+import { ErrorCode } from '@/shared/consts/error-codes.const'
+import { BaseAppError } from '@/shared/errors/base-error'
+
 import type { ILogger } from '../logger/logger.interface'
 
 export interface ImageProcessingOptions {
@@ -10,6 +13,19 @@ export interface ImageProcessingOptions {
     format?: 'jpeg' | 'png' | 'webp'
     addPadding?: boolean
     backgroundColor?: string
+}
+
+export interface ImageTransform {
+    /** 'original' or 'W:H' (e.g. '1:1', '4:5', '9:16') */
+    ratio: string
+    /** Frontend-reported source dimensions used to normalize the crop into pixel space */
+    source: { width: number; height: number }
+    crop: { x: number; y: number; scale: number }
+}
+
+export interface ImageTransformResult {
+    buffer: Buffer
+    contentType: string
 }
 
 export interface PlatformImageRequirements {
@@ -283,5 +299,155 @@ export class ImageProcessor {
         }
 
         return formatMap[requiredFormat]?.includes(actualFormat.toLowerCase()) || false
+    }
+
+    async transformImage(
+        imageBuffer: Buffer,
+        mimeType: string,
+        transform: ImageTransform
+    ): Promise<ImageTransformResult> {
+        const outputConfig = this.getTransformOutputConfig(mimeType)
+        const frontendSourceWidth = Math.round(transform.source.width)
+        const frontendSourceHeight = Math.round(transform.source.height)
+
+        if (frontendSourceWidth <= 0 || frontendSourceHeight <= 0) {
+            throw new BaseAppError('Invalid source dimensions in mediaTransforms', ErrorCode.BAD_REQUEST, 400)
+        }
+
+        try {
+            const orientedImage = sharp(imageBuffer, { failOn: 'none' }).rotate()
+            const metadata = await orientedImage.metadata()
+            const actualWidth = metadata.width ?? 0
+            const actualHeight = metadata.height ?? 0
+
+            if (actualWidth <= 0 || actualHeight <= 0) {
+                throw new BaseAppError(
+                    'Failed to read image dimensions for mediaTransforms',
+                    ErrorCode.BAD_REQUEST,
+                    400
+                )
+            }
+
+            const cropRect = this.computeCropRect(transform, actualWidth, actualHeight)
+            const outputSize = this.resolveOutputSize(transform.ratio, cropRect)
+
+            this.logger.debug('Resolved media transform', {
+                operation: 'transformImage',
+                ratio: transform.ratio,
+                crop: transform.crop,
+                source: transform.source,
+                actualSource: { width: actualWidth, height: actualHeight },
+                cropRect,
+                outputSize,
+            })
+
+            let transformed = orientedImage.extract(cropRect).resize(outputSize.width, outputSize.height, {
+                fit: 'fill',
+                kernel: sharp.kernel.lanczos3,
+            })
+
+            if (outputConfig.extension === 'png') {
+                transformed = transformed.png()
+            } else {
+                transformed = transformed.jpeg({ quality: 90 })
+            }
+
+            const transformedBuffer = await transformed.toBuffer()
+
+            return {
+                buffer: transformedBuffer,
+                contentType: outputConfig.mimeType,
+            }
+        } catch (error) {
+            if (error instanceof BaseAppError) throw error
+            throw new BaseAppError(
+                `Failed to apply media transform: ${error instanceof Error ? error.message : 'Unknown error'}`,
+                ErrorCode.BAD_REQUEST,
+                400
+            )
+        }
+    }
+
+    private clamp(value: number, min: number, max: number): number {
+        if (value < min) return min
+        if (value > max) return max
+        return value
+    }
+
+    private parseRatio(ratio: string): { width: number; height: number } {
+        const [widthRaw, heightRaw] = ratio.split(':')
+        const width = Number(widthRaw)
+        const height = Number(heightRaw)
+
+        if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+            throw new BaseAppError(`Invalid ratio: ${ratio}`, ErrorCode.BAD_REQUEST, 400)
+        }
+
+        return { width, height }
+    }
+
+    private resolveTransformRatio(
+        transform: ImageTransform,
+        sourceWidth: number,
+        sourceHeight: number
+    ): { width: number; height: number } {
+        if (transform.ratio === 'original') {
+            return { width: sourceWidth, height: sourceHeight }
+        }
+        return this.parseRatio(transform.ratio)
+    }
+
+    private resolveOutputSize(
+        ratio: string,
+        cropRect: { width: number; height: number }
+    ): { width: number; height: number } {
+        if (ratio === 'original') {
+            const targetWidth = Math.min(1080, cropRect.width)
+            return {
+                width: targetWidth,
+                height: Math.round((targetWidth * cropRect.height) / cropRect.width),
+            }
+        }
+
+        if (ratio === '1:1') return { width: 1080, height: 1080 }
+        if (ratio === '4:5') return { width: 1080, height: 1350 }
+        if (ratio === '9:16') return { width: 1080, height: 1920 }
+
+        const parsedRatio = this.parseRatio(ratio)
+        return {
+            width: 1080,
+            height: Math.round((1080 * parsedRatio.height) / parsedRatio.width),
+        }
+    }
+
+    private computeCropRect(
+        transform: ImageTransform,
+        sourceWidth: number,
+        sourceHeight: number
+    ): { width: number; height: number; left: number; top: number } {
+        const ratio = this.resolveTransformRatio(transform, sourceWidth, sourceHeight)
+
+        if (sourceWidth <= 0 || sourceHeight <= 0) {
+            throw new BaseAppError('Invalid source dimensions in mediaTransforms', ErrorCode.BAD_REQUEST, 400)
+        }
+
+        const baseCropWidth = Math.min(sourceWidth, (sourceHeight * ratio.width) / ratio.height)
+        const baseCropHeight = Math.min(sourceHeight, (sourceWidth * ratio.height) / ratio.width)
+
+        const cropWidth = this.clamp(Math.round(baseCropWidth / transform.crop.scale), 1, sourceWidth)
+        const cropHeight = this.clamp(Math.round(baseCropHeight / transform.crop.scale), 1, sourceHeight)
+        const clampedX = this.clamp(transform.crop.x, -1, 1)
+        const clampedY = this.clamp(transform.crop.y, -1, 1)
+        const left = Math.round(((1 - clampedX) / 2) * (sourceWidth - cropWidth))
+        const top = Math.round(((1 - clampedY) / 2) * (sourceHeight - cropHeight))
+
+        return { width: cropWidth, height: cropHeight, left, top }
+    }
+
+    private getTransformOutputConfig(mimeType: string): { extension: string; mimeType: string } {
+        if (mimeType === 'image/png') {
+            return { extension: 'png', mimeType: 'image/png' }
+        }
+        return { extension: 'jpg', mimeType: 'image/jpeg' }
     }
 }

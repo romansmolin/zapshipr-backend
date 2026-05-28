@@ -15,6 +15,8 @@ import { AxiosHttpClient } from '@/shared/http-client'
 import { S3Uploader } from '@/shared/media-uploader/media-uploader'
 import { SocialMediaErrorHandler } from '@/shared/social-media-errors'
 import { VideoProcessor } from '@/shared/video-processor/video-processor'
+import { VideoConverter } from '@/shared/video-processor/video-converter'
+import { ImageProcessor } from '@/shared/image-processor/image-processor'
 import {
     BullMqPostScheduler,
     BullMqPostPreparationScheduler,
@@ -44,6 +46,8 @@ import { SocialMediaPublisherFactory } from '@/modules/social/factories/socia-me
 import { SocialMediaPostSenderService } from '@/modules/social/services/social-media-post-sender.service'
 import { SocialMediaTokenRefresherService } from '@/modules/social/services/social-media-token-refresher.service'
 import { PostsService } from '@/modules/post/services/posts.service'
+import { PostMediaService } from '@/modules/post/services/post-media.service'
+import { PostSchedulingService } from '@/modules/post/services/post-scheduling.service'
 import { InspirationsService } from '@/modules/inspiration/services/inspirations.service'
 import { ContentParserService } from '@/modules/inspiration/services/content-parser/content-parser.service'
 import { MediaService } from '@/modules/media/services/media.service'
@@ -150,6 +154,8 @@ export const buildAppDeps = ({ db, logger }: AppDepsInput): AppDeps => {
     const openaiApiClient = new AxiosHttpClient('https://api.openai.com/v1')
     const emailService = new NodemailerEmailService(logger)
     const videoProcessor = new VideoProcessor(logger)
+    const videoConverter = new VideoConverter(logger)
+    const imageProcessor = new ImageProcessor(logger)
     const socialMediaErrorHandler = new SocialMediaErrorHandler(logger)
     const postScheduler = new BullMqPostScheduler()
     const postPreparationScheduler = new BullMqPostPreparationScheduler()
@@ -193,7 +199,8 @@ export const buildAppDeps = ({ db, logger }: AppDepsInput): AppDeps => {
         apiClient,
         socialMediaErrorHandler,
         videoProcessor,
-        mediaUploader
+        mediaUploader,
+        imageProcessor
     )
     const socialMediaPostSender = new SocialMediaPostSenderService(
         postsRepository,
@@ -204,14 +211,29 @@ export const buildAppDeps = ({ db, logger }: AppDepsInput): AppDeps => {
     const socialMediaTokenRefresher = new SocialMediaTokenRefresherService(logger, accountRepository)
 
     // ----- Posts -----
+    const postMediaService = new PostMediaService(
+        postsRepository,
+        mediaUploader,
+        imageProcessor,
+        videoConverter,
+        videoProcessor,
+        logger
+    )
+    const postSchedulingService = new PostSchedulingService(
+        postsRepository,
+        postScheduler,
+        postPreparationScheduler,
+        logger
+    )
     const postsService = new PostsService(
         postsRepository,
         mediaUploader,
         logger,
         socialMediaPostSender,
         socialMediaErrorHandler,
-        postScheduler,
-        postPreparationScheduler
+        imageProcessor,
+        postMediaService,
+        postSchedulingService
     )
 
     // ----- Social accounts (use cases + service) -----

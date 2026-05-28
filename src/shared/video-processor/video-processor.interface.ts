@@ -4,6 +4,7 @@ export interface IVideoProcessor {
         videoBuffer: Buffer,
         platform: 'instagram' | 'tiktok' | 'facebook' | 'threads'
     ): Promise<Buffer>
+    getDurationFromBuffer(buffer: Buffer, fileExtension?: string): Promise<number>
 }
 
 export interface VideoFilter {
