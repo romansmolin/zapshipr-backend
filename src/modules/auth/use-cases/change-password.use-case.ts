@@ -4,7 +4,7 @@ import type { IUserRepository } from '@/modules/user/repositories/user-repositor
 import type { ILogger } from '@/shared/logger/logger.interface'
 import { AppError, ErrorMessageCode } from '@/shared/errors/app-error'
 
-import type { TokenService } from '../services/token.service'
+import type { TokenService } from '../services/token/token.service'
 
 export interface ResetPasswordInput {
     token: string

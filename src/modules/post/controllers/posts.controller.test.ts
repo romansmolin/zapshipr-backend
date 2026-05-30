@@ -6,9 +6,9 @@ import { PostTargetEntity } from '@/modules/post/entity/post-target'
 
 import { PostsController } from './posts.controller'
 
-import type { IPostsService } from '@/modules/post/services/posts-service.interface'
-import type { IUserService } from '@/modules/user/services/user.service.interface'
-import type { IWorkspaceProfileService } from '@/modules/workspace/services/workspace-profile.service'
+import type { IPostsService } from '@/modules/post/services/posts/posts-service.interface'
+import type { IUserService } from '@/modules/user/services/user/user.service.interface'
+import type { IWorkspaceProfileService } from '@/modules/workspace/services/workspace-profile/workspace-profile.service'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import type { Request, Response } from 'express'
 

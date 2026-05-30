@@ -1,6 +1,6 @@
 import type { SocilaMediaPlatform } from '@/modules/post/schemas/posts.schemas'
 import type { PostTarget } from '@/modules/post/types/posts.types'
-import type { PostPreparationJobPayload } from './posts-service.interface'
+import type { PostPreparationJobPayload } from '../posts/posts-service.interface'
 
 export interface IPostSchedulingService {
     schedulePostTargets(

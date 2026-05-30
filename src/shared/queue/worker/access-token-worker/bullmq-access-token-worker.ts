@@ -3,7 +3,7 @@ import { Queue, Worker, type Job } from 'bullmq'
 import { redisConnection } from '../../scheduler/redis'
 
 import type { IAccessTokenWorker } from './access-token-worker.interface'
-import type { ISocialMediaTokenRefresherService } from '@/modules/social/services/social-media-token-refresher.interface'
+import type { ISocialMediaTokenRefresherService } from '@/modules/social/services/social-media-token-refresher/social-media-token-refresher.interface'
 import type { ILogger } from '@/shared/logger/logger.interface'
 
 export class BullMqAccessTokenWorker implements IAccessTokenWorker {

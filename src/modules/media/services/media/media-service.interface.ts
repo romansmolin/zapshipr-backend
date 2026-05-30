@@ -1,4 +1,4 @@
-import { ListUserImagesResponse } from '../entity/media.dto'
+import { ListUserImagesResponse } from '../../entity/media.dto'
 
 export interface ListUserImagesOptions {
     page: number

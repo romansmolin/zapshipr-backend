@@ -6,10 +6,10 @@ import type {
     IPostsService,
     MediaCompatibilityError,
     PostCreateQueuedResponse,
-} from '@/modules/post/services/posts-service.interface'
+} from '@/modules/post/services/posts/posts-service.interface'
 import type { CreatePostsRequest } from '@/modules/post/schemas/posts.schemas'
-import type { IUserService } from '@/modules/user/services/user.service.interface'
-import type { IWorkspaceProfileService } from '@/modules/workspace/services/workspace-profile.service'
+import type { IUserService } from '@/modules/user/services/user/user.service.interface'
+import type { IWorkspaceProfileService } from '@/modules/workspace/services/workspace-profile/workspace-profile.service'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import type { PostFilters } from '@/modules/post/types/posts.types'
 import type { NextFunction, Request, Response } from 'express'

@@ -4,10 +4,10 @@ import { BaseAppError } from '@/shared/errors/base-error'
 import { ErrorCode } from '@/shared/consts/error-codes.const'
 import type { ILogger } from '@/shared/logger/logger.interface'
 
-import type { IEmailService } from '@/modules/email/services/email.service.interface'
+import type { IEmailService } from '@/modules/email/services/email/email.service.interface'
 import { WaitlistEntry } from '@/modules/waitlist/entity/waitlist-entry'
 import type { IWaitlistRepository } from '@/modules/waitlist/repositories/waitlist.repository.interface'
-import type { WaitlistJoinResult } from '@/modules/waitlist/services/waitlist.service.interface'
+import type { WaitlistJoinResult } from '@/modules/waitlist/services/waitlist/waitlist.service.interface'
 
 export interface JoinWaitlistInput {
     email: string
@@ -43,11 +43,8 @@ const applyReferralIfEligible = async (
 
     let referrer: WaitlistEntry | null = null
 
-    if (trimmedReferralCode) {
-        referrer = await waitlist.findByReferralCode(trimmedReferralCode)
-    } else if (trimmedReferrerId) {
-        referrer = await waitlist.findById(trimmedReferrerId)
-    }
+    if (trimmedReferralCode) referrer = await waitlist.findByReferralCode(trimmedReferralCode)
+    else if (trimmedReferrerId) referrer = await waitlist.findById(trimmedReferrerId)
 
     if (!referrer) {
         logger.warn('Waitlist referral ignored due to missing referrer', {
@@ -87,9 +84,7 @@ export const joinWaitlist = async (
     const { waitlist, emailService, logger } = deps
     const normalizedEmail = payload.email.trim().toLowerCase()
 
-    if (!normalizedEmail) {
-        throw new BaseAppError('Email is required', ErrorCode.BAD_REQUEST, 400)
-    }
+    if (!normalizedEmail) throw new BaseAppError('Email is required', ErrorCode.BAD_REQUEST, 400)
 
     const entryDraft = new WaitlistEntry(
         uuidv4(),
@@ -111,9 +106,7 @@ export const joinWaitlist = async (
         waitlistEntry = await waitlist.findByEmailNormalized(normalizedEmail)
     }
 
-    if (!waitlistEntry) {
-        throw new BaseAppError('Failed to join waitlist', ErrorCode.UNKNOWN_ERROR, 500)
-    }
+    if (!waitlistEntry) throw new BaseAppError('Failed to join waitlist', ErrorCode.UNKNOWN_ERROR, 500)
 
     const referralLink = buildReferralLink(waitlistEntry.referralCode)
     const referralCount = await waitlist.countReferrals(waitlistEntry.id)

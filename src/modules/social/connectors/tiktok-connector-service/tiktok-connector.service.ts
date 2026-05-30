@@ -1,6 +1,6 @@
 import { Account } from '@/modules/social/entity/account'
 import { IAccountRepository } from '@/modules/social/repositories/account-repository.interface'
-import { IAccountsService } from '@/modules/social/services/accounts.service.interface'
+import { IAccountsService } from '@/modules/social/services/accounts/accounts.service.interface'
 import { TikTokCreatorInfoDto } from '@/modules/social/types/account.types'
 import { ErrorCode } from '@/shared/consts/error-codes.const'
 import { BaseAppError } from '@/shared/errors/base-error'

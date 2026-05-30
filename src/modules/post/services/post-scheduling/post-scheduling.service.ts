@@ -4,7 +4,7 @@ import { PostStatus } from '@/modules/post/types/posts.types'
 import { isValidTimeZone, parseDateWithTimeZone } from '@/shared/utils/timezone'
 
 import type { IPostSchedulingService } from './post-scheduling-service.interface'
-import type { PostPreparationJobPayload } from './posts-service.interface'
+import type { PostPreparationJobPayload } from '../posts/posts-service.interface'
 import type { IPostsRepository } from '@/modules/post/repositories/posts-repository.interface'
 import type { SocilaMediaPlatform } from '@/modules/post/schemas/posts.schemas'
 import type { PostTarget } from '@/modules/post/types/posts.types'

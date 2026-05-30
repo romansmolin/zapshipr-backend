@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express'
 
 import type { ILogger } from '@/shared/logger/logger.interface'
-import type { IWaitlistService } from '@/modules/waitlist/services/waitlist.service.interface'
+import type { IWaitlistService } from '@/modules/waitlist/services/waitlist/waitlist.service.interface'
 import { joinWaitlistSchema } from '@/modules/waitlist/validation/waitlist.schemas'
 
 export class WaitlistController {

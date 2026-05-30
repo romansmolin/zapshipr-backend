@@ -1,6 +1,6 @@
 import { SocilaMediaPlatform } from "@/modules/post/schemas/posts.schemas"
 import { IAccountRepository } from "@/modules/social/repositories/account-repository.interface"
-import { IAccountsService } from "@/modules/social/services/accounts.service.interface"
+import { IAccountsService } from "@/modules/social/services/accounts/accounts.service.interface"
 import { IBlueskyConnectorService } from "@/modules/social/connectors/bluesky-connector-service/bluesky-connector-service.interface"
 import { IFacebookConnectorService } from "@/modules/social/connectors/facebook-connector-service/facebook-connector-service.interface"
 import { IInstagramConnectorService } from "@/modules/social/connectors/instagram-connector-service/instagram-connector-service.interface"

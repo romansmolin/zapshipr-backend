@@ -5,7 +5,7 @@ import { BaseAppError } from '@/shared/errors/base-error'
 import { ILogger } from '@/shared/logger/logger.interface'
 import { IMediaUploader } from '@/shared/media-uploader/media-uploader.interface'
 
-import { IMediaRepository } from '../repositories/media-repository.interface'
+import { IMediaRepository } from '../../repositories/media-repository.interface'
 import { MediaService } from './media.service'
 
 describe('MediaService', () => {

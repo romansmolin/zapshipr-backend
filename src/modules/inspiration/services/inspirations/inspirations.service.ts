@@ -9,7 +9,7 @@ import type { IContentParserService } from '@/modules/inspiration/services/conte
 import type {
     IInspirationsRepository,
     InspirationWithExtraction,
-} from '../repositories/inspirations-repository.interface'
+} from '../../repositories/inspirations-repository.interface'
 import type {
     IInspirationsService,
     CreateInspirationData,
@@ -18,14 +18,14 @@ import type {
     TriggerExtractionOptions,
     TriggerExtractionResult,
 } from './inspirations-service.interface'
-import type { RawInspiration } from '../entity/raw-inspiration.schema'
+import type { RawInspiration } from '../../entity/raw-inspiration.schema'
 import {
     getThumbnailFromMarkdown,
     getThumbnailFromPdf,
     getThumbnailFromTxt,
     type ThumbnailResult,
-} from '../utils/document-thumbnails'
-import { validateInspirationByType } from '../validation/inspirations.schemas'
+} from '../../utils/document-thumbnails'
+import { validateInspirationByType } from '../../validation/inspirations.schemas'
 
 export class InspirationsService implements IInspirationsService {
     constructor(

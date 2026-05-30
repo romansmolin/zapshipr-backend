@@ -2,9 +2,9 @@ import { ILogger } from '@/shared/logger/logger.interface'
 import { IMediaUploader } from '@/shared/media-uploader/media-uploader.interface'
 import { BaseAppError } from '@/shared/errors/base-error'
 import { ErrorCode } from '@/shared/consts/error-codes.const'
-import { ListUserImagesResponse, MediaItem } from '../entity/media.dto'
+import { ListUserImagesResponse, MediaItem } from '../../entity/media.dto'
 import { IMediaService, ListUserImagesOptions } from './media-service.interface'
-import { IMediaRepository } from '../repositories/media-repository.interface'
+import { IMediaRepository } from '../../repositories/media-repository.interface'
 
 export class MediaService implements IMediaService {
     private static readonly POSTS_PREFIX = 'posts/'

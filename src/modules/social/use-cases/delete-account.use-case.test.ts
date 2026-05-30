@@ -7,7 +7,7 @@ import { deleteAccount } from './delete-account.use-case'
 import type { IAccountRepository } from '@/modules/social/repositories/account-repository.interface'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import type { IMediaUploader } from '@/shared/media-uploader/media-uploader.interface'
-import type { IPostsService } from '@/modules/post/services/posts-service.interface'
+import type { IPostsService } from '@/modules/post/services/posts/posts-service.interface'
 
 describe('deleteAccount', () => {
     let accountRepository: jest.Mocked<IAccountRepository>

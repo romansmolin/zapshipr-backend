@@ -21,7 +21,7 @@ import { IXConnectorService } from "../connectors/x-connector-service/x-connecto
 import { XConnectorService } from "../connectors/x-connector-service/x-connector.service"
 import { ILogger } from "@/shared/logger"
 import { IAccountRepository } from "@/modules/social/repositories/account-repository.interface"
-import { IAccountsService } from "@/modules/social/services/accounts.service.interface"
+import { IAccountsService } from "@/modules/social/services/accounts/accounts.service.interface"
 import { IApiClient } from "@/shared/http-client"
 import { IMediaUploader } from "@/shared/media-uploader"
 

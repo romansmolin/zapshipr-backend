@@ -4,8 +4,8 @@ import type { IUserRepository } from '@/modules/user/repositories/user-repositor
 import { AppError, ErrorMessageCode } from '@/shared/errors/app-error'
 import type { ILogger } from '@/shared/logger/logger.interface'
 
-import type { AuthResult } from '../services/auth-service.interface'
-import type { TokenService } from '../services/token.service'
+import type { AuthResult } from '../services/auth/auth-service.interface'
+import type { TokenService } from '../services/token/token.service'
 
 export interface SignInInput {
     email: string

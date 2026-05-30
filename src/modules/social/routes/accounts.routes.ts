@@ -10,9 +10,9 @@ import { bindController } from '@/shared/http/bind-controller'
 
 import { AccountsController } from '@/modules/social/controllers/accounts.controller'
 
-import type { IAccountsService } from '@/modules/social/services/accounts.service.interface'
-import type { ISocilaMediaConnectorService } from '@/modules/social/services/social-media-connector.interface'
-import type { IOAuthStateService } from '@/modules/social/services/oauth-state.service'
+import type { IAccountsService } from '@/modules/social/services/accounts/accounts.service.interface'
+import type { ISocilaMediaConnectorService } from '@/modules/social/services/social-media-connector/social-media-connector.interface'
+import type { IOAuthStateService } from '@/modules/social/services/oauth-state/oauth-state.service'
 import type { ILogger } from '@/shared/logger/logger.interface'
 
 export interface AccountsModuleDeps {

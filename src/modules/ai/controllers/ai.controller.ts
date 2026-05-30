@@ -4,7 +4,7 @@ import { BaseAppError } from '@/shared/errors/base-error'
 import { ErrorCode } from '@/shared/consts/error-codes.const'
 import type { ILogger } from '@/shared/logger/logger.interface'
 
-import type { IAiService } from '@/modules/ai/services/ai.service.interface'
+import type { IAiService } from '@/modules/ai/services/ai/ai.service.interface'
 import { aiRequestSchema } from '@/modules/ai/validation/ai.schemas'
 
 export class AiController {

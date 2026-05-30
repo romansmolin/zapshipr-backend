@@ -3,7 +3,7 @@ import type { Request, Response } from 'express'
 import type { ILogger } from '@/shared/logger'
 import { AppError, ErrorMessageCode } from '@/shared/errors/app-error'
 
-import type { IInspirationsService } from '../services/inspirations-service.interface'
+import type { IInspirationsService } from '../services/inspirations/inspirations-service.interface'
 import {
     CreateInspirationSchema,
     UpdateInspirationSchema,

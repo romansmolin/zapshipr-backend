@@ -12,9 +12,9 @@ import {
 } from '@/shared/queue'
 import { schema } from '@/db/schema'
 
-import type { IPostsService } from '@/modules/post/services/posts-service.interface'
-import type { ISocialMediaPostSenderService } from '@/modules/social/services/social-media-post-sender.interface'
-import type { ISocialMediaTokenRefresherService } from '@/modules/social/services/social-media-token-refresher.interface'
+import type { IPostsService } from '@/modules/post/services/posts/posts-service.interface'
+import type { ISocialMediaPostSenderService } from '@/modules/social/services/social-media-post-sender/social-media-post-sender.interface'
+import type { ISocialMediaTokenRefresherService } from '@/modules/social/services/social-media-token-refresher/social-media-token-refresher.interface'
 import type { ILogger } from '@/shared/logger/logger.interface'
 
 import { InspirationsRepository } from '@/modules/inspiration/repositories/inspirations.repository'

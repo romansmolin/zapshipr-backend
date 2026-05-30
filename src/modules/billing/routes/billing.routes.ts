@@ -3,7 +3,7 @@ import type { Router } from 'express'
 
 import { asyncHandler } from '@/shared/http/async-handler'
 
-import type { BillingService } from '../services/billing.service'
+import type { BillingService } from '../services/billing/billing.service'
 import type { ILogger } from '@/shared/logger/logger.interface'
 
 export interface BillingModuleDeps {

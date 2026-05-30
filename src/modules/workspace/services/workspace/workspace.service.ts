@@ -5,20 +5,20 @@ import { BaseAppError } from '@/shared/errors/base-error'
 import type { ILogger } from '@/shared/logger'
 import type { IMediaUploader } from '@/shared/media-uploader/media-uploader.interface'
 
-import { toWorkspaceDto, type WorkspaceDto } from '../entity/workspace.dto'
-import type { IWorkspaceRepository } from '../repositories/workspace-repository.interface'
+import { toWorkspaceDto, type WorkspaceDto } from '../../entity/workspace.dto'
+import type { IWorkspaceRepository } from '../../repositories/workspace-repository.interface'
 import type {
     CreateWorkspaceInput,
     UpdateWorkspaceInput,
     MainPrompt,
     UpdateMainPrompt,
-} from '../validation/workspace.schemas'
-import type { Onboarding, UpdateOnboardingInput } from '../validation/onboarding.schemas'
+} from '../../validation/workspace.schemas'
+import type { Onboarding, UpdateOnboardingInput } from '../../validation/onboarding.schemas'
 import type { IWorkspaceService } from './workspace-service.interface'
-import { normalizeOnboarding, validateOnboardingInput } from '../utils/onboarding-normalizer'
-import type { IWorkspaceProfileService } from './workspace-profile.service'
-import type { WorkspaceAIContext } from '../entity/workspace-profile.types'
-import type { IUserService } from '@/modules/user/services/user.service.interface'
+import { normalizeOnboarding, validateOnboardingInput } from '../../utils/onboarding-normalizer'
+import type { IWorkspaceProfileService } from '../workspace-profile/workspace-profile.service'
+import type { WorkspaceAIContext } from '../../entity/workspace-profile.types'
+import type { IUserService } from '@/modules/user/services/user/user.service.interface'
 
 export class WorkspaceService implements IWorkspaceService {
     constructor(

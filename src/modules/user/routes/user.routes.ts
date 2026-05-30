@@ -7,7 +7,7 @@ import { upload } from '@/middleware/upload.middleware'
 
 import { UserController } from '../controllers/user.controller'
 
-import type { IUserService } from '../services/user.service.interface'
+import type { IUserService } from '../services/user/user.service.interface'
 import type { ILogger } from '@/shared/logger/logger.interface'
 
 export interface UserModuleDeps {

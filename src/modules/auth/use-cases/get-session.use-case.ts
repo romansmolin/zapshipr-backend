@@ -1,7 +1,7 @@
 import type { ILogger } from '@/shared/logger/logger.interface'
 
-import type { AuthResult } from '../services/auth-service.interface'
-import type { TokenService } from '../services/token.service'
+import type { AuthResult } from '../services/auth/auth-service.interface'
+import type { TokenService } from '../services/token/token.service'
 
 export type GetSessionDeps = {
     tokens: TokenService

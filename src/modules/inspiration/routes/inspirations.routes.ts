@@ -11,7 +11,7 @@ import { createWorkspaceMiddleware } from '@/middleware/workspace.middleware'
 
 import { InspirationsController } from '../controllers/inspirations.controller'
 
-import type { IInspirationsService } from '../services/inspirations-service.interface'
+import type { IInspirationsService } from '../services/inspirations/inspirations-service.interface'
 import type { ILogger } from '@/shared/logger/logger.interface'
 
 const upload = multer({

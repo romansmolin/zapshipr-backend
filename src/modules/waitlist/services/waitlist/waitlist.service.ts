@@ -1,5 +1,5 @@
 import type { ILogger } from '@/shared/logger/logger.interface'
-import type { IEmailService } from '@/modules/email/services/email.service.interface'
+import type { IEmailService } from '@/modules/email/services/email/email.service.interface'
 import type { IWaitlistRepository } from '@/modules/waitlist/repositories/waitlist.repository.interface'
 
 import { joinWaitlist as joinWaitlistUseCase } from '@/modules/waitlist/use-cases/join-waitlist.use-case'

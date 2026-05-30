@@ -6,7 +6,7 @@ import { AppError, ErrorMessageCode } from '@/shared/errors/app-error'
 import { getEnvVar } from '@/shared/utils/get-env-var'
 
 import type { IAuthController } from './auth-controller.interface'
-import type { AuthResult, IAuthService } from '../services/auth-service.interface'
+import type { AuthResult, IAuthService } from '../services/auth/auth-service.interface'
 import {
     forgotPasswordSchema,
     googleCallbackSchema,

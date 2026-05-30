@@ -22,7 +22,7 @@ import type {
     MediaCompatibilityError,
     ServiceErrorEnvelope,
     PostPreparationJobPayload,
-} from './posts-service.interface'
+} from '../posts/posts-service.interface'
 import type { IPostsRepository } from '@/modules/post/repositories/posts-repository.interface'
 import type {
     CreatePostsRequest,

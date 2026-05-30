@@ -7,8 +7,8 @@ import { authMiddleware } from '@/middleware/auth.middleware'
 
 import { WorkspaceController } from '../controllers/workspace.controller'
 
-import type { IWorkspaceService } from '../services/workspace-service.interface'
-import type { IWorkspaceProfileService } from '../services/workspace-profile.service'
+import type { IWorkspaceService } from '../services/workspace/workspace-service.interface'
+import type { IWorkspaceProfileService } from '../services/workspace-profile/workspace-profile.service'
 import type { WorkspaceTagsService } from '@/modules/inspiration/services/workspace-tags/workspace-tags.service'
 import type { ILogger } from '@/shared/logger/logger.interface'
 

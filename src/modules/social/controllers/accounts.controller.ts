@@ -5,9 +5,9 @@ import { ErrorCode } from '@/shared/consts/error-codes.const'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import { getEnvVar } from '@/shared/utils/get-env-var'
 
-import type { IAccountsService } from '@/modules/social/services/accounts.service.interface'
-import type { ISocilaMediaConnectorService } from '@/modules/social/services/social-media-connector.interface'
-import type { IOAuthStateService } from '@/modules/social/services/oauth-state.service'
+import type { IAccountsService } from '@/modules/social/services/accounts/accounts.service.interface'
+import type { ISocilaMediaConnectorService } from '@/modules/social/services/social-media-connector/social-media-connector.interface'
+import type { IOAuthStateService } from '@/modules/social/services/oauth-state/oauth-state.service'
 import {
     accountIdParamSchema,
     blueskyConnectSchema,

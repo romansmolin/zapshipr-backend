@@ -3,8 +3,8 @@ import { Worker, type Job } from 'bullmq'
 import { redisConnection } from '../../scheduler/redis'
 
 import type { IPostPreparationWorker } from './post-preparation-worker.interface'
-import type { PostPreparationJobPayload } from '@/modules/post/services/posts-service.interface'
-import type { IPostsService } from '@/modules/post/services/posts-service.interface'
+import type { PostPreparationJobPayload } from '@/modules/post/services/posts/posts-service.interface'
+import type { IPostsService } from '@/modules/post/services/posts/posts-service.interface'
 import type { ILogger } from '@/shared/logger/logger.interface'
 
 const PREPARATION_QUEUE_NAME = 'post-preparation'

@@ -7,7 +7,7 @@ import { toUserResponse } from '@/modules/user/entity/user.dto'
 import { AppError, ErrorMessageCode } from '@/shared/errors/app-error'
 
 import type { IUserController } from './user-controller.interface'
-import type { IUserService } from '../services/user.service.interface'
+import type { IUserService } from '../services/user/user.service.interface'
 import { updateUserSettingsSchema } from '../validation/user.schemas'
 
 export class UserController implements IUserController {
@@ -67,7 +67,7 @@ export class UserController implements IUserController {
             userId,
         })
 
-        await this.userService.deleteUserAccout(userId)
+        await this.userService.deleteUserAccount(userId)
 
         res.json({
             message: 'User account deleted successfully',

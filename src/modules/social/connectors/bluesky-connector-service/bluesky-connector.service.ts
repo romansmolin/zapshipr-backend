@@ -10,7 +10,7 @@ import { uploadAccountAvatar } from "../../utils/upload-account-avatar";
 import { IMediaUploader } from "@/shared/media-uploader";
 import { upsertAccount } from "../../utils/upsert-account";
 import { IAccountRepository } from "@/modules/social/repositories/account-repository.interface";
-import { IAccountsService } from "@/modules/social/services/accounts.service.interface";
+import { IAccountsService } from "@/modules/social/services/accounts/accounts.service.interface";
 import { IBlueskyConnectorService } from "./bluesky-connector-service.interface";
 
 export class BlueskyConnectorService implements IBlueskyConnectorService {

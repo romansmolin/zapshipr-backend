@@ -8,8 +8,8 @@ import type { ILogger } from '@/shared/logger/logger.interface'
 import { formatError } from '@/shared/utils/forma-error'
 import { getEnvVar } from '@/shared/utils/get-env-var'
 
-import type { AuthResult } from '../services/auth-service.interface'
-import type { TokenService } from '../services/token.service'
+import type { AuthResult } from '../services/auth/auth-service.interface'
+import type { TokenService } from '../services/token/token.service'
 
 interface GoogleOAuthConfig {
     clientId: string

@@ -6,7 +6,7 @@ import type {
 import type {
     MediaCompatibilityError,
     PostPreparationJobPayload,
-} from './posts-service.interface'
+} from '../posts/posts-service.interface'
 
 type MediaInput = Express.Multer.File[] | { [fieldname: string]: Express.Multer.File[] } | undefined
 

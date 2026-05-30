@@ -6,7 +6,7 @@ import { BaseAppError } from '@/shared/errors/base-error'
 import { ErrorCode } from '@/shared/consts/error-codes.const'
 
 import type { IAccountRepository } from '@/modules/social/repositories/account-repository.interface'
-import type { IPostsService } from '@/modules/post/services/posts-service.interface'
+import type { IPostsService } from '@/modules/post/services/posts/posts-service.interface'
 
 export interface DeleteAccountInput {
     userId: string

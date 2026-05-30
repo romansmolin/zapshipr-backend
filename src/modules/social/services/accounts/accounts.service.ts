@@ -1,8 +1,8 @@
 import type { ILogger } from '@/shared/logger/logger.interface'
 import type { IMediaUploader } from '@/shared/media-uploader/media-uploader.interface'
 
-import type { IUserService } from '@/modules/user/services/user.service.interface'
-import type { IPostsService } from '@/modules/post/services/posts-service.interface'
+import type { IUserService } from '@/modules/user/services/user/user.service.interface'
+import type { IPostsService } from '@/modules/post/services/posts/posts-service.interface'
 
 import type { Account } from '@/modules/social/entity/account'
 import type { PinterestBoard } from '@/modules/social/entity/pinterest-board'

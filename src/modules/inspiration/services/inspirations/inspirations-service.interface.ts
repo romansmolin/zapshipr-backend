@@ -1,5 +1,5 @@
-import type { RawInspiration } from '../entity/raw-inspiration.schema'
-import type { InspirationWithExtraction } from '../repositories/inspirations-repository.interface'
+import type { RawInspiration } from '../../entity/raw-inspiration.schema'
+import type { InspirationWithExtraction } from '../../repositories/inspirations-repository.interface'
 
 export interface CreateInspirationData {
     workspaceId: string

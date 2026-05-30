@@ -5,7 +5,7 @@ import { bindController } from '@/shared/http/bind-controller'
 
 import { WaitlistController } from '@/modules/waitlist/controllers/waitlist.controller'
 
-import type { IWaitlistService } from '@/modules/waitlist/services/waitlist.service.interface'
+import type { IWaitlistService } from '@/modules/waitlist/services/waitlist/waitlist.service.interface'
 import type { ILogger } from '@/shared/logger/logger.interface'
 
 export interface WaitlistModuleDeps {

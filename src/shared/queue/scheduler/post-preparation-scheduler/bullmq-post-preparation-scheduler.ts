@@ -2,7 +2,7 @@ import { Queue } from 'bullmq'
 
 import { redisConnection } from '../redis'
 
-import type { PostPreparationJobPayload } from '@/modules/post/services/posts-service.interface'
+import type { PostPreparationJobPayload } from '@/modules/post/services/posts/posts-service.interface'
 import type { IPostPreparationScheduler } from './post-preparation-scheduler.interface'
 
 const PREPARATION_QUEUE_NAME = 'post-preparation'

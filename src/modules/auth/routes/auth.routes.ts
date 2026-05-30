@@ -5,7 +5,7 @@ import { bindController } from '@/shared/http/bind-controller'
 
 import { AuthController } from '../controllers/auth.controller'
 
-import type { IAuthService } from '../services/auth-service.interface'
+import type { IAuthService } from '../services/auth/auth-service.interface'
 import type { ILogger } from '@/shared/logger/logger.interface'
 
 export interface AuthModuleDeps {

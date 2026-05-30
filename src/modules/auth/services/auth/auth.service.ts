@@ -1,5 +1,5 @@
 import type { IUserRepository } from '@/modules/user/repositories/user-repository.interface'
-import type { IEmailService } from '@/modules/email/services/email.service.interface'
+import type { IEmailService } from '@/modules/email/services/email/email.service.interface'
 import type { ILogger } from '@/shared/logger/logger.interface'
 
 import type {
@@ -11,16 +11,16 @@ import type {
     SignInInput,
     SignUpInput,
 } from './auth-service.interface'
-import { TokenService } from './token.service'
+import { TokenService } from '../token/token.service'
 
-import { signUp as signUpUseCase } from '../use-cases/sign-up.use-case'
-import { signIn as signInUseCase } from '../use-cases/sign-in.use-case'
-import { refreshToken as refreshTokenUseCase } from '../use-cases/refresh-token.use-case'
-import { getSession as getSessionUseCase } from '../use-cases/get-session.use-case'
-import { googleCallback as googleCallbackUseCase } from '../use-cases/google-callback.use-case'
-import { logout as logoutUseCase } from '../use-cases/logout.use-case'
-import { changePassword as changePasswordUseCase } from '../use-cases/change-password.use-case'
-import { forgetPassword as forgetPasswordUseCase } from '../use-cases/forget-password.use-case'
+import { signUp as signUpUseCase } from '../../use-cases/sign-up.use-case'
+import { signIn as signInUseCase } from '../../use-cases/sign-in.use-case'
+import { refreshToken as refreshTokenUseCase } from '../../use-cases/refresh-token.use-case'
+import { getSession as getSessionUseCase } from '../../use-cases/get-session.use-case'
+import { googleCallback as googleCallbackUseCase } from '../../use-cases/google-callback.use-case'
+import { logout as logoutUseCase } from '../../use-cases/logout.use-case'
+import { changePassword as changePasswordUseCase } from '../../use-cases/change-password.use-case'
+import { forgetPassword as forgetPasswordUseCase } from '../../use-cases/forget-password.use-case'
 
 type AuthDeps = {
     users: IUserRepository

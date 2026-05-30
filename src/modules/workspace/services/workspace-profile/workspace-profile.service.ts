@@ -1,16 +1,16 @@
 import type { ILogger } from '@/shared/logger'
 
-import type { IWorkspaceRepository } from '../repositories/workspace-repository.interface'
-import type { IWorkspaceProfileSignalsRepository } from '../repositories/workspace-profile-signals-repository.interface'
+import type { IWorkspaceRepository } from '../../repositories/workspace-repository.interface'
+import type { IWorkspaceProfileSignalsRepository } from '../../repositories/workspace-profile-signals-repository.interface'
 import type { IWorkspaceTagsService } from '@/modules/inspiration/services/workspace-tags/workspace-tags-service.interface'
 import type {
     WorkspaceAIContext,
     ProfileSignalInput,
     LearnedPreferences,
     CompletionLevel,
-} from '../entity/workspace-profile.types'
-import type { Onboarding } from '../validation/onboarding.schemas'
-import { calculateCompletionLevel } from '../utils/onboarding-normalizer'
+} from '../../entity/workspace-profile.types'
+import type { Onboarding } from '../../validation/onboarding.schemas'
+import { calculateCompletionLevel } from '../../utils/onboarding-normalizer'
 import { BaseAppError } from '@/shared/errors/base-error'
 import { ErrorCode } from '@/shared/consts/error-codes.const'
 

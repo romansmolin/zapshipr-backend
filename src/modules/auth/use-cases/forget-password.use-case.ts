@@ -1,8 +1,8 @@
-import type { IEmailService } from '@/modules/email/services/email.service.interface'
+import type { IEmailService } from '@/modules/email/services/email/email.service.interface'
 import type { IUserRepository } from '@/modules/user/repositories/user-repository.interface'
 import type { ILogger } from '@/shared/logger/logger.interface'
 
-import type { TokenService } from '../services/token.service'
+import type { TokenService } from '../services/token/token.service'
 
 export interface ForgetPasswordInput {
     email: string

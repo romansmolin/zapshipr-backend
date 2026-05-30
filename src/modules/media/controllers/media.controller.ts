@@ -1,6 +1,6 @@
 import { Request, Response } from 'express'
 import { ILogger } from '@/shared/logger/logger.interface'
-import { IMediaService } from '../services/media-service.interface'
+import { IMediaService } from '../services/media/media-service.interface'
 import { IMediaController } from './media-controller.interface'
 import { listUserImagesQuerySchema } from '../validation/media.schemas'
 

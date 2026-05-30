@@ -6,7 +6,7 @@ import { bindController } from '@/shared/http/bind-controller'
 
 import { MediaController } from '../controllers/media.controller'
 
-import type { IMediaService } from '../services/media-service.interface'
+import type { IMediaService } from '../services/media/media-service.interface'
 import type { ILogger } from '@/shared/logger/logger.interface'
 
 export interface MediaModuleDeps {

@@ -1,6 +1,6 @@
 import { Workspace } from '@/modules/workspace/entity/workspace.schema'
-import type { User } from '../entity/user.schema'
-import type { UpdateUserSettingsInput } from '../validation/user.schemas'
+import type { User } from '../../entity/user.schema'
+import type { UpdateUserSettingsInput } from '../../validation/user.schemas'
 
 export interface QuotaMetric {
     used: number
@@ -66,5 +66,5 @@ export interface IUserService {
         data: UpdateUserSettingsInput,
         avatarFile?: Express.Multer.File
     ): Promise<User>
-    deleteUserAccout(userId: string): Promise<void>
+    deleteUserAccount(userId: string): Promise<void>
 }

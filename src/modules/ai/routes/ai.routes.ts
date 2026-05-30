@@ -6,7 +6,7 @@ import { bindController } from '@/shared/http/bind-controller'
 
 import { AiController } from '@/modules/ai/controllers/ai.controller'
 
-import type { IAiService } from '@/modules/ai/services/ai.service.interface'
+import type { IAiService } from '@/modules/ai/services/ai/ai.service.interface'
 import type { ILogger } from '@/shared/logger/logger.interface'
 
 export interface AiModuleDeps {

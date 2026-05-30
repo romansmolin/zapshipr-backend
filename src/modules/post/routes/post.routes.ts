@@ -9,9 +9,9 @@ import { bindController } from '@/shared/http/bind-controller'
 
 import { PostsController } from '../controllers/posts.controller'
 
-import type { IPostsService } from '../services/posts-service.interface'
-import type { IUserService } from '@/modules/user/services/user.service.interface'
-import type { IWorkspaceProfileService } from '@/modules/workspace/services/workspace-profile.service'
+import type { IPostsService } from '../services/posts/posts-service.interface'
+import type { IUserService } from '@/modules/user/services/user/user.service.interface'
+import type { IWorkspaceProfileService } from '@/modules/workspace/services/workspace-profile/workspace-profile.service'
 import type { ILogger } from '@/shared/logger/logger.interface'
 import type { NodePgDatabase } from 'drizzle-orm/node-postgres'
 import type { Router } from 'express'

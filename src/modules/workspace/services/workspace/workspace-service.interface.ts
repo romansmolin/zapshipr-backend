@@ -1,7 +1,7 @@
-import type { WorkspaceDto } from '../entity/workspace.dto'
-import type { CreateWorkspaceInput, UpdateWorkspaceInput, MainPrompt, UpdateMainPrompt } from '../validation/workspace.schemas'
-import type { Onboarding, UpdateOnboardingInput } from '../validation/onboarding.schemas'
-import type { WorkspaceAIContext } from '../entity/workspace-profile.types'
+import type { WorkspaceDto } from '../../entity/workspace.dto'
+import type { CreateWorkspaceInput, UpdateWorkspaceInput, MainPrompt, UpdateMainPrompt } from '../../validation/workspace.schemas'
+import type { Onboarding, UpdateOnboardingInput } from '../../validation/onboarding.schemas'
+import type { WorkspaceAIContext } from '../../entity/workspace-profile.types'
 
 export interface IWorkspaceService {
     create(userId: string, data: CreateWorkspaceInput, file?: Express.Multer.File): Promise<WorkspaceDto>

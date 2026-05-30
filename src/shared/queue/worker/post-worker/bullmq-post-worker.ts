@@ -7,7 +7,7 @@ import { JitterUtils, RetryUtils, type RetryableError } from '../../utils/jitter
 import { PlatformRateLimiter } from '../../utils/rate-limiter'
 
 import type { IPostWorker } from './post-worker.interface'
-import type { ISocialMediaPostSenderService } from '@/modules/social/services/social-media-post-sender.interface'
+import type { ISocialMediaPostSenderService } from '@/modules/social/services/social-media-post-sender/social-media-post-sender.interface'
 import type { PostPlatform } from '@/modules/post/schemas/posts.schemas'
 
 export class BullMqPostWorker implements IPostWorker {

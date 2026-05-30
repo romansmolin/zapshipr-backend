@@ -15,10 +15,10 @@ import type {
     PostCreateQueuedResponse,
     PostPreparationJobPayload,
 } from './posts-service.interface'
-import type { IPostMediaService } from './post-media-service.interface'
-import type { IPostSchedulingService } from './post-scheduling-service.interface'
+import type { IPostMediaService } from '../post-media/post-media-service.interface'
+import type { IPostSchedulingService } from '../post-scheduling/post-scheduling-service.interface'
 import type { IPostsRepository } from '@/modules/post/repositories/posts-repository.interface'
-import type { ISocialMediaPostSenderService } from '@/modules/social/services/social-media-post-sender.interface'
+import type { ISocialMediaPostSenderService } from '@/modules/social/services/social-media-post-sender/social-media-post-sender.interface'
 import type {
     CreatePostsRequest,
     PresignUploadFileRequest,
